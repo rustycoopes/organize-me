@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** 2026-06-30  
-**Status:** Draft — awaiting sign-off before implementation begins
+**Status:** Approved — implementation decisions that supersede this document are in `docs/implementation-plan.md`
 
 ---
 
@@ -16,7 +16,7 @@
 | Database | PostgreSQL via Supabase (free hosted) |
 | ORM / migrations | SQLAlchemy 2.0 async + Alembic |
 | Background jobs | Celery + Upstash Redis |
-| File-watch scheduler | GCP Cloud Scheduler → Cloud Run Job |
+| File-watch scheduler | GCP Cloud Scheduler → POST /internal/trigger-scan (every 15 min) |
 | Real-time pipeline UI | SSE via sse-starlette + HTMX SSE extension |
 | Auth | FastAPI-Users (email/password + Google OAuth) |
 | LLM | google-genai SDK (Gemini) |
@@ -24,7 +24,7 @@
 | Email notifications | Resend (3 000 emails/month free) |
 | SMS notifications | Twilio (~$0.008/message — paid) |
 | Testing | pytest + httpx + pytest-asyncio + factory_boy |
-| Containerisation | Docker + Docker Compose (dev) / Dockerfile (prod) |
+| Containerisation | Dockerfile + supervisord (app + Celery worker in one container) |
 | CI/CD | GitHub Actions |
 | Deployment | GCP Cloud Run (app + workers) |
 | Secrets | GCP Secret Manager |
@@ -92,7 +92,7 @@ The app has two async concerns:
 **Architecture:**
 
 ```
-Cloud Scheduler (every 5 min)
+Cloud Scheduler (every 15 min)
   → POST /internal/trigger-scan (Cloud Run)
     → Celery task: scan each user's storage, enqueue FileProcess tasks
       → Celery worker: 7-step pipeline → SSE updates → DB write → notify
@@ -256,73 +256,19 @@ as GitHub Actions secrets.
 
 ## Prerequisites Checklist
 
-The following must be provisioned before development begins or CI/CD can run end-to-end.
-
-### GitHub
-- [ ] Repository created with branch protection on `main` (require PR + passing CI)
-- [ ] GitHub Projects board created for issue tracking
-- [ ] GitHub Actions secrets configured (added progressively as services are provisioned)
-
-### GCP
-- [ ] GCP project created (e.g. `organize-me`)
-- [ ] Billing account linked (required even for free-tier resources)
-- [ ] APIs enabled: Cloud Run, Cloud Scheduler, Artifact Registry, Secret Manager, Cloud Build, Cloud Logging
-- [ ] Service account created for GitHub Actions with roles: `Artifact Registry Writer`, `Cloud Run Developer`, `Secret Manager Secret Accessor`
-- [ ] Service account JSON key downloaded and stored as GitHub Actions secret `GCP_SA_KEY`
-- [ ] Two Cloud Run services provisioned: `organize-me-qa`, `organize-me-prod`
-- [ ] Cloud Scheduler job created (POST to `/internal/trigger-scan` every 5 minutes)
-- [ ] Artifact Registry repository created (e.g. `organize-me`)
-
-### Supabase
-- [ ] Account created at supabase.com
-- [ ] Two projects created: `organize-me-qa`, `organize-me-prod`
-- [ ] Connection strings (PostgreSQL) noted for GitHub Actions secrets and local `.env`
-
-### Upstash Redis
-- [ ] Account created at upstash.com
-- [ ] Redis database created; connection URL noted
-
-### Gemini
-- [ ] API key generated in Google AI Studio (aistudio.google.com)
-- [ ] Confirm free tier quota (15 RPM / 1 500 req/day) is sufficient for expected volume
-
-### Resend
-- [ ] Account created at resend.com
-- [ ] Domain verified for sending (or use sandbox for initial development)
-- [ ] API key generated
-
-### Twilio
-- [ ] Account created at twilio.com (trial credit ~$15 available)
-- [ ] Phone number purchased or trial number used
-- [ ] Account SID + Auth Token noted
-
-### Local development
-- [ ] Python 3.12 installed
-- [ ] Docker Desktop installed (for local Postgres + Redis via Docker Compose)
-- [ ] `pyproject.toml` scaffold created (FastAPI, Pydantic, SQLAlchemy, Celery, etc.)
-- [ ] `docker-compose.yml` with PostgreSQL + Redis services
-- [ ] `.env.local` file created with all keys (confirmed in `.gitignore`)
-- [ ] `mypy.ini` with `strict = true`
-- [ ] `pytest.ini` / `pyproject.toml` test config pointing at test database
+> Moved to [`docs/implementation-plan.md`](implementation-plan.md#prerequisites-before-slice-1-begins) — that version reflects the confirmed infrastructure decisions (no local Docker Compose; Supabase QA + Upstash Redis accessed directly via `.env.local`).
 
 ---
 
 ## Reference Fixtures
 
-The following example files in `examples/` are canonical for testing and LLM prompt tuning:
-
-- `examples/example.whatsapp.txt` — 630-line real WhatsApp conversation (input format)
-- `examples/example.lmmoutput.txt` — 22 extracted events in JSON (expected pipeline output)
-
-The end-to-end integration test uploads `example.whatsapp.txt`, runs the full pipeline with the
-real Gemini API, and asserts that the resulting dashboard rows match `example.lmmoutput.txt`.
-All other pipeline tests stub the Gemini call and return the example output directly.
+> See [`docs/implementation-plan.md`](implementation-plan.md#reference-fixtures) for canonical fixture details and their role in the test suite.
 
 ---
 
 ## Key Implementation Notes
 
-- **Dev/prod parity**: Docker Compose runs PostgreSQL + Redis locally, matching Cloud Run exactly. No SQLite shortcuts.
+- **Dev/prod parity**: Local dev connects directly to Supabase QA + Upstash Redis via `.env.local`. No local Docker for external services.
 - **Strict typing throughout**: `mypy --strict` in CI; Pydantic v2 validates all API I/O and LLM responses at runtime.
 - **Storage provider abstraction**: `StorageProvider` ABC with injectable fakes — storage tests never hit live credentials.
 - **Celery eager mode in tests**: `CELERY_TASK_ALWAYS_EAGER = True` makes pipeline tasks run synchronously in the test process.

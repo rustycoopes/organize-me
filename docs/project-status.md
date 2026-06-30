@@ -15,18 +15,18 @@
 | 2026-06-30 | 34-question requirements grilling session completed |
 | 2026-06-30 | `docs/prd.md` written — full user requirements captured |
 | 2026-06-30 | `docs/technical-approach.md` written — full stack and infrastructure decisions |
-| 2026-06-30 | `docs/slice-1-plan.md` written — implementation design spec, 9 vertical slices defined |
+| 2026-06-30 | `docs/implementation-plan.md` written — implementation design spec, 9 vertical slices defined |
 
 ## Next Steps
 
-1. **Provision prerequisites** — GCP project, Supabase, Upstash Redis, Resend, Twilio, Google OAuth app (see checklist in `docs/slice-1-plan.md`)
+1. **Provision prerequisites** — GCP project, Supabase, Upstash Redis, Resend, Twilio, Google OAuth app (see checklist in `docs/implementation-plan.md`)
 2. **Slice 1** — Project scaffold + Auth + CI/CD (FastAPI app, FastAPI-Users, landing page, login/register/profile, GitHub Actions, Cloud Run deploy)
 3. **Slice 2** — Google Drive storage integration
 4. **Slice 3** — LLM Prompt page
 
 ## Open Decisions
 
-- None — all design questions resolved in `docs/slice-1-plan.md`
+- None — all design questions resolved in `docs/implementation-plan.md`
 
 ## Known Constraints
 
