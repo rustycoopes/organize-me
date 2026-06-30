@@ -98,7 +98,7 @@ Anyone who coordinates logistics, agreements, or commitments over chat — co-pa
 | Document | Description |
 |----------|-------------|
 | [PRD](docs/prd.md) | Full product requirements and user stories |
-| [Tech Design](docs/tech-design.md) | Architecture, stack, and infrastructure decisions |
+| [Technical Approach](docs/technical-approach.md) | Stack selection, infrastructure, CI/CD, cost summary, and prerequisites checklist |
 | [Changelog](docs/changelog.md) | Release history |
 | [Project Status](docs/project-status.md) | Current phase and next steps |
 
@@ -115,4 +115,4 @@ The `examples/` folder contains reference files used for development and testing
 
 ## Status
 
-**Pre-development** — requirements complete, tech design in progress. See [Project Status](docs/project-status.md).
+**Pre-development** — requirements complete, technical approach decided. Ready for development kickoff. See [Project Status](docs/project-status.md).

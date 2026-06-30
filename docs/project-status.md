@@ -6,7 +6,8 @@
 
 ## Current Phase
 
-**Requirements gathering complete.** PRD written and ready for review.
+**Technical approach decided.** Stack selected, infrastructure planned, prerequisites defined.
+Ready for development kickoff.
 
 ## Completed Milestones
 
@@ -14,18 +15,17 @@
 |------|-----------|
 | 2026-06-30 | 34-question requirements grilling session completed |
 | 2026-06-30 | `docs/prd.md` written — full user requirements captured |
+| 2026-06-30 | `docs/technical-approach.md` written — full stack and infrastructure decisions |
 
 ## Next Steps
 
-1. **Tech Design** — architecture, stack selection, infrastructure decisions (`docs/tech-design.md`)
-2. **Stakeholder review** of `docs/prd.md`
-3. **Development kickoff** — branch strategy, initial scaffold
+1. **Provision prerequisites** — GCP project, Supabase, Upstash Redis, Resend, Twilio (see checklist in `docs/technical-approach.md`)
+2. **Project scaffold** — `pyproject.toml`, Docker Compose, Alembic, GitHub Actions workflows
+3. **Development kickoff** — first feature branch, TDD from the pipeline inward
 
 ## Open Decisions
 
-- Stack / framework selection (deferred to tech design)
 - LLM prompt initial content / starting template
-- Hosting / deployment target
 - Admin panel (deferred, out of scope for v1)
 
 ## Known Constraints

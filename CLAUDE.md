@@ -44,7 +44,7 @@ This repository is currently empty. Update this file as the project is built out
 
 \- \[ChangeLog] (docs/changelog.md)
 
-\- \[Tech Design] (docs/tech-design.md)
+\- \[Technical Approach] (docs/technical-approach.md)
 
 \- \[PRD] (docs/prd.md) 
 
