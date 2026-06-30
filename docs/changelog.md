@@ -5,6 +5,22 @@
 ## [Unreleased]
 
 ### Added
+- `docs/slice-1-plan.md` — full implementation design spec: confirmed stack decisions, complete
+  database schema (5 tables), API endpoint map (21 endpoints), 9 vertical implementation slices,
+  key utilities, testing approach, and prerequisites checklist. Produced from structured Q&A
+  session resolving all open design questions (component library, auth session length, storage
+  provider build order, pagination, sort defaults, pipeline failure handling, notifications
+  styling, onboarding steps, and more).
+
+### Changed
+- `docs/project-status.md` — updated phase, milestones, open decisions, and next steps to
+  reflect completion of implementation planning
+
+---
+
+## 2026-06-30
+
+### Added
 - `docs/technical-approach.md` — full technology stack evaluation: backend framework, frontend
   rendering strategy, database, background jobs, real-time pipeline progress, auth, notifications,
   deployment architecture (GCP Cloud Run), CI/CD pipeline, cost summary, and prerequisites

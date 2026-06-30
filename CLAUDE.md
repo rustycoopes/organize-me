@@ -38,6 +38,14 @@ This repository is currently empty. Update this file as the project is built out
 
 
 
+\## GitHub Issues
+
+\- When creating GitHub issues, always use the **OrganizeMe** project within GitHub (the GitHub Projects board linked to this repository).
+
+\- Assign issues to the OrganizeMe project when creating them via `gh issue create`.
+
+
+
 \## Documentation
 
 \- \[README] (README.md) — project overview, setup, and run instructions; keep this accurate after every change
