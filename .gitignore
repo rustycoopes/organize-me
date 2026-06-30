@@ -2,6 +2,9 @@
 .env
 .env.local
 .env.*.local
+github-sa-key.json
+*.json.key
+service-account*.json
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
