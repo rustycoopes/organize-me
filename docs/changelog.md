@@ -5,6 +5,11 @@
 ## [Unreleased]
 
 ### Added
+- GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
+  independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
+  CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),
+  forgot/reset password (#14), profile + dark mode + account deletion (#15), landing page (#16),
+  sidebar shell (#17). See `docs/implementation-plan.md` § Slice 1 for the source scope.
 - `docs/slice-1-plan.md` — full implementation design spec: confirmed stack decisions, complete
   database schema (5 tables), API endpoint map (21 endpoints), 9 vertical implementation slices,
   key utilities, testing approach, and prerequisites checklist. Produced from structured Q&A
