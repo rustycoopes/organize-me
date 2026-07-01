@@ -11,8 +11,39 @@ service-account*.json
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .venv/
+venv/
+ENV/
+.Python
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / coverage / type-check caches
 .pytest_cache/
 .mypy_cache/
-*.egg-info/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+htmlcov/
+.tox/
+.nox/
+
+# Celery runtime
+celerybeat-schedule
+celerybeat.pid
+
+# Jupyter (if used for exploration)
+.ipynb_checkpoints/
