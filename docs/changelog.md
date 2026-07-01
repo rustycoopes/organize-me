@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Post-merge prod deploy hotfixes** (direct to `main`, after PR #19 merged): `alembic upgrade
+  head` failed in CI with `ValueError: invalid interpolation syntax` — Alembic's `env.py` routed
+  `DATABASE_URL` through `config.set_main_option()`/`async_engine_from_config()`, both backed by
+  Python's `configparser`, whose `BasicInterpolation` treats a literal `%` (present in the real
+  `SUPABASE_QA_URL` secret's percent-encoded password) as an interpolation reference. Fixed by
+  bypassing configparser storage entirely and passing the URL straight to `create_async_engine`.
+  Separately, `deploy.yml`'s prod deploy gate then failed with `OSError: Network is unreachable`
+  — the `SUPABASE_PROD_URL` secret still used Supabase's IPv6-only direct-connection host, same
+  as `SUPABASE_QA_URL` had; updated to the Session/Transaction Pooler URL. Prod's pooler runs in
+  transaction mode (port 6543, vs QA's session mode on 5432), which breaks asyncpg's default
+  prepared-statement cache under PgBouncer — every async engine construction in the repo
+  (`app/db/session.py`, `migrations/env.py`, `tests/conftest.py`) now passes
+  `connect_args={"statement_cache_size": 0}` to work around it. `test` and `deploy-prod` are now
+  green on `main`; prod `/health` confirmed live.
+
 ### Added
 - **Issue #10 implemented** — project scaffold + CI/CD pipeline (branch `feature/slice-1-scaffold-cicd`):
   - `pyproject.toml` (uv-managed), FastAPI app skeleton (`app/main.py`) with `GET /health`,
