@@ -85,6 +85,47 @@ Anyone who coordinates logistics, agreements, or commitments over chat — co-pa
 
 ---
 
+## Development
+
+**Stack:** Python 3.12 + FastAPI, managed with [uv](https://docs.astral.sh/uv/). See [Technical Approach](docs/technical-approach.md) for the full stack.
+
+### Setup
+
+```bash
+uv sync --group dev          # install runtime + dev dependencies into .venv
+cp .env.local.example .env.local   # fill in real values (never commit .env.local)
+```
+
+### Run locally
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+The app serves `GET /health` for a liveness check. Local dev connects directly to the Supabase QA database and Upstash Redis via `.env.local` — no local Docker required for either.
+
+### Test & type-check
+
+```bash
+uv run pytest
+uv run mypy app tests
+```
+
+### Docker
+
+```bash
+docker build -t organize-me .
+docker run --env-file .env.local -p 8000:8000 organize-me
+```
+
+The container runs the FastAPI app and the Celery worker as separate processes under `supervisord`.
+
+### CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy --strict`, then build and push the Docker image to Artifact Registry and deploy to Cloud Run — QA on every PR, prod on merge to `main`.
+
+---
+
 ## Security
 
 - All personal data and conversation content is encrypted at rest
@@ -115,4 +156,4 @@ The `examples/` folder contains reference files used for development and testing
 
 ## Status
 
-**Pre-development** — requirements complete, technical approach decided. Ready for development kickoff. See [Project Status](docs/project-status.md).
+**In development** — Slice 1 (project scaffold, auth, CI/CD) underway. See [Project Status](docs/project-status.md).

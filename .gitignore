@@ -8,3 +8,11 @@ service-account*.json
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/

@@ -1,12 +1,12 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-06-30
+**Last updated:** 2026-07-01
 
 ---
 
 ## Current Phase
 
-**Slice 1 issues published — implementation starting.** All Slice 1 prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17) and published to the OrganizeMe project. Ready to implement, starting with #10.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issue #10 (project scaffold + CI/CD) implemented on branch `feature/slice-1-scaffold-cicd`, not yet merged. Next up: #11.
 
 ## Completed Milestones
 
@@ -18,11 +18,12 @@
 | 2026-06-30 | `docs/implementation-plan.md` written — implementation design spec, 9 vertical slices defined |
 | 2026-06-30 | Slice 1 prerequisites provisioned — GCP, Cloud Run (QA + prod), Artifact Registry, Supabase, Upstash Redis, Google OAuth app, Resend, Twilio, Gemini key (issues #1–#9) |
 | 2026-07-01 | Slice 1 broken into 8 TDD-ready issues (#10–#17) and published to the OrganizeMe project |
+| 2026-07-01 | Issue #10 (project scaffold + CI/CD) implemented — FastAPI skeleton, Docker + supervisord, GitHub Actions ci.yml/deploy.yml — on branch `feature/slice-1-scaffold-cicd` |
 
 ## Next Steps
 
 1. **Implement Slice 1, in order:**
-   - #10 Project scaffold + CI/CD pipeline
+   - #10 Project scaffold + CI/CD pipeline — ✅ implemented, pending merge
    - #11 DB foundation — Supabase connection + `users` table
    - #12 Email/password auth — register, login, logout
    - #13 Google OAuth login
