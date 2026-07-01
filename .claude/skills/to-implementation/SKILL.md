@@ -24,4 +24,4 @@ Once done, use /review to review the work.
 
 After the implementation, ensure all changes are commited to local git using a meaningful message. 
 
-Commit all outstanding changes to GitHub with a meaningful message. Push the changes to remote. Mark the issue as completed and add the branch into the comments. Then raise a PR to merge this all into main. Make sure that the Git Hub build completes correctly and any deployment is successful.
+Commit all outstanding changes to GitHub with a meaningful message. Push the changes to remote. Mark the issue as done and add the branch into the comments. Then raise a PR to merge this all into main. Make sure that the Git Hub build completes correctly and any deployment is successful.
