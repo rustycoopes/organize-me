@@ -3,7 +3,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from app.core.config import get_settings
@@ -20,16 +20,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# DATABASE_URL comes from the app's own Settings (.env.local / real env vars),
-# not from alembic.ini, so no credentials are ever committed to the repo.
-config.set_main_option("sqlalchemy.url", to_asyncpg_url(get_settings().database_url))
-
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# DATABASE_URL comes from the app's own Settings (.env.local / real env vars), not from
+# alembic.ini, so no credentials are ever committed to the repo. Kept as a plain Python string
+# (never passed through config.set_main_option/get_section) because those go through
+# configparser, whose BasicInterpolation treats a literal `%` in the value (e.g. a
+# percent-encoded character in a real password) as the start of an interpolation reference and
+# raises ValueError.
+DATABASE_URL = to_asyncpg_url(get_settings().database_url)
 
 
 def run_migrations_offline() -> None:
@@ -44,9 +43,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -69,11 +67,7 @@ async def run_async_migrations() -> None:
 
     """
 
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_async_engine(DATABASE_URL, poolclass=pool.NullPool)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
