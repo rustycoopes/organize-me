@@ -1,12 +1,12 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-06-30
+**Last updated:** 2026-07-01
 
 ---
 
 ## Current Phase
 
-**Implementation planning complete.** All design decisions locked. 9 vertical implementation slices defined with full DB schema, API map, and testing strategy. Ready to begin Slice 1.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issue #10 (project scaffold + CI/CD) implemented on branch `feature/slice-1-scaffold-cicd`, not yet merged. Next up: #11.
 
 ## Completed Milestones
 
@@ -16,13 +16,23 @@
 | 2026-06-30 | `docs/prd.md` written — full user requirements captured |
 | 2026-06-30 | `docs/technical-approach.md` written — full stack and infrastructure decisions |
 | 2026-06-30 | `docs/implementation-plan.md` written — implementation design spec, 9 vertical slices defined |
+| 2026-06-30 | Slice 1 prerequisites provisioned — GCP, Cloud Run (QA + prod), Artifact Registry, Supabase, Upstash Redis, Google OAuth app, Resend, Twilio, Gemini key (issues #1–#9) |
+| 2026-07-01 | Slice 1 broken into 8 TDD-ready issues (#10–#17) and published to the OrganizeMe project |
+| 2026-07-01 | Issue #10 (project scaffold + CI/CD) implemented — FastAPI skeleton, Docker + supervisord, GitHub Actions ci.yml/deploy.yml — on branch `feature/slice-1-scaffold-cicd` |
 
 ## Next Steps
 
-1. **Provision prerequisites** — GCP project, Supabase, Upstash Redis, Resend, Twilio, Google OAuth app (see checklist in `docs/implementation-plan.md`)
-2. **Slice 1** — Project scaffold + Auth + CI/CD (FastAPI app, FastAPI-Users, landing page, login/register/profile, GitHub Actions, Cloud Run deploy)
-3. **Slice 2** — Google Drive storage integration
-4. **Slice 3** — LLM Prompt page
+1. **Implement Slice 1, in order:**
+   - #10 Project scaffold + CI/CD pipeline — ✅ implemented, pending merge
+   - #11 DB foundation — Supabase connection + `users` table
+   - #12 Email/password auth — register, login, logout
+   - #13 Google OAuth login
+   - #14 Forgot / reset password
+   - #15 Profile — view/edit, dark mode, account deletion
+   - #16 Landing page
+   - #17 Sidebar shell + placeholder pages
+2. **Slice 2** — Google Drive storage integration
+3. **Slice 3** — LLM Prompt page
 
 ## Open Decisions
 
