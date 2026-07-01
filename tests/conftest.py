@@ -22,7 +22,10 @@ from app.db.url import to_asyncpg_url
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(to_asyncpg_url(get_settings().database_url))
+    engine = create_async_engine(
+        to_asyncpg_url(get_settings().database_url),
+        connect_args={"statement_cache_size": 0},
+    )
     try:
         async with engine.connect() as connection:
             transaction = await connection.begin()
