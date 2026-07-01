@@ -9,6 +9,11 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.12",
     "celery[redis]>=5.4",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.31.0",
+    "alembic>=1.18.5",
+    "fastapi-users-db-sqlalchemy>=7.0.0",
+    "pydantic-settings>=2.14.2",
 ]
 
 [dependency-groups]

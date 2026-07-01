@@ -12,6 +12,11 @@ BASE_DIR = Path(__file__).resolve().parent
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
+    # Imported here, not at module level, so importing app.main (e.g. for /health tests that
+    # never touch the DB) doesn't force DATABASE_URL/Settings to be resolved at import time.
+    from app.db.session import engine
+
+    await engine.dispose()
 
 
 app = FastAPI(title="OrganizeMe", lifespan=lifespan)
