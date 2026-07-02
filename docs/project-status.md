@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, PR pending. Next up: merge #15, then #16.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), #14 (forgot/reset password, PR #21), and #15 (profile — view/edit, dark mode, account deletion, PR #24) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), `/forgot-password`/`/reset-password`, `/profile`, and `/api/v1/users/me` are confirmed live on both Cloud Run services. Issue #16 (landing page) implemented on branch `feature/slice-1-landing-page`, PR pending. Next up: merge #16, then #17.
 
 ## Completed Milestones
 
@@ -25,7 +25,8 @@
 | 2026-07-02 | Issue #13 (Google OAuth login) implemented on branch `feature/slice-1-google-oauth` — `httpx-oauth`, `OAuthAccount` table/migration, custom redirect-based `GET /api/v1/auth/google` + `/callback` (fastapi-users' built-in OAuth router returns JSON, not a redirect), signed-JWT + double-submit-cookie CSRF state, account linking by email, Google sign-in buttons on login/register pages. Multi-agent code review (8 finder angles + verification) caught and fixed three real bugs: unhandled Google token/profile exchange failures surfacing as raw 500s, an unguarded `IntegrityError` race on concurrent first-time Google logins, and a `TypeError` crash from comparing a non-ASCII CSRF cookie value. Built in an isolated git worktree after discovering another session was concurrently using the shared working directory for issue #14. Merged into `main` (PR #22); `deploy.yml` green and prod `/health`, `/api/v1/auth/google` (redirects to Google's real consent screen with the correct `client_id`/`redirect_uri`) confirmed live |
 | 2026-07-02 | Issue #13 merging to `main` stamped the shared Supabase QA database's Alembic revision ahead of issue #14's branch (still checked out in the primary working directory, not a worktree), breaking #14's CI `alembic upgrade head` step with `Can't locate revision`. Resolved by merging `main` into `feature/slice-1-forgot-reset-password` once #13 landed |
 | 2026-07-02 | Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` — `POST /api/v1/auth/forgot-password` + `/reset-password`, DaisyUI forgot/reset-password pages, and `app/services/notifications/email.py` (`EmailSender` protocol, `ResendEmailSender`, `FakeEmailSender`) — the first cut of the email interface Slice 7 (Notifications) will reuse. Proactively wired `RESEND_API_KEY` into both `ci.yml`/`deploy.yml` Cloud Run env-vars (closing the same "secret exists but isn't wired to the running service" gap class that bit #10 and #12) instead of discovering it post-merge |
-| 2026-07-02 | Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, built in an isolated worktree with two parallel agents (backend endpoints, frontend page/template) working disjoint file sets. `PATCH`/`DELETE /api/v1/users/me` added; `GET /profile` is the app's first authenticated page route; Alpine.js introduced (named in `docs/technical-approach.md` since #10, never wired in until now) for the dark/light toggle and delete-confirm modal; `base.html`'s theme is now server-rendered from the user's persisted preference. A TDD test written specifically because issue #15's own comment thread asked for it (confirming the `oauth_accounts` cascade-delete) caught a real ORM bug — `passive_deletes="all"` added to `User.oauth_accounts`. Multi-agent code review before commit caught two further real bugs (explicit `{"email": null}`/`{"dark_mode": null}` PATCH bodies bypassed validation and hit the DB's NOT NULL constraint, mislabeled as an email conflict; a delete-failure path tried to close the confirm modal via a variable never wired to it) — both fixed pre-merge. See `docs/changelog.md` for full detail |
+| 2026-07-02 | Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, built in an isolated worktree with two parallel agents (backend endpoints, frontend page/template) working disjoint file sets. `PATCH`/`DELETE /api/v1/users/me` added; `GET /profile` is the app's first authenticated page route; Alpine.js introduced (named in `docs/technical-approach.md` since #10, never wired in until now) for the dark/light toggle and delete-confirm modal; `base.html`'s theme is now server-rendered from the user's persisted preference. A TDD test written specifically because issue #15's own comment thread asked for it (confirming the `oauth_accounts` cascade-delete) caught a real ORM bug — `passive_deletes="all"` added to `User.oauth_accounts`. Multi-agent code review before commit caught two further real bugs (explicit `{"email": null}`/`{"dark_mode": null}` PATCH bodies bypassed validation and hit the DB's NOT NULL constraint, mislabeled as an email conflict; a delete-failure path tried to close the confirm modal via a variable never wired to it) — both fixed pre-merge. Merged into `main` (PR #24); `deploy.yml` green and prod `/profile`, `/api/v1/users/me` confirmed live. See `docs/changelog.md` for full detail |
+| 2026-07-02 | Issue #16 (landing page) implemented on branch `feature/slice-1-landing-page` — `GET /` (public, no auth) renders a DaisyUI hero/features/CTA landing page with nav links to `/login`/`/register`; added a reusable `{% block head %}` extension point to `base.html` (used here for a meta description, available to future pages). Small enough in scope to implement directly rather than dispatch multiple agents. 5 improvements applied after comparing against issue #16's acceptance criteria: a meta description tag, a second CTA path (login) for returning visitors, broadened test coverage confirming the hero's CTA (not just the dedicated CTA section) links to `/register`, a nav-links-present test, and a regression test that `/login`/`/register` actually resolve to 200 (guards against a typo'd `href` silently breaking navigation) |
 
 ## Next Steps
 
@@ -35,8 +36,8 @@
    - #12 Email/password auth — register, login, logout — ✅ merged
    - #13 Google OAuth login — ✅ merged
    - #14 Forgot / reset password — ✅ merged
-   - #15 Profile — view/edit, dark mode, account deletion — ✅ implemented, PR pending
-   - #16 Landing page
+   - #15 Profile — view/edit, dark mode, account deletion — ✅ merged
+   - #16 Landing page — ✅ implemented, PR pending
    - #17 Sidebar shell + placeholder pages
 2. **Slice 2** — Google Drive storage integration
 3. **Slice 3** — LLM Prompt page
@@ -105,6 +106,30 @@ scope), flagged here for a deliberate decision before or during the slice that w
     default, which likely satisfies this, but no explicit decision has been recorded confirming
     that's sufficient versus requiring column-level encryption for PII specifically — worth settling
     before Slice 2+ adds more PII (SMS numbers, storage credentials).
+
+Surfaced comparing issue #16's implementation against `docs/prd.md`; not implemented (out of #16's
+scope), flagged here for a deliberate decision before or during the slice that would own each one.
+
+11. **No Open Graph / social-preview meta tags.** PRD story #50 wants "a clear, structured
+    introduction to the product" for visitors; a link to `/` shared on social media or in a chat
+    (ironically, exactly the kind of message OrganizeMe itself processes) currently renders as a bare
+    URL with no preview card. Worth adding `og:title`/`og:description`/`og:image` once there's a
+    product screenshot or logo asset to point `og:image` at.
+12. **No `robots.txt` / sitemap / SEO discoverability decision.** The PRD doesn't mention search
+    discoverability at all, and no explicit decision has been made on whether this product wants to
+    be indexed by search engines pre-launch. Worth a deliberate call rather than defaulting to
+    whatever crawlers do with an unconfigured site.
+13. **No footer with privacy policy / terms of service links.** PRD stories #51/#52 (Security & Data
+    Privacy) imply data-handling commitments to users, but there's nowhere on the public site linking
+    to a privacy policy or terms of service — those pages don't exist yet either. Worth planning
+    before public self-registration launches for real users.
+14. **No favicon configured.** `base.html` (shared by every page, not just the landing page) has no
+    `<link rel="icon">` — browsers show a default blank tab icon. Minor, but it's the kind of
+    first-impression polish a public marketing page in particular should have.
+15. **Undecided behaviour for an already-authenticated visitor landing on `/`.** Right now every
+    visitor sees the marketing page regardless of session state. Once a dashboard exists (#17+),
+    worth deciding whether a logged-in user hitting `/` should see the marketing page (current
+    behaviour) or get redirected straight to their dashboard.
 
 ## Known Constraints
 

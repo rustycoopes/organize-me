@@ -14,6 +14,7 @@
     <!-- Alpine's x-cloak only works if the page supplies this rule itself; without it,
          x-cloak elements flash visibly for one frame before Alpine initializes. -->
     <style>[x-cloak] { display: none !important; }</style>
+    {% block head %}{% endblock %}
   </head>
   <body class="min-h-screen bg-base-200">
     {% block content %}{% endblock %}

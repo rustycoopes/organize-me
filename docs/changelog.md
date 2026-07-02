@@ -366,6 +366,31 @@
     duplicated four times across the auth templates, which #14's review named #15 itself as the
     right point to fix; deferred again here to avoid touching four already-shipped, tested
     templates outside this issue's scope
+- **Issue #16 implemented** — public landing page (branch `feature/slice-1-landing-page`):
+  - `GET /` (`app/pages/landing.py`) — no auth dependency, renders `app/templates/landing.html`: a
+    DaisyUI hero/features/CTA page (PRD story #50) with a top nav linking to `/login`/`/register`
+  - Added a `{% block head %}{% endblock %}` extension point to `base.html` — the first page-level
+    override of `<head>` content (used here for a meta description); every existing page keeps
+    rendering identically since an unoverridden Jinja block is simply empty
+  - Small enough in scope (one route, one template, no backend logic) to implement directly rather
+    than dispatch multiple parallel agents, unlike #13/#15
+  - Five improvements applied after comparing against issue #16's acceptance criteria: (1) a meta
+    description tag for the page that's actually the SEO/link-preview entry point to the whole
+    site; (2) a second CTA path (a "Log in" link inside the CTA section) for a visitor who already
+    has an account; (3) broadened the CTA-links-to-register test to also assert the hero section's
+    own button links there, not just the dedicated CTA section; (4) a test asserting the nav's
+    `/login`/`/register` links are present; (5)
+    `test_landing_page_nav_links_resolve_to_200` — actually requests `/login` and `/register` to
+    guard against a typo'd `href` silently breaking navigation, rather than only checking the
+    string is present
+  - Self-reviewed directly (no multi-agent `/code-review` dispatch) given the diff's size and
+    complexity — a handful of static HTML/route lines with no business logic; nothing survived
+    review
+  - 5 PRD-alignment suggestions recorded in `docs/project-status.md` (not implemented, out of
+    scope): no Open Graph/social-preview meta tags, no `robots.txt`/SEO discoverability decision,
+    no footer with privacy policy/terms-of-service links, no favicon configured on `base.html`, and
+    undecided behaviour for an already-authenticated visitor landing on `/` (relevant once #17+
+    builds a dashboard to redirect to)
 - GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),
