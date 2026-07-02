@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), and #12 (email/password auth) are implemented; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health` is confirmed live on both Cloud Run services. Next up: #13.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), and #12 (email/password auth, PR #20) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health` plus the new `/register`/`/login` pages are confirmed live on both Cloud Run services. Next up: #13.
 
 ## Completed Milestones
 
@@ -21,14 +21,14 @@
 | 2026-07-01 | Issue #10 (project scaffold + CI/CD) implemented — FastAPI skeleton, Docker + supervisord, GitHub Actions ci.yml/deploy.yml — on branch `feature/slice-1-scaffold-cicd` |
 | 2026-07-01 | Issue #11 (DB foundation — Supabase connection + `users` table) implemented — SQLAlchemy 2.0 async engine/session, Alembic async migrations, pydantic-settings config, transaction-rollback pytest fixture against real Supabase QA DB — on branch `feature/slice-1-db-foundation` |
 | 2026-07-01 | Issues #10 and #11 merged into `main` (PRs #18, #19). Post-merge, `deploy.yml`'s prod gate caught that the `SUPABASE_PROD_URL` secret still used Supabase's IPv6-only direct-connection host (same issue QA's secret had) and that prod's transaction-mode pooler needed asyncpg's prepared-statement cache disabled (`statement_cache_size=0`) — both fixed directly on `main`; `test` + `deploy-prod` are green and prod `/health` is confirmed live |
-| 2026-07-02 | Issue #12 (email/password auth — register/login/logout) implemented — FastAPI-Users v15, bcrypt password hashing, JWT-in-HTTPOnly-cookie (7-day expiry), DaisyUI register/login pages — on branch `feature/slice-1-auth-register-login`. Discovered and fixed a live-deployment gap: QA/prod Cloud Run services had zero environment variables wired in at all; added `JWT_SECRET_QA`/`JWT_SECRET_PROD` secrets and `--env-vars-file` deploy wiring for `DATABASE_URL`+`JWT_SECRET` |
+| 2026-07-02 | Issue #12 (email/password auth — register/login/logout) implemented — FastAPI-Users v15, bcrypt password hashing, JWT-in-HTTPOnly-cookie (7-day expiry), DaisyUI register/login pages. Discovered and fixed a live-deployment gap: QA/prod Cloud Run services had zero environment variables wired in at all; added `JWT_SECRET_QA`/`JWT_SECRET_PROD` secrets and `--env-vars-file` deploy wiring for `DATABASE_URL`+`JWT_SECRET`. Merged into `main` (PR #20); `deploy.yml` green and prod `/health`, `/register`, `/login` confirmed live |
 
 ## Next Steps
 
 1. **Implement Slice 1, in order:**
    - #10 Project scaffold + CI/CD pipeline — ✅ merged
    - #11 DB foundation — Supabase connection + `users` table — ✅ merged
-   - #12 Email/password auth — register, login, logout — ✅ implemented, PR pending
+   - #12 Email/password auth — register, login, logout — ✅ merged
    - #13 Google OAuth login
    - #14 Forgot / reset password
    - #15 Profile — view/edit, dark mode, account deletion
