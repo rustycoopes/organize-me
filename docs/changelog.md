@@ -299,6 +299,15 @@
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),
   forgot/reset password (#14), profile + dark mode + account deletion (#15), landing page (#16),
   sidebar shell (#17). See `docs/implementation-plan.md` § Slice 1 for the source scope.
+- GitHub issue #23 — Slice 1.8: automated Playwright E2E UX tests, added at the user's request to
+  validate Slice 1's overall delivery rather than just its individual pieces. Targets the deployed
+  QA Cloud Run instance via a new `e2e-qa` CI job (runs after `deploy-qa`, becomes a required check
+  going forward). Google OAuth is out of scope for E2E (unreliable to drive headlessly against
+  Google's real consent screen) and stays covered by #13's backend tests. Forgot/reset-password
+  is tested via a new debug-only `GET /api/v1/internal/e2e/last-reset-token` endpoint (gated by
+  `E2E_TEST_MODE`, wired to QA's Cloud Run env vars only, 404s when unset) instead of a real inbox
+  or mail-testing service. Blocked by #15/#16/#17 since it exercises profile, landing, and sidebar
+  pages those issues haven't built yet.
 - `docs/slice-1-plan.md` — full implementation design spec: confirmed stack decisions, complete
   database schema (5 tables), API endpoint map (21 endpoints), 9 vertical implementation slices,
   key utilities, testing approach, and prerequisites checklist. Produced from structured Q&A

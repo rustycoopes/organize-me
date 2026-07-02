@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Next up: #15.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17), plus a 9th (#23) added 2026-07-02 to validate the whole slice with automated Playwright E2E tests. Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Next up: #15.
 
 ## Completed Milestones
 
@@ -25,6 +25,7 @@
 | 2026-07-02 | Issue #13 (Google OAuth login) implemented on branch `feature/slice-1-google-oauth` — `httpx-oauth`, `OAuthAccount` table/migration, custom redirect-based `GET /api/v1/auth/google` + `/callback` (fastapi-users' built-in OAuth router returns JSON, not a redirect), signed-JWT + double-submit-cookie CSRF state, account linking by email, Google sign-in buttons on login/register pages. Multi-agent code review (8 finder angles + verification) caught and fixed three real bugs: unhandled Google token/profile exchange failures surfacing as raw 500s, an unguarded `IntegrityError` race on concurrent first-time Google logins, and a `TypeError` crash from comparing a non-ASCII CSRF cookie value. Built in an isolated git worktree after discovering another session was concurrently using the shared working directory for issue #14. Merged into `main` (PR #22); `deploy.yml` green and prod `/health`, `/api/v1/auth/google` (redirects to Google's real consent screen with the correct `client_id`/`redirect_uri`) confirmed live |
 | 2026-07-02 | Issue #13 merging to `main` stamped the shared Supabase QA database's Alembic revision ahead of issue #14's branch (still checked out in the primary working directory, not a worktree), breaking #14's CI `alembic upgrade head` step with `Can't locate revision`. Resolved by merging `main` into `feature/slice-1-forgot-reset-password` once #13 landed |
 | 2026-07-02 | Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` — `POST /api/v1/auth/forgot-password` + `/reset-password`, DaisyUI forgot/reset-password pages, and `app/services/notifications/email.py` (`EmailSender` protocol, `ResendEmailSender`, `FakeEmailSender`) — the first cut of the email interface Slice 7 (Notifications) will reuse. Proactively wired `RESEND_API_KEY` into both `ci.yml`/`deploy.yml` Cloud Run env-vars (closing the same "secret exists but isn't wired to the running service" gap class that bit #10 and #12) instead of discovering it post-merge |
+| 2026-07-02 | Added issue #23 (Slice 1.8: automated Playwright E2E tests) to validate Slice 1's overall UX delivery against the deployed QA Cloud Run instance, at the user's request. Decided with the user: tests target the real QA deploy (new `e2e-qa` CI job after `deploy-qa`, becomes a required check going forward); Google OAuth is excluded from E2E (unreliable to drive headlessly) and stays on backend tests only; the forgot/reset-password flow uses a new debug-only `/api/v1/internal/e2e/last-reset-token` endpoint (gated by `E2E_TEST_MODE`, QA-only) instead of a real inbox. Blocked by #15/#16/#17 since it exercises profile, landing, and sidebar pages that don't exist yet |
 
 ## Next Steps
 
@@ -37,6 +38,7 @@
    - #15 Profile — view/edit, dark mode, account deletion
    - #16 Landing page
    - #17 Sidebar shell + placeholder pages
+   - #23 Automated E2E UX tests (Playwright, against QA deploy) — validates the full slice; blocked by #15–#17
 2. **Slice 2** — Google Drive storage integration
 3. **Slice 3** — LLM Prompt page
 

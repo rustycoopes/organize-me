@@ -228,6 +228,7 @@ All under `/api/v1/`:
 - Sidebar shell (all nav items present but links to placeholder pages)
 - GitHub Actions `ci.yml` + `deploy.yml`
 - GCP Cloud Run services (QA + prod), Artifact Registry, Secret Manager secrets
+- Playwright E2E suite validating the full slice against the deployed QA instance (`e2e-qa` CI job)
 
 ---
 
@@ -354,7 +355,7 @@ All under `/api/v1/`:
 - **Storage provider tests**: inject `FakeStorageProvider` (implements ABC) — never hit live credentials
 - **Notification tests**: stub Resend + Twilio at delivery boundary; assert payloads
 - **End-to-end pipeline test** (one real Gemini call): upload `examples/example.whatsapp.txt`, run full pipeline, assert dashboard rows match `examples/example.lmmoutput.txt`
-- **Browser tests**: dark/light mode toggle persistence, notification toggles, storage config form conditional fields
+- **Browser tests (Playwright)**: a `e2e/` suite runs against the deployed QA Cloud Run instance (`e2e-qa` CI job, after `deploy-qa`) to validate each slice's overall UX delivery — e.g. Slice 1 covers landing page, register/login/logout, forgot/reset password, dark/light mode toggle persistence, profile edit, account deletion, and sidebar nav. Google OAuth is excluded (unreliable to drive headlessly against Google's real consent screen) and stays covered by backend tests. Later slices add their own Playwright specs to the same suite (e.g. storage config form conditional fields, notification toggles) rather than a separate one-off suite per slice.
 
 ---
 
