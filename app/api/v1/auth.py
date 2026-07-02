@@ -22,6 +22,12 @@ from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+# Same response body regardless of whether the email is registered, so the endpoint
+# doesn't leak account existence.
+FORGOT_PASSWORD_RESPONSE = {
+    "detail": "If that email address is registered, a password reset link has been sent."
+}
+
 # Anti-CSRF "state" for the Google OAuth flow: a short-lived signed JWT is embedded in the
 # state param sent to Google, and the same random value is set as an HTTPOnly cookie. Only
 # someone who both initiated /google (and thus received the cookie) and completed the redirect
@@ -97,6 +103,58 @@ async def login(
         await user_manager.user_db.update(user, {"hashed_password": updated_hash})
 
     return await auth_backend.login(strategy, user)
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: Request,
+    email: EmailStr = Form(...),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> dict[str, str]:
+    try:
+        user = await user_manager.get_by_email(email)
+    except exceptions.UserNotExists:
+        return FORGOT_PASSWORD_RESPONSE
+
+    try:
+        await user_manager.forgot_password(user, request)
+    except exceptions.UserInactive:
+        pass
+
+    return FORGOT_PASSWORD_RESPONSE
+
+
+@router.post("/reset-password")
+async def reset_password(
+    token: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> dict[str, str]:
+    if password != confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="RESET_PASSWORD_PASSWORD_MISMATCH"
+        )
+
+    try:
+        await user_manager.reset_password(token, password)
+    except (exceptions.InvalidResetPasswordToken, exceptions.UserNotExists):
+        # UserNotExists here means the account the token was issued for no longer exists (e.g.
+        # deleted between the forgot-password request and this one) - treated the same as an
+        # invalid token rather than surfaced as a distinct case, so this endpoint never reveals
+        # whether an account used to exist.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="RESET_PASSWORD_BAD_TOKEN")
+    except exceptions.UserInactive:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="RESET_PASSWORD_USER_INACTIVE"
+        )
+    except exceptions.InvalidPasswordException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "RESET_PASSWORD_INVALID_PASSWORD", "reason": exc.reason},
+        )
+
+    return {"detail": "Your password has been reset."}
 
 
 @router.post("/logout")
