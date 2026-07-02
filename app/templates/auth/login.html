@@ -4,17 +4,63 @@
 
 {% block content %}
 <div class="flex min-h-screen items-center justify-center px-4">
-  <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+  <div
+    class="card w-full max-w-sm bg-base-100 shadow-xl"
+    x-data="{
+      error: '',
+      info: '',
+      submitting: false,
+      init() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('error') === 'google_auth_failed') {
+          this.error = 'Google sign-in failed or was cancelled. Please try again.';
+        } else if (params.get('registered') === '1') {
+          this.info = 'Account created — please log in.';
+        }
+      },
+      async login(event) {
+        this.submitting = true;
+        this.error = '';
+        const formData = new FormData(event.target);
+        const email = formData.get('email');
+        if (typeof email === 'string') {
+          formData.set('email', email.trim());
+        }
+        try {
+          const response = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!response.ok) {
+            this.error = 'Incorrect email or password.';
+            return;
+          }
+          window.location.href = '/profile';
+        } catch (e) {
+          this.error = 'Could not log in. Please try again.';
+        } finally {
+          this.submitting = false;
+        }
+      },
+    }"
+  >
     <div class="card-body">
       <h1 class="card-title">Log in</h1>
 
-      {% if request.query_params.get('error') == 'google_auth_failed' %}
-      <div role="alert" class="alert alert-error mt-2">
-        <span>Google sign-in failed or was cancelled. Please try again.</span>
+      <div role="alert" aria-live="polite" class="alert alert-info mt-2" x-show="info" x-cloak>
+        <span x-text="info"></span>
       </div>
-      {% endif %}
 
-      <form method="post" action="/api/v1/auth/login" class="flex flex-col gap-4 mt-2">
+      <div role="alert" aria-live="polite" class="alert alert-error mt-2" x-show="error" x-cloak>
+        <span x-text="error"></span>
+      </div>
+
+      <form
+        method="post"
+        action="/api/v1/auth/login"
+        class="flex flex-col gap-4 mt-2"
+        @submit.prevent="login"
+      >
         <label class="form-control w-full">
           <div class="label"><span class="label-text">Email</span></div>
           <input
@@ -44,7 +90,10 @@
           />
         </label>
 
-        <button type="submit" class="btn btn-primary mt-2">Log in</button>
+        <button type="submit" class="btn btn-primary mt-2" :disabled="submitting">
+          <span x-show="!submitting">Log in</span>
+          <span x-show="submitting" x-cloak>Logging in...</span>
+        </button>
       </form>
 
       <div class="divider">OR</div>

@@ -35,6 +35,21 @@ async def test_register_with_malformed_email_returns_4xx_not_500(client: AsyncCl
     assert 400 <= response.status_code < 500
 
 
+async def test_register_with_malformed_email_returns_pydantic_validation_array_shape(
+    client: AsyncClient,
+) -> None:
+    # The register page's JS reads detail[0].msg from FastAPI's own 422 validation-error
+    # shape to show a specific message - see issue #26.
+    response = await client.post(
+        "/api/v1/auth/register", data={"email": "not-an-email", "password": "correct-horse-battery"}
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert isinstance(detail, list)
+    assert "msg" in detail[0]
+
+
 async def test_register_with_duplicate_email_returns_4xx(client: AsyncClient) -> None:
     email = unique_email()
     payload = {"email": email, "password": "correct-horse-battery"}
@@ -166,6 +181,76 @@ async def test_login_page_renders_daisyui_form_with_expected_fields(client: Asyn
     assert 'type="password"' in body
     assert 'action="/api/v1/auth/login"' in body
     assert "input-bordered" in body
+
+
+async def test_register_page_submits_via_js_and_auto_logs_in(client: AsyncClient) -> None:
+    response = await client.get("/register")
+
+    body = response.text
+    assert '@submit.prevent="register"' in body
+    # After a successful POST /register, the page's own JS must call /login with the same
+    # credentials (auto-login) rather than leaving the browser on the raw register JSON
+    # response - see issue #26.
+    assert "fetch('/api/v1/auth/register'" in body
+    assert "fetch('/api/v1/auth/login'" in body
+    assert "window.location.href = '/profile'" in body
+    assert 'x-show="error"' in body
+    # If auto-login unexpectedly fails after a successful registration, the user should land
+    # on /login with an explanation rather than silently.
+    assert "window.location.href = '/login?registered=1'" in body
+
+
+async def test_register_page_shows_google_auth_failed_via_alpine_init(client: AsyncClient) -> None:
+    response = await client.get("/register")
+
+    body = response.text
+    # The google_auth_failed banner is driven by Alpine's init() reading the query string
+    # client-side, not a server-rendered Jinja conditional - see issue #26.
+    assert "init()" in body
+    assert "google_auth_failed" in body
+    assert "{% if request.query_params.get" not in body
+
+
+async def test_login_page_submits_via_js_and_redirects_to_profile(client: AsyncClient) -> None:
+    response = await client.get("/login")
+
+    body = response.text
+    assert '@submit.prevent="login"' in body
+    assert "fetch('/api/v1/auth/login'" in body
+    assert "window.location.href = '/profile'" in body
+    assert 'x-show="error"' in body
+
+
+async def test_login_page_shows_registered_info_banner_via_alpine_init(client: AsyncClient) -> None:
+    response = await client.get("/login")
+
+    body = response.text
+    assert "init()" in body
+    assert "google_auth_failed" in body
+    assert "registered" in body
+    assert 'x-show="info"' in body
+    assert "{% if request.query_params.get" not in body
+
+
+async def test_register_page_trims_email_before_submit_and_alerts_are_accessible(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/register")
+
+    body = response.text
+    # A pasted/trailing-space email shouldn't produce a confusing 422 - see issue #26.
+    assert "email.trim()" in body
+    assert 'aria-live="polite"' in body
+
+
+async def test_login_page_trims_email_before_submit_and_alerts_are_accessible(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/login")
+
+    body = response.text
+    assert "email.trim()" in body
+    assert 'aria-live="polite"' in body
 
 
 def extract_reset_token(html: str) -> str:

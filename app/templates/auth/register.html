@@ -4,18 +4,80 @@
 
 {% block content %}
 <div class="flex min-h-screen items-center justify-center px-4">
-  <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+  <div
+    class="card w-full max-w-sm bg-base-100 shadow-xl"
+    x-data="{
+      error: '',
+      submitting: false,
+      init() {
+        if (new URLSearchParams(window.location.search).get('error') === 'google_auth_failed') {
+          this.error = 'Google sign-in failed or was cancelled. Please try again.';
+        }
+      },
+      async register(event) {
+        this.submitting = true;
+        this.error = '';
+        const formData = new FormData(event.target);
+        const email = formData.get('email');
+        if (typeof email === 'string') {
+          formData.set('email', email.trim());
+        }
+        try {
+          const registerResponse = await fetch('/api/v1/auth/register', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!registerResponse.ok) {
+            const data = await registerResponse.json().catch(() => ({}));
+            const detail = data.detail;
+            if (detail === 'REGISTER_USER_ALREADY_EXISTS') {
+              this.error = 'An account with that email already exists.';
+            } else if (detail && typeof detail === 'object' && !Array.isArray(detail) && detail.reason) {
+              this.error = detail.reason;
+            } else if (Array.isArray(detail) && detail[0] && detail[0].msg) {
+              // FastAPI's own 422 shape for a request that fails pydantic validation
+              // (e.g. a malformed email bypassing the input's own type="email" check).
+              this.error = detail[0].msg;
+            } else {
+              this.error = 'Could not create your account. Please try again.';
+            }
+            return;
+          }
+          // Register doesn't log the user in itself, so log in immediately after with the
+          // same credentials, matching the Google sign-up path's instant-login behaviour. If
+          // that unexpectedly fails, send them to /login with an explanation rather than
+          // silently landing them there with no context.
+          const loginResponse = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!loginResponse.ok) {
+            window.location.href = '/login?registered=1';
+            return;
+          }
+          window.location.href = '/profile';
+        } catch (e) {
+          this.error = 'Could not create your account. Please try again.';
+        } finally {
+          this.submitting = false;
+        }
+      },
+    }"
+  >
     <div class="card-body">
       <h1 class="card-title">Create your account</h1>
       <p class="text-sm text-base-content/70">Self-registration is open — no invite needed.</p>
 
-      {% if request.query_params.get('error') == 'google_auth_failed' %}
-      <div role="alert" class="alert alert-error mt-2">
-        <span>Google sign-in failed or was cancelled. Please try again.</span>
+      <div role="alert" aria-live="polite" class="alert alert-error mt-2" x-show="error" x-cloak>
+        <span x-text="error"></span>
       </div>
-      {% endif %}
 
-      <form method="post" action="/api/v1/auth/register" class="flex flex-col gap-4 mt-2">
+      <form
+        method="post"
+        action="/api/v1/auth/register"
+        class="flex flex-col gap-4 mt-2"
+        @submit.prevent="register"
+      >
         <label class="form-control w-full">
           <div class="label"><span class="label-text">Email</span></div>
           <input
@@ -43,7 +105,10 @@
           />
         </label>
 
-        <button type="submit" class="btn btn-primary mt-2">Register</button>
+        <button type="submit" class="btn btn-primary mt-2" :disabled="submitting">
+          <span x-show="!submitting">Register</span>
+          <span x-show="submitting" x-cloak>Creating account...</span>
+        </button>
       </form>
 
       <div class="divider">OR</div>

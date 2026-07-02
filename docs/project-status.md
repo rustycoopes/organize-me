@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), #14 (forgot/reset password, PR #21), and #15 (profile — view/edit, dark mode, account deletion, PR #24) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), `/forgot-password`/`/reset-password`, `/profile`, and `/api/v1/users/me` are confirmed live on both Cloud Run services. Issue #16 (landing page) implemented on branch `feature/slice-1-landing-page`, PR pending. Next up: merge #16, then #17.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), #14 (forgot/reset password, PR #21), #15 (profile — view/edit, dark mode, account deletion, PR #24), and #16 (landing page, PR #25) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/`, `/register`/`/login` (incl. Google sign-in), `/forgot-password`/`/reset-password`, `/profile`, and `/api/v1/users/me` are confirmed live on both Cloud Run services. Two live bugs reported by the user after #16 shipped: `/register`/`/login`'s plain HTML forms landed users on a raw JSON response instead of any page (filed as issue #26, fixed on branch `fix/auth-form-json-response`, PR pending) and Google sign-in hanging on Google's consent page (filed as issue #27, still open — diagnosis only, root cause not yet found). Next up: merge #26, then #17, then investigate #27.
 
 ## Completed Milestones
 
@@ -26,7 +26,9 @@
 | 2026-07-02 | Issue #13 merging to `main` stamped the shared Supabase QA database's Alembic revision ahead of issue #14's branch (still checked out in the primary working directory, not a worktree), breaking #14's CI `alembic upgrade head` step with `Can't locate revision`. Resolved by merging `main` into `feature/slice-1-forgot-reset-password` once #13 landed |
 | 2026-07-02 | Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` — `POST /api/v1/auth/forgot-password` + `/reset-password`, DaisyUI forgot/reset-password pages, and `app/services/notifications/email.py` (`EmailSender` protocol, `ResendEmailSender`, `FakeEmailSender`) — the first cut of the email interface Slice 7 (Notifications) will reuse. Proactively wired `RESEND_API_KEY` into both `ci.yml`/`deploy.yml` Cloud Run env-vars (closing the same "secret exists but isn't wired to the running service" gap class that bit #10 and #12) instead of discovering it post-merge |
 | 2026-07-02 | Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, built in an isolated worktree with two parallel agents (backend endpoints, frontend page/template) working disjoint file sets. `PATCH`/`DELETE /api/v1/users/me` added; `GET /profile` is the app's first authenticated page route; Alpine.js introduced (named in `docs/technical-approach.md` since #10, never wired in until now) for the dark/light toggle and delete-confirm modal; `base.html`'s theme is now server-rendered from the user's persisted preference. A TDD test written specifically because issue #15's own comment thread asked for it (confirming the `oauth_accounts` cascade-delete) caught a real ORM bug — `passive_deletes="all"` added to `User.oauth_accounts`. Multi-agent code review before commit caught two further real bugs (explicit `{"email": null}`/`{"dark_mode": null}` PATCH bodies bypassed validation and hit the DB's NOT NULL constraint, mislabeled as an email conflict; a delete-failure path tried to close the confirm modal via a variable never wired to it) — both fixed pre-merge. Merged into `main` (PR #24); `deploy.yml` green and prod `/profile`, `/api/v1/users/me` confirmed live. See `docs/changelog.md` for full detail |
-| 2026-07-02 | Issue #16 (landing page) implemented on branch `feature/slice-1-landing-page` — `GET /` (public, no auth) renders a DaisyUI hero/features/CTA landing page with nav links to `/login`/`/register`; added a reusable `{% block head %}` extension point to `base.html` (used here for a meta description, available to future pages). Small enough in scope to implement directly rather than dispatch multiple agents. 5 improvements applied after comparing against issue #16's acceptance criteria: a meta description tag, a second CTA path (login) for returning visitors, broadened test coverage confirming the hero's CTA (not just the dedicated CTA section) links to `/register`, a nav-links-present test, and a regression test that `/login`/`/register` actually resolve to 200 (guards against a typo'd `href` silently breaking navigation) |
+| 2026-07-02 | Issue #16 (landing page) implemented on branch `feature/slice-1-landing-page` — `GET /` (public, no auth) renders a DaisyUI hero/features/CTA landing page with nav links to `/login`/`/register`; added a reusable `{% block head %}` extension point to `base.html` (used here for a meta description, available to future pages). Small enough in scope to implement directly rather than dispatch multiple agents. 5 improvements applied after comparing against issue #16's acceptance criteria: a meta description tag, a second CTA path (login) for returning visitors, broadened test coverage confirming the hero's CTA (not just the dedicated CTA section) links to `/register`, a nav-links-present test, and a regression test that `/login`/`/register` actually resolve to 200 (guards against a typo'd `href` silently breaking navigation). Merged into `main` (PR #25); `deploy.yml` green and prod `/` confirmed live |
+| 2026-07-02 | User reported two live bugs post-#16: registering with email/password lands on a raw JSON response instead of any page, and Google sign-in hangs on Google's consent screen without returning to the app. Investigated both; filed as issues #26 and #27 rather than guessing at fixes blind |
+| 2026-07-02 | Issue #26 (register/login plain forms show raw JSON) implemented on branch `fix/auth-form-json-response` — root cause was `register.html`/`login.html` using plain `<form method="post">` against JSON API endpoints with no redirect. Both forms now submit via Alpine.js `fetch` (progressive enhancement — native `action`/`method` kept as markup, not a functional no-JS fallback given the API returns JSON either way); register auto-logs in after a successful signup (matching Google sign-up's instant-login UX) and redirects to `/profile`. 5 improvements applied comparing against the issue: (1) register's error handling now also parses FastAPI's 422 pydantic-validation array shape; (2) the previously server-rendered `?error=google_auth_failed` Jinja banner unified into the same Alpine `error` reactive state (via a new `init()` reading the query string) on both pages; (3) a `registered=1` info banner added to `login.html` for the case where auto-login unexpectedly fails right after a successful registration; (4) email inputs are trimmed of leading/trailing whitespace before submit on both forms; (5) `aria-live="polite"` added to both alert banners for screen-reader accessibility. Self-reviewed directly (no multi-agent dispatch) given the diff's size (3 files, template/test only, no business logic) — one real finding survived: removing the static Jinja `google_auth_failed` block means a no-JS visitor no longer sees that banner at all, whereas it previously rendered unconditionally; accepted as a known trade-off rather than fixed, since the same visitor's actual form submission was already broken without JS regardless (the entire point of this fix) |
 
 ## Next Steps
 
@@ -130,6 +132,40 @@ scope), flagged here for a deliberate decision before or during the slice that w
     visitor sees the marketing page regardless of session state. Once a dashboard exists (#17+),
     worth deciding whether a logged-in user hitting `/` should see the marketing page (current
     behaviour) or get redirected straight to their dashboard.
+
+Surfaced comparing issue #26's implementation (fixing `/register`/`/login`'s raw-JSON-response bug)
+against `docs/prd.md`; not implemented (out of #26's scope), flagged here for a deliberate decision
+before or during the slice that would own each one.
+
+16. **Auto-login on registration bypasses email verification and immediately issues a working
+    session.** #26 wires password-based registration to auto-login (matching the Google sign-up
+    path), but since `is_verified` still isn't enforced anywhere (suggestion #1), anyone can
+    register with an email address they don't own and land on `/profile` with a live session
+    instantly — no verification gate ever gets a chance to run. Worth weighing alongside
+    suggestion #1 now that auto-login makes this concretely reachable, not just theoretical.
+17. **Registration's "account already exists" error aids account enumeration.** The register
+    page's JS now surfaces `REGISTER_USER_ALREADY_EXISTS` as a clean, friendly banner —
+    functionally correct, but it makes confirming whether an email is already registered easier
+    than before (the raw JSON 400 was there since #12, just less discoverable). `forgot-password`
+    deliberately returns an identical response for known/unknown emails to avoid exactly this
+    (suggestion #5); worth deciding if registration should follow the same non-enumeration
+    pattern, or if this trade-off is accepted for open self-registration.
+18. **Duplicated DaisyUI card/form markup — now a third alert variant (`alert-info`) layered on
+    top.** Suggestions #3/#6 already flagged the four (now five, with `profile.html`) auth/page
+    templates repeating the same card/form wrapper. #26 adds an `alert-info` "registered"
+    banner alongside the existing `alert-error` pattern on `login.html`, independently
+    hand-rolled rather than through a shared component — the divergence between templates grows
+    with each issue that touches them.
+19. **No documented decision on whether the app requires JavaScript.** #26's fix necessarily makes
+    `/register` and `/login` depend on JS to work correctly, since the underlying API endpoints
+    return JSON and a plain form POST has no way to redirect afterward. This is a structural,
+    site-wide decision (interacts with the public landing page's audience, accessibility policy,
+    and SEO crawlability) that has never been written down in `docs/technical-approach.md`.
+20. **No standardized alert/banner convention across severities.** `login.html`/`register.html`
+    now each hand-roll their own `x-show`/`x-cloak`/`aria-live` alert markup per severity
+    (`alert-error`, `alert-info`); worth defining a documented DaisyUI alert component/macro
+    (colour, icon, ARIA attributes per severity) before a `alert-success`/`alert-warning` variant
+    gets added ad hoc by some future issue.
 
 ## Known Constraints
 
