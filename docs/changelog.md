@@ -121,6 +121,62 @@
     pytest-asyncio test functions. #12's DB-backed test fixtures should follow the same
     dedicated-per-test-engine pattern established in `tests/conftest.py::db_session`, not reuse
     `app.db.session.engine` directly, if they exercise real DB-backed endpoints.
+- **Issue #12 implemented** — email/password auth: register, login, logout (branch
+  `feature/slice-1-auth-register-login`):
+  - FastAPI-Users v15 wired up with a **bcrypt-only** `PasswordHelper` (the library defaults to
+    Argon2 for new hashes; `docs/technical-approach.md` and issue #12 both specify bcrypt), a
+    cookie-based JWT backend (`organizeme_auth` cookie, HttpOnly, `SameSite=Lax`, 7-day
+    max-age/token lifetime), and a `UserManager` enforcing an 8-character minimum password
+  - Custom `POST /api/v1/auth/register`, `/login`, `/logout` under `app/api/v1/auth.py` rather
+    than fastapi-users' built-in routers: the built-in login route returns 400 on bad
+    credentials, but issue #12's acceptance criteria require 401; register/login accept
+    `application/x-www-form-urlencoded` (`Form(...)`) instead of JSON so the plain HTML
+    `<form method="post">` pages work without any JS
+  - `GET /api/v1/users/me` (protected, `app/api/v1/users.py`) and matching DaisyUI (CDN)
+    Jinja2 register/login pages at `GET /register` / `GET /login` (`app/templates/auth/`)
+  - Resolved the "known, accepted forward-looking risk" #11 flagged for #12: `app/db/session.py`'s
+    `engine` singleton was rebuilt as a lazily-constructed, `lru_cache`d `get_engine()` instead of
+    an import-time side effect, so wiring the auth routers permanently into `app/main.py` doesn't
+    force `DATABASE_URL`/`JWT_SECRET` resolution just by importing the module (`test_health.py`
+    still imports `app.main` with no DB config). Tests use a new `client` fixture
+    (`tests/conftest.py`) that overrides `get_db` with the existing `db_session` fixture's
+    dedicated-per-test engine, exactly the pattern #11 called out — not the process-wide singleton
+  - Discovered and fixed a live-deployment gap while wiring this up: the QA/prod Cloud Run
+    `gcloud run deploy` steps in `ci.yml`/`deploy.yml` had **zero** environment variables set on
+    the actual running services (only the CI *test job* had `DATABASE_URL`) — register/login
+    would have 500'd in the real deployed app despite green CI. Added a `JWT_SECRET_QA`/
+    `JWT_SECRET_PROD` GitHub secret pair and a `--env-vars-file` deploy step (secrets piped through
+    a step `env:` block and shell `${VAR}` expansion, not GH Actions' `${{ }}` template
+    substitution directly in the script body, to avoid the injection footgun that approach has
+    with secret values containing shell-special characters)
+  - `cookie_secure` defaults to `true` (required for the `Secure` flag Cloud Run's real HTTPS
+    needs) but is a plain `os.environ` read (`COOKIE_SECURE`), not routed through the pydantic
+    `Settings` class, so building the cookie transport at import time never requires
+    `DATABASE_URL`. Real browsers treat `http://localhost` as a secure context and accept `Secure`
+    cookies there regardless, but non-browser HTTP clients (httpx, curl) don't get that exception
+    and would silently never resend the cookie over plain `http://`; `tests/conftest.py` sets
+    `COOKIE_SECURE=false` before any app module import so the test suite's httpx client works
+  - Five improvements applied after comparing the implementation against the PRD and issue #12:
+    (1) login hashes the submitted password even when the email doesn't exist (result discarded),
+    mirroring `BaseUserManager.authenticate`'s own mitigation, so response timing doesn't leak
+    which emails are registered; (2) register catches `IntegrityError` from a concurrent
+    duplicate-email insert racing past the pre-insert existence check (Cloud Run runs multiple
+    instances) and returns the same clean 400 instead of a raw 500; (3) `register`/`login` bind
+    `email` as `pydantic.EmailStr` at the FastAPI parameter layer instead of `str` — with `str`,
+    a malformed email reached `UserCreate(...)`'s own `EmailStr` validation *inside* the handler
+    body, which FastAPI doesn't auto-convert to a 4xx the way it does for route-parameter
+    validation, so malformed input 500'd instead of 400ing (caught by a new
+    `test_register_with_malformed_email_returns_4xx_not_500`); (4) the lazy `get_engine()` refactor
+    and (5) the `--env-vars-file` Cloud Run wiring, both described above
+  - `app/models/user.py`'s `email` column is now typed as plain `str` under `TYPE_CHECKING`
+    (matching `SQLAlchemyBaseUserTableUUID`'s own convention) rather than `Mapped[str]`, so `User`
+    keeps satisfying fastapi-users' `UserProtocol` structurally under `mypy --strict` — re-declaring
+    it as `Mapped[str]` to override the base mixin's unique index shadowed the base class's
+    Protocol-compatible annotation. This is a known, deliberate trade-off in the
+    fastapi-users-db-sqlalchemy package itself (not something #12 introduced) that makes
+    SQLAlchemy query expressions like `User.email == ...` type as `bool` instead of
+    `ColumnElement[bool]` under mypy; `tests/test_db_session.py`'s pre-existing query needed one
+    scoped `# type: ignore[arg-type]`
 - GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 
     database_url: str
+    jwt_secret: str
 
 
 @lru_cache

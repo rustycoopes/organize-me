@@ -13,6 +13,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "alembic>=1.18.5",
     "fastapi-users-db-sqlalchemy>=7.0.0",
+    "fastapi-users[sqlalchemy]>=15.0.0",
     "pydantic-settings>=2.14.2",
 ]
 
