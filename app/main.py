@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.auth import router as auth_router
 from app.api.v1.users import router as users_router
 from app.pages.auth import router as auth_pages_router
+from app.pages.landing import router as landing_pages_router
 from app.pages.profile import router as profile_pages_router
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,6 +31,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(auth_pages_router)
 app.include_router(profile_pages_router)
+app.include_router(landing_pages_router)
 
 
 @app.get("/health")
