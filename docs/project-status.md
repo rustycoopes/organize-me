@@ -50,88 +50,10 @@
 
 ## Suggestions for Future Review
 
-Surfaced comparing issue #14's implementation against `docs/prd.md`; not implemented (out of #14's
-scope), flagged here for a deliberate decision before or during the slice that would own each one.
-
-1. **Email verification (`is_verified`) not enforced.** Self-registration currently lets anyone
-   register with an email address they don't own — nothing in the PRD's Security & Data Privacy
-   section explicitly requires enforcing verification, but it's implied by "cloud storage
-   credentials... never exposed" and general account-integrity expectations. Worth deciding whether
-   to require a verified email before password reset / account actions, or accept the current
-   open-registration model as-is.
-2. **No shared email-template mechanism yet.** The forgot-password email
-   (`app/auth/users.py::on_after_forgot_password`) is a hand-rolled HTML f-string. The PRD's
-   Notifications section (user stories #40–#43) describes "rich HTML email" with branding and a
-   summary table for Slice 7 — worth building a shared Jinja-based email template (header/footer,
-   consistent styling) before Slice 7 adds 2+ more transactional email types, rather than each flow
-   hand-rolling its own HTML.
-3. **Duplicated DaisyUI auth template markup.** `login.html`, `register.html`,
-   `forgot_password.html`, and `reset_password.html` now all repeat the same card/form wrapper
-   markup four times. A shared Jinja include/macro would pay off before more auth-adjacent pages are
-   added (e.g. Slice 1's own #15 profile page, or a future verify-email page).
-4. **No rate limiting on `/api/v1/auth/forgot-password`.** Low risk at personal scale, but the
-   endpoint can be used to spam an arbitrary user's inbox with reset emails with no cost to the
-   caller. Worth a Redis-backed limiter once Slice 2 wires up Upstash Redis for the app (currently
-   only referenced for Celery).
-5. **Forgot-password response-timing side channel.** The response *body* is identical for
-   known/unknown emails, but a known email pays for JWT generation + a live Resend network call the
-   unknown-email path skips, so response latency can still distinguish registered from unregistered
-   addresses. A full fix would need an equivalent-cost dummy operation on the unknown-email path;
-   not attempted in #14 since it's awkward for a network-bound call. Documented as an accepted,
-   unfixed risk in `docs/changelog.md`'s #14 entry.
-
-Surfaced comparing issue #15's implementation against `docs/prd.md`; not implemented (out of #15's
-scope), flagged here for a deliberate decision before or during the slice that would own each one.
-
-6. **Duplicated DaisyUI card/form markup — now five templates deep, not four.** Suggestion #3 above
-   named issue #15's own profile page as the trigger point to fix this before it recurred again;
-   `app/templates/profile.html` shipped with the same copy-pasted `card`/`card-body`/`form-control`
-   wrapper anyway, since extracting a shared macro would have meant touching four already-shipped,
-   tested auth templates outside #15's scope. This is the second time this has been flagged without
-   action — strongly worth doing before #16 (landing page) and #17 (sidebar shell) add more page
-   chrome on top.
-7. **No re-authentication required for account deletion.** PRD story #8 ("permanently delete my
-   account") doesn't specify a confirmation mechanism; #15 implements a DaisyUI confirm modal but no
-   password re-entry. For an immediate, no-grace-period deletion, consider requiring the current
-   password before the DELETE fires, guarding against a hijacked-but-unattended session.
-8. **Email change permanently strands `is_verified` at `False` with no way back.** `PATCH
-   /api/v1/users/me` correctly resets `is_verified` when email changes (reusing fastapi-users'
-   own `_update()` logic), but since no verify-email flow exists yet (see suggestion #1), there's
-   currently no way for a user to ever become verified again after changing their email. Worth
-   deciding this alongside suggestion #1 rather than independently.
-9. **No security-notification email on email change.** A common baseline for account-integrity is
-   notifying the *old* address when the login email changes, so a hijacker changing it doesn't go
-   unnoticed. Not built for #15 — worth adding once the shared email-template mechanism (suggestion
-   #2) exists.
-10. **No documented decision on column-level encryption for `phone_number`.** PRD story #51 requires
-    personal data "stored encrypted... at rest." Supabase/Postgres provides disk-level encryption by
-    default, which likely satisfies this, but no explicit decision has been recorded confirming
-    that's sufficient versus requiring column-level encryption for PII specifically — worth settling
-    before Slice 2+ adds more PII (SMS numbers, storage credentials).
-
-Surfaced comparing issue #16's implementation against `docs/prd.md`; not implemented (out of #16's
-scope), flagged here for a deliberate decision before or during the slice that would own each one.
-
-11. **No Open Graph / social-preview meta tags.** PRD story #50 wants "a clear, structured
-    introduction to the product" for visitors; a link to `/` shared on social media or in a chat
-    (ironically, exactly the kind of message OrganizeMe itself processes) currently renders as a bare
-    URL with no preview card. Worth adding `og:title`/`og:description`/`og:image` once there's a
-    product screenshot or logo asset to point `og:image` at.
-12. **No `robots.txt` / sitemap / SEO discoverability decision.** The PRD doesn't mention search
-    discoverability at all, and no explicit decision has been made on whether this product wants to
-    be indexed by search engines pre-launch. Worth a deliberate call rather than defaulting to
-    whatever crawlers do with an unconfigured site.
-13. **No footer with privacy policy / terms of service links.** PRD stories #51/#52 (Security & Data
-    Privacy) imply data-handling commitments to users, but there's nowhere on the public site linking
-    to a privacy policy or terms of service — those pages don't exist yet either. Worth planning
-    before public self-registration launches for real users.
-14. **No favicon configured.** `base.html` (shared by every page, not just the landing page) has no
-    `<link rel="icon">` — browsers show a default blank tab icon. Minor, but it's the kind of
-    first-impression polish a public marketing page in particular should have.
-15. **Undecided behaviour for an already-authenticated visitor landing on `/`.** Right now every
-    visitor sees the marketing page regardless of session state. Once a dashboard exists (#17+),
-    worth deciding whether a logged-in user hitting `/` should see the marketing page (current
-    behaviour) or get redirected straight to their dashboard.
+The improvement/decision items surfaced while reviewing Slice 1 issues #14–#16 against
+`docs/prd.md` are now tracked as GitHub issues **#29–#42** in the OrganizeMe project, each tagged
+`future-enhancement` + `slice1`. (The duplicated-DaisyUI-markup item, flagged during both #14 and
+#15, was consolidated into a single issue.) See the OrganizeMe project board for current status.
 
 ## Known Constraints
 
