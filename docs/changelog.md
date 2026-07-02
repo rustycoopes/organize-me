@@ -41,6 +41,53 @@
   database schema (5 tables), API endpoint map (21 endpoints), 9 vertical implementation slices,
   key utilities, testing approach, prerequisites. Produced from a structured Q&A session.
 
+### Fixed
+- **Issue #26 fixed** — `/register`/`/login` showed a raw JSON response instead of a page
+  (branch `fix/auth-form-json-response`):
+  - Root cause: `app/templates/auth/register.html` and `login.html` used plain
+    `<form method="post" action="...">` elements posting directly to
+    `POST /api/v1/auth/register`/`/login`, both JSON API endpoints. A plain form POST makes the
+    browser navigate to whatever the endpoint returns, so users landed on the raw `UserRead`
+    JSON body (register) or a blank `204 No Content` page (login) instead of anywhere useful —
+    these routes had only ever been exercised via httpx `TestClient` assertions, never a real
+    browser form submission
+  - Both forms now submit via Alpine.js `fetch()` (`@submit.prevent`), keeping the native
+    `action`/`method` attributes as markup (not a functional no-JS fallback — the API returns
+    JSON regardless of how it's posted to). `POST /register` doesn't itself log the user in, so a
+    successful registration now immediately calls `POST /login` with the same credentials
+    (auto-login, matching the Google sign-up path's instant-login UX — confirmed via user
+    clarifying question) and redirects to `/profile`; `POST /login` redirects to `/profile` on
+    success or shows an inline error banner on failure
+  - Five improvements applied after comparing the implementation against issue #26: (1) the
+    register page's error handling now also parses FastAPI's own 422 pydantic-validation-error
+    array shape (`detail[0].msg`), not just the two JSON-object error shapes it already handled;
+    (2) the previously separate, server-rendered `?error=google_auth_failed` Jinja banner (added
+    in #13) was unified into the same Alpine `error` reactive state via a new `init()` lifecycle
+    hook reading the query string client-side, on both `register.html` and `login.html`; (3) a
+    `registered=1` info banner added to `login.html` for the case where auto-login unexpectedly
+    fails immediately after a successful registration, so the user lands somewhere explained
+    rather than a bare `/login`; (4) email inputs are trimmed of leading/trailing whitespace
+    before submit on both forms, so a pasted email with stray whitespace doesn't produce a
+    confusing validation error; (5) `aria-live="polite"` added to both alert banners so
+    screen readers announce registration/login errors and the new info banner
+  - Self-reviewed directly (no multi-agent `/code-review` dispatch) given the diff's size and
+    complexity — 3 files, template/test changes only, no new business logic. One real finding
+    survived review, documented as an accepted trade-off rather than fixed: removing the static
+    Jinja `google_auth_failed` block in favour of Alpine's `init()` means a visitor with
+    JavaScript disabled no longer sees that banner at all (it previously rendered unconditionally
+    server-side); accepted because that same visitor's actual form submission was already broken
+    without JS regardless — restoring the no-JS banner in isolation wouldn't restore a working
+    no-JS auth flow, which is exactly the JSON-response problem this issue exists to fix. Flagged
+    in `docs/project-status.md`'s Suggestions for Future Review as a site-wide "does this app
+    require JavaScript" decision that's never been written down
+  - Issue #27 (Google sign-in hangs on Google's own consent page after clicking "Continue") was
+    also filed from the same user report but is **not** part of this fix — diagnosed via browser
+    automation that the initial redirect to Google is well-formed (correct `client_id`/
+    `redirect_uri`/scope/signed state); completing the actual Google consent flow to reproduce
+    further would require granting OAuth/SSO permissions on the user's behalf, which needs
+    explicit authorization rather than being implied by a bug-investigation request — left open
+    with clarifying questions asked in the issue
+
 ### Changed
 - `docs/project-status.md` — updated phase, milestones, open decisions, and next steps to
   reflect completion of implementation planning
