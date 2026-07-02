@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), and #13 (Google OAuth login, PR #22) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login`, and `/api/v1/auth/google` are confirmed live on both Cloud Run services. Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` (PR #21), rebased onto `main` to pick up #13's changes. Next up: #15.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Next up: #15.
 
 ## Completed Milestones
 
@@ -33,7 +33,7 @@
    - #11 DB foundation — Supabase connection + `users` table — ✅ merged
    - #12 Email/password auth — register, login, logout — ✅ merged
    - #13 Google OAuth login — ✅ merged
-   - #14 Forgot / reset password — ✅ implemented, PR #21 pending
+   - #14 Forgot / reset password — ✅ merged
    - #15 Profile — view/edit, dark mode, account deletion
    - #16 Landing page
    - #17 Sidebar shell + placeholder pages
@@ -43,6 +43,38 @@
 ## Open Decisions
 
 - None — all design questions resolved in `docs/implementation-plan.md`
+
+## Suggestions for Future Review
+
+Surfaced comparing issue #14's implementation against `docs/prd.md`; not implemented (out of #14's
+scope), flagged here for a deliberate decision before or during the slice that would own each one.
+
+1. **Email verification (`is_verified`) not enforced.** Self-registration currently lets anyone
+   register with an email address they don't own — nothing in the PRD's Security & Data Privacy
+   section explicitly requires enforcing verification, but it's implied by "cloud storage
+   credentials... never exposed" and general account-integrity expectations. Worth deciding whether
+   to require a verified email before password reset / account actions, or accept the current
+   open-registration model as-is.
+2. **No shared email-template mechanism yet.** The forgot-password email
+   (`app/auth/users.py::on_after_forgot_password`) is a hand-rolled HTML f-string. The PRD's
+   Notifications section (user stories #40–#43) describes "rich HTML email" with branding and a
+   summary table for Slice 7 — worth building a shared Jinja-based email template (header/footer,
+   consistent styling) before Slice 7 adds 2+ more transactional email types, rather than each flow
+   hand-rolling its own HTML.
+3. **Duplicated DaisyUI auth template markup.** `login.html`, `register.html`,
+   `forgot_password.html`, and `reset_password.html` now all repeat the same card/form wrapper
+   markup four times. A shared Jinja include/macro would pay off before more auth-adjacent pages are
+   added (e.g. Slice 1's own #15 profile page, or a future verify-email page).
+4. **No rate limiting on `/api/v1/auth/forgot-password`.** Low risk at personal scale, but the
+   endpoint can be used to spam an arbitrary user's inbox with reset emails with no cost to the
+   caller. Worth a Redis-backed limiter once Slice 2 wires up Upstash Redis for the app (currently
+   only referenced for Celery).
+5. **Forgot-password response-timing side channel.** The response *body* is identical for
+   known/unknown emails, but a known email pays for JWT generation + a live Resend network call the
+   unknown-email path skips, so response latency can still distinguish registered from unregistered
+   addresses. A full fix would need an equivalent-cost dummy operation on the unknown-email path;
+   not attempted in #14 since it's awkward for a network-bound call. Documented as an accepted,
+   unfixed risk in `docs/changelog.md`'s #14 entry.
 
 ## Known Constraints
 
