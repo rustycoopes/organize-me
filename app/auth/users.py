@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.backend import auth_backend
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.services.notifications.email import EmailSender, ResendEmailSender
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def get_user_db(
     session: AsyncSession = Depends(get_db),
 ) -> AsyncIterator[SQLAlchemyUserDatabase[User, uuid.UUID]]:
-    yield SQLAlchemyUserDatabase(session, User)
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 
 def get_email_sender() -> EmailSender:

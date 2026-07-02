@@ -8,6 +8,9 @@ class Settings(BaseSettings):
 
     database_url: str
     jwt_secret: str
+    google_oauth_client_id: str
+    google_oauth_client_secret: str
+    google_oauth_redirect_uri: str
     # Empty default (rather than a required field) so existing deployments/CI jobs that don't
     # set RESEND_API_KEY yet don't fail Settings construction; ResendEmailSender only needs a
     # real value once forgot-password is actually exercised in a live environment.
