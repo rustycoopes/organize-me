@@ -137,6 +137,15 @@ Provides out of the box:
 - Password reset flow with email tokens
 - Extensible user model for OrganizeMe-specific fields (phone number, preferences, onboarding state)
 
+**Google OAuth account linking (issue #13):** if a Google sign-in's email address matches an
+existing email/password account, the Google account is linked to that existing user rather than
+rejected as a duplicate (`associate_by_email=True`), and the resulting account is marked verified
+without a separate email-verification step, since Google has already verified the address as part
+of its own consent flow (`is_verified_by_default=True`). This means anyone who can complete
+Google's OAuth flow for a given email address gains access to whatever OrganizeMe account already
+uses that email — an accepted trade-off for a low-friction sign-in experience, consistent with how
+most consumer apps handle multi-provider auth for the same address.
+
 ---
 
 ### 7. Notifications

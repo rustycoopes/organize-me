@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.backend import auth_backend
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 
 # fastapi-users defaults to Argon2 for newly-hashed passwords; docs/technical-approach.md and
@@ -24,7 +25,7 @@ MIN_PASSWORD_LENGTH = 8
 async def get_user_db(
     session: AsyncSession = Depends(get_db),
 ) -> AsyncIterator[SQLAlchemyUserDatabase[User, uuid.UUID]]:
-    yield SQLAlchemyUserDatabase(session, User)
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
