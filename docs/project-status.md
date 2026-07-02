@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Next up: #15.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), and #14 (forgot/reset password, PR #21) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/register`/`/login` (incl. Google sign-in), and `/forgot-password`/`/reset-password` are confirmed live on both Cloud Run services. Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, PR pending. Next up: merge #15, then #16.
 
 ## Completed Milestones
 
@@ -25,6 +25,7 @@
 | 2026-07-02 | Issue #13 (Google OAuth login) implemented on branch `feature/slice-1-google-oauth` — `httpx-oauth`, `OAuthAccount` table/migration, custom redirect-based `GET /api/v1/auth/google` + `/callback` (fastapi-users' built-in OAuth router returns JSON, not a redirect), signed-JWT + double-submit-cookie CSRF state, account linking by email, Google sign-in buttons on login/register pages. Multi-agent code review (8 finder angles + verification) caught and fixed three real bugs: unhandled Google token/profile exchange failures surfacing as raw 500s, an unguarded `IntegrityError` race on concurrent first-time Google logins, and a `TypeError` crash from comparing a non-ASCII CSRF cookie value. Built in an isolated git worktree after discovering another session was concurrently using the shared working directory for issue #14. Merged into `main` (PR #22); `deploy.yml` green and prod `/health`, `/api/v1/auth/google` (redirects to Google's real consent screen with the correct `client_id`/`redirect_uri`) confirmed live |
 | 2026-07-02 | Issue #13 merging to `main` stamped the shared Supabase QA database's Alembic revision ahead of issue #14's branch (still checked out in the primary working directory, not a worktree), breaking #14's CI `alembic upgrade head` step with `Can't locate revision`. Resolved by merging `main` into `feature/slice-1-forgot-reset-password` once #13 landed |
 | 2026-07-02 | Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` — `POST /api/v1/auth/forgot-password` + `/reset-password`, DaisyUI forgot/reset-password pages, and `app/services/notifications/email.py` (`EmailSender` protocol, `ResendEmailSender`, `FakeEmailSender`) — the first cut of the email interface Slice 7 (Notifications) will reuse. Proactively wired `RESEND_API_KEY` into both `ci.yml`/`deploy.yml` Cloud Run env-vars (closing the same "secret exists but isn't wired to the running service" gap class that bit #10 and #12) instead of discovering it post-merge |
+| 2026-07-02 | Issue #15 (profile — view/edit, dark mode, account deletion) implemented on branch `feature/slice-1-profile`, built in an isolated worktree with two parallel agents (backend endpoints, frontend page/template) working disjoint file sets. `PATCH`/`DELETE /api/v1/users/me` added; `GET /profile` is the app's first authenticated page route; Alpine.js introduced (named in `docs/technical-approach.md` since #10, never wired in until now) for the dark/light toggle and delete-confirm modal; `base.html`'s theme is now server-rendered from the user's persisted preference. A TDD test written specifically because issue #15's own comment thread asked for it (confirming the `oauth_accounts` cascade-delete) caught a real ORM bug — `passive_deletes="all"` added to `User.oauth_accounts`. Multi-agent code review before commit caught two further real bugs (explicit `{"email": null}`/`{"dark_mode": null}` PATCH bodies bypassed validation and hit the DB's NOT NULL constraint, mislabeled as an email conflict; a delete-failure path tried to close the confirm modal via a variable never wired to it) — both fixed pre-merge. See `docs/changelog.md` for full detail |
 
 ## Next Steps
 
@@ -34,7 +35,7 @@
    - #12 Email/password auth — register, login, logout — ✅ merged
    - #13 Google OAuth login — ✅ merged
    - #14 Forgot / reset password — ✅ merged
-   - #15 Profile — view/edit, dark mode, account deletion
+   - #15 Profile — view/edit, dark mode, account deletion — ✅ implemented, PR pending
    - #16 Landing page
    - #17 Sidebar shell + placeholder pages
 2. **Slice 2** — Google Drive storage integration
@@ -75,6 +76,35 @@ scope), flagged here for a deliberate decision before or during the slice that w
    addresses. A full fix would need an equivalent-cost dummy operation on the unknown-email path;
    not attempted in #14 since it's awkward for a network-bound call. Documented as an accepted,
    unfixed risk in `docs/changelog.md`'s #14 entry.
+
+Surfaced comparing issue #15's implementation against `docs/prd.md`; not implemented (out of #15's
+scope), flagged here for a deliberate decision before or during the slice that would own each one.
+
+6. **Duplicated DaisyUI card/form markup — now five templates deep, not four.** Suggestion #3 above
+   named issue #15's own profile page as the trigger point to fix this before it recurred again;
+   `app/templates/profile.html` shipped with the same copy-pasted `card`/`card-body`/`form-control`
+   wrapper anyway, since extracting a shared macro would have meant touching four already-shipped,
+   tested auth templates outside #15's scope. This is the second time this has been flagged without
+   action — strongly worth doing before #16 (landing page) and #17 (sidebar shell) add more page
+   chrome on top.
+7. **No re-authentication required for account deletion.** PRD story #8 ("permanently delete my
+   account") doesn't specify a confirmation mechanism; #15 implements a DaisyUI confirm modal but no
+   password re-entry. For an immediate, no-grace-period deletion, consider requiring the current
+   password before the DELETE fires, guarding against a hijacked-but-unattended session.
+8. **Email change permanently strands `is_verified` at `False` with no way back.** `PATCH
+   /api/v1/users/me` correctly resets `is_verified` when email changes (reusing fastapi-users'
+   own `_update()` logic), but since no verify-email flow exists yet (see suggestion #1), there's
+   currently no way for a user to ever become verified again after changing their email. Worth
+   deciding this alongside suggestion #1 rather than independently.
+9. **No security-notification email on email change.** A common baseline for account-integrity is
+   notifying the *old* address when the login email changes, so a hijacker changing it doesn't go
+   unnoticed. Not built for #15 — worth adding once the shared email-template mechanism (suggestion
+   #2) exists.
+10. **No documented decision on column-level encryption for `phone_number`.** PRD story #51 requires
+    personal data "stored encrypted... at rest." Supabase/Postgres provides disk-level encryption by
+    default, which likely satisfies this, but no explicit decision has been recorded confirming
+    that's sufficient versus requiring column-level encryption for PII specifically — worth settling
+    before Slice 2+ adds more PII (SMS numbers, storage credentials).
 
 ## Known Constraints
 

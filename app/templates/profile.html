@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Your profile — OrganizeMe{% endblock %}
+
+{% block content %}
+<div
+  class="flex min-h-screen items-center justify-center px-4 py-8"
+  x-data='{
+    ...{{ profile_data | tojson }},
+    saving: false,
+    error: "",
+    success: false,
+    deleting: false,
+    async save() {
+      this.saving = true;
+      this.error = "";
+      this.success = false;
+      try {
+        const response = await fetch("/api/v1/users/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: this.name,
+            email: this.email,
+            phone_number: this.phone_number,
+          }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          this.error = data.detail || "Could not save changes. Please try again.";
+          return;
+        }
+        this.success = true;
+      } catch (e) {
+        this.error = "Could not save changes. Please try again.";
+      } finally {
+        this.saving = false;
+      }
+    },
+    async toggleDarkMode() {
+      document.documentElement.dataset.theme = this.dark_mode ? "dark" : "corporate";
+      try {
+        await fetch("/api/v1/users/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dark_mode: this.dark_mode }),
+        });
+      } catch (e) {
+        // Cosmetic preference only: a failed save just means it does not persist next load.
+      }
+    },
+    async deleteAccount() {
+      this.deleting = true;
+      this.error = "";
+      this.success = false;
+      try {
+        const response = await fetch("/api/v1/users/me", { method: "DELETE" });
+        if (!response.ok) throw new Error("delete failed");
+        window.location.href = "/login";
+      } catch (e) {
+        this.error = "Could not delete account. Please try again.";
+        this.$refs.deleteModal.close();
+        this.deleting = false;
+      }
+    },
+  }'
+>
+  <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h1 class="card-title">Your profile</h1>
+
+      <div role="alert" class="alert alert-success mt-2" x-show="success" x-cloak>
+        <span>Changes saved.</span>
+      </div>
+      <div role="alert" class="alert alert-error mt-2" x-show="error" x-cloak>
+        <span x-text="error"></span>
+      </div>
+
+      <form class="flex flex-col gap-4 mt-2" @submit.prevent="save">
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Name</span></div>
+          <input
+            type="text"
+            name="name"
+            id="name"
+            x-model="name"
+            value="{{ profile_data.name }}"
+            placeholder="Your name"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Email</span></div>
+          <input
+            type="email"
+            name="email"
+            id="email"
+            x-model="email"
+            required
+            autocomplete="email"
+            value="{{ profile_data.email }}"
+            placeholder="you@example.com"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Phone number</span></div>
+          <input
+            type="tel"
+            name="phone_number"
+            id="phone_number"
+            x-model="phone_number"
+            value="{{ profile_data.phone_number }}"
+            placeholder="+1 555 555 5555"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <button type="submit" class="btn btn-primary mt-2" :disabled="saving">
+          <span x-show="!saving">Save changes</span>
+          <span x-show="saving" x-cloak>Saving...</span>
+        </button>
+      </form>
+
+      <div class="divider"></div>
+
+      <div class="form-control">
+        <label class="label cursor-pointer justify-start gap-4">
+          <input
+            type="checkbox"
+            class="toggle"
+            x-model="dark_mode"
+            @change="toggleDarkMode"
+          />
+          <span class="label-text">Dark mode</span>
+        </label>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <button type="button" class="btn btn-error btn-outline" @click="$refs.deleteModal.showModal()">
+          Delete account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <dialog class="modal" x-ref="deleteModal">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">Delete your account?</h3>
+      <p class="py-4">
+        This will permanently delete your account and all associated data. This action is
+        irreversible and cannot be undone.
+      </p>
+      <div class="modal-action">
+        <button type="button" class="btn" @click="$refs.deleteModal.close()">Cancel</button>
+        <button
+          type="button"
+          class="btn btn-error"
+          :disabled="deleting"
+          @click="deleteAccount"
+        >
+          <span x-show="!deleting">Delete permanently</span>
+          <span x-show="deleting" x-cloak>Deleting...</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+</div>
+{% endblock %}

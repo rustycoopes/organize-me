@@ -294,6 +294,78 @@
     card/form markup four times over — flagged as a good trigger point for a shared Jinja
     include/macro in a future cleanup pass, not done here to avoid touching `login.html`/
     `register.html` beyond issue #14's scope
+- **Issue #15 implemented** — profile view/edit, dark mode, account deletion (branch
+  `feature/slice-1-profile`, built in an isolated worktree with two parallel agents — one on the
+  backend endpoints, one on the page/template — since their file sets didn't overlap):
+  - `PATCH` / `DELETE /api/v1/users/me` added to `app/api/v1/users.py` (`GET` already existed).
+    `UserRead` (`app/schemas/user.py`) extended with `name`/`phone_number`/`dark_mode` (the `User`
+    model and DB columns already had these from #11 — no migration needed). The new `UserUpdate`
+    schema deliberately does *not* inherit fastapi-users' `BaseUserUpdate` (which carries
+    `password`/`is_active`/`is_superuser`/`is_verified`) — it inherits `CreateUpdateDictModel`
+    directly instead, so a client structurally cannot smuggle a privilege-escalation or password
+    change through this profile-only PATCH, regardless of what JSON keys it sends
+  - Found and fixed a real ORM bug before it shipped: `User.oauth_accounts` is `lazy="joined"` (so
+    it's always loaded) with a NOT NULL FK — deleting a user via `session.delete()` made SQLAlchemy
+    try to null out the loaded child's FK instead of leaving it to the DB's `ON DELETE CASCADE`,
+    raising an `IntegrityError` for any user with a linked Google account. A first attempt at
+    `passive_deletes=True` still failed under a TDD test (`test_delete_removes_linked_oauth_account`,
+    written because issue #15's own comment thread explicitly asked for it) — `True` only skips
+    nulling out *unloaded* collections; `passive_deletes="all"` is the value that also covers
+    already-loaded ones, which is what `lazy="joined"` guarantees here
+  - `GET /profile` (`app/pages/profile.py`) is the first *authenticated* page route in the app —
+    every prior page (`/login`, `/register`, etc.) was public. Added
+    `current_active_user_optional = fastapi_users.current_user(active=True, optional=True)`
+    (`app/auth/users.py`) so an anonymous visit redirects to `/login` instead of surfacing
+    fastapi-users' default JSON 401 body in a browser
+  - `app/templates/profile.html` — DaisyUI card with name/email/phone fields (single "Save
+    changes" button, PATCHed together via `fetch`), an immediate-fire dark/light toggle that
+    PATCHes on every change and optimistically updates `data-theme` client-side, and a native
+    `<dialog>`-based delete-confirmation modal. First template in the app to use Alpine.js (named
+    in `docs/technical-approach.md` since #10 but never actually wired in) — added its CDN
+    `<script>` tag and an `[x-cloak] { display: none !important; }` rule to `base.html` (Alpine
+    doesn't supply that CSS itself; without it, `x-cloak`-gated elements flash visibly for a frame
+    on load)
+  - `app/templates/base.html`'s `<html data-theme="corporate">` was hardcoded; now reads a
+    `dark_mode` template variable (defaulting to the prior light theme when a page doesn't pass
+    one, so none of the existing auth pages needed changes) — this is what makes the dark-mode
+    acceptance criterion ("reflected on next page load, server-rendered") true: the theme comes
+    from the DB on every full page load, not just client-side Alpine state
+  - Five improvements applied after comparing the implementation against issue #15's acceptance
+    criteria: (1) the `[x-cloak]` CSS rule above — Alpine was wired in without it, so the
+    save/delete "in-progress" labels and success/error alerts would have flashed on every load;
+    (2) a real bug in the delete-confirmation flow: on a failed DELETE, the code tried to close the
+    modal by setting a `showDeleteModal` state variable that was never actually wired to the native
+    `<dialog>` element (which opens/closes via `$refs.deleteModal.showModal()`/`.close()`) — the
+    modal would have silently stayed open over the error message; fixed to call `.close()` on the
+    ref directly, and removed the dead variable; (3)
+    `test_patch_with_case_different_duplicate_email_returns_4xx` added — the case-insensitive
+    email-uniqueness check #11/#12/#14 already established was untested for the new PATCH path;
+    (4) `test_patch_email_change_resets_is_verified` added — locks in a behaviour PATCH gets for
+    free from fastapi-users' internals (resetting `is_verified` when email changes) that had no
+    regression coverage; (5) `UserUpdate.name`/`phone_number` given explicit `max_length` bounds —
+    neither the `users` table migration nor the model bound these columns to a length, so nothing
+    upstream stopped an unbounded payload without adding it at the API layer
+  - Multi-agent code review (8 finder angles, 1-vote verify) run before commit caught two further
+    real bugs beyond the five improvements above, both fixed: (1) `UserUpdate.email`/`.dark_mode`
+    accepted an explicit JSON `null` (typed `Optional` only so `exclude_unset` could distinguish
+    "omitted" from "provided" for partial updates), which sailed past pydantic and only failed at
+    the DB's NOT NULL constraint on those columns — surfacing as an `IntegrityError` that the
+    route's exception handler mislabeled as `UPDATE_USER_EMAIL_ALREADY_EXISTS` regardless of which
+    field actually caused it; fixed with a `field_validator` rejecting explicit nulls (422 instead
+    of a misleading 400), with `test_patch_with_explicit_null_email_returns_422` and
+    `..._dark_mode_returns_422` added; (2) the delete-confirmation flow's failure path tried to
+    close the modal by setting a `showDeleteModal` variable that was never actually wired to the
+    native `<dialog>` element (which opens/closes via `$refs.deleteModal.showModal()`/`.close()`)
+    — the modal would have silently stayed open over the error message; fixed to call `.close()`
+    on the ref directly (this was also improvement (2) above; the review independently rediscovered
+    it, confirming it was real). Also applied on review: merged two `except` blocks in
+    `update_current_user` that raised byte-for-byte identical `HTTPException`s, and removed a
+    redundant `btn-disabled` class already covered by the native `:disabled` attribute. Not
+    actioned — recorded instead in `docs/project-status.md`'s Suggestions for Future Review as a
+    second, stronger flag: the profile page repeats the same DaisyUI card/form markup already
+    duplicated four times across the auth templates, which #14's review named #15 itself as the
+    right point to fix; deferred again here to avoid touching four already-shipped, tested
+    templates outside this issue's scope
 - GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),
