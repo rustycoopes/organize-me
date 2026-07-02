@@ -8,6 +8,9 @@ class Settings(BaseSettings):
 
     database_url: str
     jwt_secret: str
+    google_oauth_client_id: str
+    google_oauth_client_secret: str
+    google_oauth_redirect_uri: str
 
 
 @lru_cache

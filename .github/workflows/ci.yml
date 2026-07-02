@@ -17,6 +17,9 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
       JWT_SECRET: ${{ secrets.JWT_SECRET_QA }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,10 +68,16 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET_QA }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
           JWT_SECRET: "${JWT_SECRET}"
+          GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
+          GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
+          GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
           EOF
 
       - name: Build image

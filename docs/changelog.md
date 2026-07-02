@@ -177,6 +177,62 @@
     SQLAlchemy query expressions like `User.email == ...` type as `bool` instead of
     `ColumnElement[bool]` under mypy; `tests/test_db_session.py`'s pre-existing query needed one
     scoped `# type: ignore[arg-type]`
+- **Issue #13 implemented** — Google OAuth login (branch `feature/slice-1-google-oauth`):
+  - New dependency `httpx-oauth`; `app/auth/oauth.py`'s `get_google_oauth_client()` builds a
+    `GoogleOAuth2` client lazily from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` settings (mirrors
+    `app/auth/backend.py`'s `get_jwt_strategy()` pattern) — overridable in tests with a fake
+    client that never calls Google, per the issue's "no live Google credentials touched" requirement
+  - `app/models/oauth_account.py` — `OAuthAccount` table (`fastapi-users-db-sqlalchemy`'s
+    `SQLAlchemyBaseOAuthAccountTableUUID` mixin, with `user_id`'s FK re-pointed at this app's
+    `users` table instead of the mixin's hardcoded default `user`); `User.oauth_accounts`
+    relationship wired in; new Alembic migration
+  - Custom `GET /api/v1/auth/google` (redirects to Google's consent URL — issued as a real
+    302, unlike fastapi-users' built-in `get_oauth_router`, which returns JSON) and
+    `GET /api/v1/auth/google/callback` (exchanges the code, then reuses fastapi-users'
+    `UserManager.oauth_callback()` — same create-or-reuse-by-oauth-account logic the library
+    uses internally — and logs in through the existing `auth_backend`, setting the identical
+    `organizeme_auth` JWT cookie as email/password login)
+  - Anti-CSRF `state`: a short-lived signed JWT (embedding a random token + the originating
+    page) plus a matching HTTPOnly double-submit cookie, checked at the callback — the same
+    pattern fastapi-users' own OAuth router uses internally, hand-rolled here because the
+    redirect requirement above rules out reusing the router directly
+  - Account linking: a Google sign-in whose email matches an existing email/password account is
+    linked to it (`associate_by_email=True`) rather than rejected, and marked verified without a
+    separate step since Google already verified the address (`is_verified_by_default=True`) —
+    documented in `docs/technical-approach.md`'s Authentication section
+  - "Sign in with Google" button (with Google's four-colour "G" mark) added to the login and
+    register DaisyUI pages
+  - Five improvements applied after comparing the implementation against issue #13's acceptance
+    criteria: (1) Google consent errors/cancellations (`error=access_denied`) now redirect back to
+    the originating page with a friendly banner instead of a raw 400 body, since this endpoint is
+    only ever reached via full-page browser navigation; (2) the originating page (login vs
+    register) is preserved through the OAuth round trip via a `next` param embedded in the signed
+    state, restricted to an allowlist to avoid an open redirect; (3) the CSRF cookie is cleared on
+    every exit path, not just success; (4) the sign-in buttons render Google's own four-colour "G"
+    icon instead of plain text; (5) test coverage added for the cancellation/error-redirect path
+    on both origin pages
+  - Multi-agent code review (8 parallel finder angles, then 1-vote verification) caught three real
+    bugs before commit, all fixed: Google's token/profile exchange
+    (`get_access_token`/`get_id_email`) wasn't wrapped in error handling, so a replayed/expired
+    authorization code raised an unhandled exception → raw 500 instead of the graceful redirect
+    every other failure path uses; concurrent first-time Google logins for the same email had no
+    `IntegrityError` guard around the race (unlike the identical race `register()` already
+    guards, whose comment explains the Cloud Run multi-instance scenario), and the paired
+    `except UserAlreadyExists` was unreachable dead code since `associate_by_email=True` is always
+    passed; `secrets.compare_digest` raises `TypeError` (not a clean `False`) on a non-ASCII CSRF
+    cookie value, which an attacker-controlled raw HTTP client can send directly. Also fixed: the
+    `next`-path allowlist validation was duplicated with slightly different shapes between the two
+    endpoints, unified into one `_sanitize_next()` helper. One finding was confirmed but
+    deliberately left unchanged: `User.oauth_accounts`'s `lazy="joined"` (required by
+    fastapi-users' own async-SQLAlchemy pattern for `add_oauth_account`) puts a `LEFT JOIN`
+    against `oauth_accounts` on every `User` load app-wide, not just the Google login path —
+    documented as an accepted trade-off in `app/models/user.py` rather than reworked, since
+    `selectin` would only trade the join for an equally-unconditional second query
+  - Discovered mid-implementation that another Claude Code session was concurrently working on
+    issue #14 in the same shared working directory (`C:\dev\organize-me`), which had already
+    checked out `feature/slice-1-forgot-reset-password` and made uncommitted changes; moved this
+    issue's work into an isolated git worktree (`.claude/worktrees/slice-1-google-oauth`) rather
+    than risk clobbering it
 - GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),

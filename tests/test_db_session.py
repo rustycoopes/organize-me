@@ -21,7 +21,10 @@ async def test_insert_and_read_back_user(db_session: AsyncSession) -> None:
     result = await db_session.execute(
         select(User).where(User.email == "smoke-test@example.com")  # type: ignore[arg-type]
     )
-    fetched = result.scalar_one()
+    # .unique() is required whenever the query touches a joined-eager-loaded collection -
+    # User.oauth_accounts uses lazy="joined" (see app/models/user.py) so SQLAlchemy can dedupe
+    # the row multiplication a LEFT OUTER JOIN against that collection would otherwise produce.
+    fetched = result.unique().scalar_one()
 
     assert fetched.id == user.id
     assert fetched.name == "Smoke Test"
