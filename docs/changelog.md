@@ -10,6 +10,12 @@
 ## [Unreleased]
 
 ### Fixed
+- **Issue #27** — Google sign-in hung on Google's consent page and never returned to the app
+  (branch `fix/google-oauth-callback-redirect`). The `/api/v1/auth/google/callback` success path
+  returned fastapi-users' default cookie login response — a bare `204 No Content` — so the
+  full-page browser redirect from Google had nothing to navigate to. Now it `302`s to `/profile`,
+  carrying the auth cookie across from the backend login response. Follow-up #43 filed for the
+  same latent `204` shape on `POST /auth/login` (currently masked by client-side JS).
 - **Post-merge prod deploy hotfixes** (direct to `main`, after PR #19): Alembic `%`-interpolation
   crash, Supabase IPv6 → pooler URL, and asyncpg `statement_cache_size=0` under PgBouncer
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)

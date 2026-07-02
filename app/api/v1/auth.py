@@ -43,6 +43,12 @@ GOOGLE_OAUTH_STATE_LIFETIME_SECONDS = 600
 GOOGLE_OAUTH_DEFAULT_NEXT = "/login"
 GOOGLE_OAUTH_ALLOWED_NEXT_PATHS = {"/login", "/register"}
 
+# Where a successful Google sign-in lands the browser. /profile is the only authenticated page
+# in Slice 1 (it bounces unauthenticated visitors back to /login); repoint this to /dashboard
+# once the sidebar shell (issue #17) exists. Kept in sync with the email/password login's
+# client-side redirect target in templates/auth/login.html.
+GOOGLE_OAUTH_SUCCESS_REDIRECT = "/profile"
+
 
 def _sanitize_next(value: object) -> str:
     """Used at both /google (a query param) and /google/callback (a decoded JWT state
@@ -283,6 +289,17 @@ async def google_callback(
     if not user.is_active:
         return failure_redirect()
 
-    response = await auth_backend.login(strategy, user)
-    response.delete_cookie(GOOGLE_OAUTH_STATE_COOKIE_NAME)
-    return response
+    # This endpoint is only ever reached via a full-page browser redirect from Google, so the
+    # success response has to navigate the browser back into the app itself. auth_backend.login
+    # returns fastapi-users' default cookie login response - a bare 204 No Content - which a
+    # browser following a redirect simply renders as nothing, leaving the user stranded on
+    # Google's consent page (issue #27). Instead, 302 to /profile and carry the auth cookie
+    # across by copying the backend's Set-Cookie header(s) onto the redirect, so the cookie's
+    # name/max-age/secure/samesite stay defined in one place (app.auth.backend.cookie_transport).
+    login_response = await auth_backend.login(strategy, user)
+    redirect = RedirectResponse(GOOGLE_OAUTH_SUCCESS_REDIRECT, status_code=status.HTTP_302_FOUND)
+    for header_name, header_value in login_response.raw_headers:
+        if header_name.lower() == b"set-cookie":
+            redirect.raw_headers.append((header_name, header_value))
+    redirect.delete_cookie(GOOGLE_OAUTH_STATE_COOKIE_NAME)
+    return redirect
