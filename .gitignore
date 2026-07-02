@@ -8,6 +8,11 @@ service-account*.json
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
+# Claude Code worktrees & local plans — full repo copies / scratch; keep them out of
+# search (ripgrep/glob respect .gitignore) and out of the tree
+.claude/worktrees/
+.claude/plans/
+.claude/scheduled_tasks.lock
 
 # Python
 __pycache__/
