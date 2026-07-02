@@ -21,12 +21,14 @@ os.environ.setdefault("COOKIE_SECURE", "false")
 
 from collections.abc import AsyncIterator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
 from app.db.url import to_asyncpg_url
+from app.services.notifications.email import FakeEmailSender
 
 
 @pytest_asyncio.fixture
@@ -50,8 +52,15 @@ async def db_session() -> AsyncIterator[AsyncSession]:
         await engine.dispose()
 
 
+@pytest.fixture
+def fake_email_sender() -> FakeEmailSender:
+    return FakeEmailSender()
+
+
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+async def client(
+    db_session: AsyncSession, fake_email_sender: FakeEmailSender
+) -> AsyncIterator[AsyncClient]:
     """httpx client for endpoint tests, wired to the same rolled-back db_session.
 
     Overrides the app's get_db dependency rather than letting request handlers
@@ -59,14 +68,23 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     binds asyncpg connections to the event loop that first created it, which breaks
     across pytest-asyncio's per-test event loops (see tests/conftest.py::db_session's
     own dedicated-engine-per-test docstring for the same underlying issue).
+
+    Also overrides get_email_sender with a FakeEmailSender (see the fake_email_sender
+    fixture) so no test ever calls the real Resend API.
     """
+    from app.auth.users import get_email_sender
     from app.db.session import get_db
     from app.main import app
+    from app.services.notifications.email import EmailSender
 
     async def override_get_db() -> AsyncIterator[AsyncSession]:
         yield db_session
 
+    def override_get_email_sender() -> EmailSender:
+        return fake_email_sender
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_email_sender] = override_get_email_sender
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:

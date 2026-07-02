@@ -65,10 +65,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET_QA }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
           JWT_SECRET: "${JWT_SECRET}"
+          RESEND_API_KEY: "${RESEND_API_KEY}"
           EOF
 
       - name: Build image

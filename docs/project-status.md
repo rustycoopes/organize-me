@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), and #12 (email/password auth, PR #20) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health` plus the new `/register`/`/login` pages are confirmed live on both Cloud Run services. Next up: #13.
+**Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17). Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), and #12 (email/password auth, PR #20) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health` plus the new `/register`/`/login` pages are confirmed live on both Cloud Run services. Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password`, PR pending. Next up: #13 (Google OAuth, out of order — #14 was picked up first per direct request).
 
 ## Completed Milestones
 
@@ -22,6 +22,7 @@
 | 2026-07-01 | Issue #11 (DB foundation — Supabase connection + `users` table) implemented — SQLAlchemy 2.0 async engine/session, Alembic async migrations, pydantic-settings config, transaction-rollback pytest fixture against real Supabase QA DB — on branch `feature/slice-1-db-foundation` |
 | 2026-07-01 | Issues #10 and #11 merged into `main` (PRs #18, #19). Post-merge, `deploy.yml`'s prod gate caught that the `SUPABASE_PROD_URL` secret still used Supabase's IPv6-only direct-connection host (same issue QA's secret had) and that prod's transaction-mode pooler needed asyncpg's prepared-statement cache disabled (`statement_cache_size=0`) — both fixed directly on `main`; `test` + `deploy-prod` are green and prod `/health` is confirmed live |
 | 2026-07-02 | Issue #12 (email/password auth — register/login/logout) implemented — FastAPI-Users v15, bcrypt password hashing, JWT-in-HTTPOnly-cookie (7-day expiry), DaisyUI register/login pages. Discovered and fixed a live-deployment gap: QA/prod Cloud Run services had zero environment variables wired in at all; added `JWT_SECRET_QA`/`JWT_SECRET_PROD` secrets and `--env-vars-file` deploy wiring for `DATABASE_URL`+`JWT_SECRET`. Merged into `main` (PR #20); `deploy.yml` green and prod `/health`, `/register`, `/login` confirmed live |
+| 2026-07-02 | Issue #14 (forgot/reset password) implemented on branch `feature/slice-1-forgot-reset-password` — `POST /api/v1/auth/forgot-password` + `/reset-password`, DaisyUI forgot/reset-password pages, and `app/services/notifications/email.py` (`EmailSender` protocol, `ResendEmailSender`, `FakeEmailSender`) — the first cut of the email interface Slice 7 (Notifications) will reuse. Proactively wired `RESEND_API_KEY` into both `ci.yml`/`deploy.yml` Cloud Run env-vars (closing the same "secret exists but isn't wired to the running service" gap class that bit #10 and #12) instead of discovering it post-merge |
 
 ## Next Steps
 
@@ -30,7 +31,7 @@
    - #11 DB foundation — Supabase connection + `users` table — ✅ merged
    - #12 Email/password auth — register, login, logout — ✅ merged
    - #13 Google OAuth login
-   - #14 Forgot / reset password
+   - #14 Forgot / reset password — ✅ implemented, PR pending
    - #15 Profile — view/edit, dark mode, account deletion
    - #16 Landing page
    - #17 Sidebar shell + placeholder pages

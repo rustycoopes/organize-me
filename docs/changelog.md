@@ -177,6 +177,67 @@
     SQLAlchemy query expressions like `User.email == ...` type as `bool` instead of
     `ColumnElement[bool]` under mypy; `tests/test_db_session.py`'s pre-existing query needed one
     scoped `# type: ignore[arg-type]`
+- **Issue #14 implemented** — forgot/reset password (branch `feature/slice-1-forgot-reset-password`,
+  picked up ahead of #13 per direct request):
+  - `app/services/notifications/email.py` — the first cut of the email-sending interface Slice 7
+    (Notifications) will reuse: an `EmailSender` protocol (`to`/`subject`/`html`), `ResendEmailSender`
+    (wraps the `resend` SDK's blocking client in `asyncio.to_thread`), and `FakeEmailSender` (records
+    sent messages; used everywhere in the test suite so no test ever calls the real Resend API)
+  - `app/core/config.py` — `resend_api_key` (default `""`) and `email_from` (default Resend's shared
+    sandbox sender, `OrganizeMe <onboarding@resend.dev>`, which works without a verified custom
+    domain but only delivers to the Resend account owner's own address until one is verified)
+  - `UserManager.on_after_forgot_password` (`app/auth/users.py`) sends the reset-link email; the
+    link's origin is built from the *incoming request's* `base_url` rather than a static `BASE_URL`
+    setting, so it's correct on both the QA and prod Cloud Run domains with no extra per-environment
+    config. Token single-use behaviour comes for free from fastapi-users' own design: the JWT embeds
+    a fingerprint of the current password hash, so a token stops verifying the moment the password
+    it was issued for has already been changed
+  - `POST /api/v1/auth/forgot-password` / `/reset-password` (`app/api/v1/auth.py`) and matching
+    DaisyUI pages at `GET /forgot-password` / `/reset-password` (`app/templates/auth/`)
+  - `tests/conftest.py`'s `client` fixture now also overrides `get_email_sender` with a
+    `FakeEmailSender`, exposed via a new `fake_email_sender` fixture so tests can assert on the
+    stub's call args
+  - Five improvements applied after comparing the implementation against issue #14: (1) a "Forgot
+    password?" link added to the login page — without it, #14's flow would have been functionally
+    complete but undiscoverable from the existing UI; (2) a confirm-password field added to the
+    reset-password form, with a server-side match check (`RESET_PASSWORD_PASSWORD_MISMATCH`, 400 on
+    mismatch) so a typo in the new password can't silently lock the user out; (3)
+    `test_forgot_password_email_lookup_is_case_insensitive` added — forgot-password relies on the
+    same case-insensitive `get_by_email` lookup #11/#12 already established, but this was previously
+    unverified for this endpoint; (4)
+    `test_reset_password_below_minimum_length_returns_400` added — confirms the 8-character minimum
+    password policy (`UserManager.validate_password`) is also enforced on the reset path, not just
+    register; (5) `RESEND_API_KEY` proactively wired into both `ci.yml` and `deploy.yml`'s Cloud Run
+    `--env-vars-file` step, closing the exact "secret exists in GitHub but was never wired to the
+    running service" gap class that #10 (Celery worker env vars) and #12 (`JWT_SECRET`) both hit
+    post-merge, instead of discovering it after this merges
+  - Found a pre-existing uncommitted change on `main` when starting this issue (an `httpx-oauth`
+    dependency added to `pyproject.toml`/`uv.lock`, unrelated to #14 — likely unfinished local prep
+    for #13's Google OAuth work); stashed separately rather than discarding or folding it into this
+    branch
+  - Multi-angle code review (8 finder angles, 1-vote verify) caught three real issues, all fixed:
+    (1) a failure calling the email provider (bad/missing `RESEND_API_KEY`, Resend outage) inside
+    `on_after_forgot_password` was unhandled and would 500 — but *only* for registered emails,
+    which itself leaks account existence via status code even though the response body was
+    already identical for both cases; now caught and logged, endpoint always returns 200;
+    (2) `reset_password`'s exception handling didn't cover `UserNotExists`, which
+    `BaseUserManager.reset_password` raises internally if the account the token was issued for
+    was deleted before the token was used — now mapped to the same generic bad-token 400; (3)
+    uvicorn's default `--forwarded-allow-ips=127.0.0.1` doesn't trust Cloud Run's actual proxy
+    peer address, so `request.base_url` (used to build the emailed reset link) could report
+    `http://` instead of `https://` in prod/QA — fixed by adding `--proxy-headers
+    --forwarded-allow-ips='*'` to `supervisord.conf`'s uvicorn command (safe here because Cloud
+    Run containers are only ever reachable through Google's own proxy, never directly; confirmed
+    with the user before applying since it's a deploy-config security setting). Two more
+    review-flagged findings were accepted as known, unfixed follow-ups: forgot-password's response
+    *body* is identical for known/unknown emails, but response *timing* isn't (a known email pays
+    for JWT generation + a live Resend network call the unknown-email path skips) — a full fix
+    would need to fire an equivalent-cost dummy operation on the unknown-email path, which isn't
+    straightforward for a network-bound call and wasn't attempted here; and the four DaisyUI auth
+    templates (`login.html`, `register.html`, and the two new pages) now duplicate the same
+    card/form markup four times over — flagged as a good trigger point for a shared Jinja
+    include/macro in a future cleanup pass, not done here to avoid touching `login.html`/
+    `register.html` beyond issue #14's scope
 - GitHub issues #10–#17 — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),

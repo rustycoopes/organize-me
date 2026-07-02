@@ -15,6 +15,7 @@ dependencies = [
     "fastapi-users-db-sqlalchemy>=7.0.0",
     "fastapi-users[sqlalchemy]>=15.0.0",
     "pydantic-settings>=2.14.2",
+    "resend>=2.32.2",
 ]
 
 [dependency-groups]
