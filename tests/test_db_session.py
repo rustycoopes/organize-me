@@ -15,7 +15,12 @@ async def test_insert_and_read_back_user(db_session: AsyncSession) -> None:
     db_session.add(user)
     await db_session.flush()
 
-    result = await db_session.execute(select(User).where(User.email == "smoke-test@example.com"))
+    # User.email is typed as plain `str` (not Mapped[str]) under TYPE_CHECKING so User satisfies
+    # fastapi_users' UserProtocol (see app/models/user.py) - harmless at runtime, but it means
+    # mypy sees this comparison as str.__eq__ -> bool instead of a SQLAlchemy ColumnElement.
+    result = await db_session.execute(
+        select(User).where(User.email == "smoke-test@example.com")  # type: ignore[arg-type]
+    )
     fetched = result.scalar_one()
 
     assert fetched.id == user.id

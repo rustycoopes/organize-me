@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Register — OrganizeMe{% endblock %}
+
+{% block content %}
+<div class="flex min-h-screen items-center justify-center px-4">
+  <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h1 class="card-title">Create your account</h1>
+      <p class="text-sm text-base-content/70">Self-registration is open — no invite needed.</p>
+
+      <form method="post" action="/api/v1/auth/register" class="flex flex-col gap-4 mt-2">
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Email</span></div>
+          <input
+            type="email"
+            name="email"
+            id="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Password</span></div>
+          <input
+            type="password"
+            name="password"
+            id="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+            placeholder="At least 8 characters"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <button type="submit" class="btn btn-primary mt-2">Register</button>
+      </form>
+
+      <p class="text-sm mt-4">
+        Already have an account?
+        <a href="/login" class="link link-primary">Log in</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

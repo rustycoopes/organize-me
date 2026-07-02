@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import DateTime, Index, String, func, text
@@ -17,8 +18,16 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     )
 
     # Override the mixin's plain case-sensitive unique index; ix_users_email_lower above
-    # replaces it.
-    email: Mapped[str] = mapped_column(String(length=320), nullable=False, index=False, unique=False)
+    # replaces it. Typed under TYPE_CHECKING as plain `str` (matching the base mixin's own
+    # convention), not `Mapped[str]`, so this class keeps satisfying fastapi_users'
+    # UserProtocol structurally under mypy - re-declaring it as Mapped[str] here would shadow
+    # the base class's TYPE_CHECKING-only `email: str` and fail the protocol check.
+    if TYPE_CHECKING:
+        email: str
+    else:
+        email: Mapped[str] = mapped_column(
+            String(length=320), nullable=False, index=False, unique=False
+        )
 
     name: Mapped[str | None] = mapped_column(nullable=True)
     phone_number: Mapped[str | None] = mapped_column(nullable=True)

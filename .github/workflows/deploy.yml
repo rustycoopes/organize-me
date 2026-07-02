@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.SUPABASE_PROD_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET_PROD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +61,16 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
+      - name: Write Cloud Run env vars file
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_PROD_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_PROD }}
+        run: |
+          cat > /tmp/cloud-run-env.yaml <<EOF
+          DATABASE_URL: "${DATABASE_URL}"
+          JWT_SECRET: "${JWT_SECRET}"
+          EOF
+
       - name: Build image
         run: |
           docker build \
@@ -78,4 +89,5 @@ jobs:
             --image=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
+            --env-vars-file=/tmp/cloud-run-env.yaml \
             --quiet

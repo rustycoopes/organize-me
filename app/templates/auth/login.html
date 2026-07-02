@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Log in — OrganizeMe{% endblock %}
+
+{% block content %}
+<div class="flex min-h-screen items-center justify-center px-4">
+  <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h1 class="card-title">Log in</h1>
+
+      <form method="post" action="/api/v1/auth/login" class="flex flex-col gap-4 mt-2">
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Email</span></div>
+          <input
+            type="email"
+            name="email"
+            id="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Password</span></div>
+          <input
+            type="password"
+            name="password"
+            id="password"
+            required
+            autocomplete="current-password"
+            placeholder="********"
+            class="input input-bordered w-full"
+          />
+        </label>
+
+        <button type="submit" class="btn btn-primary mt-2">Log in</button>
+      </form>
+
+      <p class="text-sm mt-4">
+        Don't have an account?
+        <a href="/register" class="link link-primary">Register</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
