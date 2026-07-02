@@ -9,6 +9,12 @@
 
 This document captures all design decisions made during a structured Q&A session on top of the PRD and tech design doc. Its purpose is to provide enough detail to generate a concrete, ordered set of implementation tasks. The build strategy is **vertical slices** — each slice delivers a complete end-to-end user-facing feature (DB migration + API endpoints + Jinja2/HTMX frontend + tests) in one go.
 
+> **Per-slice specs:** Each slice now has its own self-contained file under
+> [`docs/slices/`](slices/) — see the index below. When implementing an issue, read only that
+> slice's file (it embeds the relevant schema, endpoints, and utilities) rather than this whole
+> document. This document holds the shared/stable reference: stack, full schema, full endpoint
+> map, cross-slice utilities, and testing approach.
+
 ---
 
 ## Confirmed Stack (no changes from tech-approach.md)
@@ -183,154 +189,49 @@ UNIQUE(user_id, description, resolved_date)  -- duplicate detection
 
 All under `/api/v1/`:
 
-| Method | Path | Purpose |
+| Method | Path | Purpose | Slice |
+|---|---|---|---|
+| POST | /auth/register | Email/password registration | 1 |
+| POST | /auth/login | Login, set JWT cookie | 1 |
+| POST | /auth/logout | Clear cookie | 1 |
+| GET/POST | /auth/google | Google OAuth flow | 1 |
+| POST | /auth/forgot-password | Send reset email | 1 |
+| POST | /auth/reset-password | Apply new password | 1 |
+| GET/PATCH | /users/me | Get/update profile | 1 |
+| DELETE | /users/me | Delete account | 1 |
+| GET/PUT | /storage-config | Get/set storage config | 2 |
+| POST | /storage-config/google-drive/auth | Start Google Drive OAuth | 2 |
+| GET | /storage-config/google-drive/callback | OAuth callback | 2 |
+| GET/PUT | /llm-prompt | Get/update user's prompt | 3 |
+| POST | /llm-prompt/reset | Reset to factory default | 3 |
+| POST | /upload | Upload file for immediate processing | 4 |
+| GET | /processing-runs/{id}/sse | SSE stream for live step updates | 4 |
+| GET | /processing-runs | List processing history | 6 |
+| GET | /processing-runs/{id} | Run detail (steps + status) | 6 |
+| GET | /processing-runs/{id}/logs | Structured log lines | 6 |
+| GET | /processing-runs/{id}/logs/download | Download logs as JSON | 6 |
+| GET | /events | List events (paginated, filtered, sorted) | 5 |
+| DELETE | /events/{id} | Delete single event | 5 |
+| POST | /internal/trigger-scan | Cloud Scheduler webhook (internal) | 9 |
+
+---
+
+## Vertical Implementation Slices — Index
+
+Each slice is a self-contained spec under [`docs/slices/`](slices/). Read the relevant one
+when implementing an issue; it embeds the schema tables, endpoints, and utilities that slice needs.
+
+| Slice | File | Delivers |
 |---|---|---|
-| POST | /auth/register | Email/password registration |
-| POST | /auth/login | Login, set JWT cookie |
-| POST | /auth/logout | Clear cookie |
-| GET/POST | /auth/google | Google OAuth flow |
-| POST | /auth/forgot-password | Send reset email |
-| POST | /auth/reset-password | Apply new password |
-| GET/PATCH | /users/me | Get/update profile |
-| DELETE | /users/me | Delete account |
-| GET/PUT | /storage-config | Get/set storage config |
-| POST | /storage-config/google-drive/auth | Start Google Drive OAuth |
-| GET | /storage-config/google-drive/callback | OAuth callback |
-| GET/PUT | /llm-prompt | Get/update user's prompt |
-| POST | /llm-prompt/reset | Reset to factory default |
-| POST | /upload | Upload file for immediate processing |
-| GET | /processing-runs | List processing history |
-| GET | /processing-runs/{id} | Run detail (steps + status) |
-| GET | /processing-runs/{id}/logs | Structured log lines |
-| GET | /processing-runs/{id}/logs/download | Download logs as JSON |
-| GET | /processing-runs/{id}/sse | SSE stream for live step updates |
-| GET | /events | List events (paginated, filtered, sorted) |
-| DELETE | /events/{id} | Delete single event |
-| POST | /internal/trigger-scan | Cloud Scheduler webhook (internal) |
-
----
-
-## Vertical Implementation Slices
-
-### Slice 1 — Project Scaffold + Auth + CI/CD
-**Delivers:** Runnable app deployed to Cloud Run. Users can register, log in (email or Google), reset password, view/edit profile, toggle dark mode, delete account.
-
-**Includes:**
-- `pyproject.toml`, `Dockerfile`, `supervisord.conf`
-- `.env.local` structure + `.gitignore`
-- FastAPI app skeleton (`app/main.py`, routers, lifespan)
-- Supabase connection + SQLAlchemy async engine + Alembic init migration
-- FastAPI-Users setup: User model, auth backends (email/password + Google OAuth)
-- `users` table migration
-- Landing page (hero + features + CTA sections)
-- Login / register / forgot-password / reset-password pages (DaisyUI forms)
-- Profile page (name, email, phone, dark/light mode toggle)
-- Sidebar shell (all nav items present but links to placeholder pages)
-- GitHub Actions `ci.yml` + `deploy.yml`
-- GCP Cloud Run services (QA + prod), Artifact Registry, Secret Manager secrets
-
----
-
-### Slice 2 — Settings: Google Drive Storage
-**Delivers:** User can connect Google Drive, set a folder path, and disconnect.
-
-**Includes:**
-- `storage_configs` table migration
-- `StorageProvider` abstract base class (`list_new_files()`, `move_file()`, `download_file()`)
-- Google Drive implementation of `StorageProvider`
-- Google Drive OAuth flow (auth redirect + callback + token storage encrypted)
-- Settings page > Storage tab (shows Drive fields; Dropbox/S3 stubs hidden)
-- Form shows/hides fields based on selected provider (Alpine.js)
-- `onboarding_storage_done` flag set on first successful connection
-
----
-
-### Slice 3 — LLM Prompt Page
-**Delivers:** User can view, edit, and reset their extraction prompt.
-
-**Includes:**
-- `llm_prompts` table migration
-- Factory default prompt constant + seed on user creation
-- Prompt page: textarea editor, Save button, Reset to Default button
-- `/api/v1/llm-prompt` GET/PUT/reset endpoints
-
----
-
-### Slice 4 — Manual Upload + Processing Pipeline + SSE Progress
-**Delivers:** User uploads a file, sees live pipeline progress, and extracted events appear in the dashboard.
-
-**Includes:**
-- Upload page (drag-and-drop + file picker, `.txt`/`.zip`/`.csv`)
-- `processing_runs` + `processing_steps` + `events` table migrations
-- Celery task: 7-step pipeline
-  1. File Received (record run, record step)
-  2. Extract (unzip if `.zip`)
-  3. Filter by Date (message window from settings, default 7 days)
-  4. Call Gemini LLM (google-genai SDK; fail immediately on error)
-  5. Parse LLM Response (Pydantic validation)
-  6. Deduplicate & Save (UNIQUE constraint check; parse `resolved_date_earliest`)
-  7. Notify (SMS + email; send even if 0 new events)
-- SSE endpoint `/api/v1/processing-runs/{id}/sse` (sse-starlette)
-- Pipeline progress page: 7 step indicators with live SSE updates (HTMX)
-- `onboarding_first_upload_done` flag set on first upload
-
----
-
-### Slice 5 — Events Dashboard
-**Delivers:** Full events table with filters, sort, pagination, calendar/tasks links, and delete.
-
-**Includes:**
-- Dashboard page: table (type, description, resolved_date, raw_date_text, agreed_by chips, Calendar link, Tasks link, Delete)
-- Filters: event type dropdown, date range pickers, free-text search (HTMX-driven)
-- Default sort: newest `resolved_date_earliest` first; user-sortable by date
-- Pagination: 50 per page
-- Google Calendar URL builder (title + resolved_date_earliest + description with raw_date_text and agreed_by)
-- Google Tasks URL builder (title + due date)
-- Single event delete (with confirmation via DaisyUI modal)
-- Getting Started checklist (3 steps, shown until all complete)
-
----
-
-### Slice 6 — Processing History + Logs
-**Delivers:** User can review all past runs, drill into step detail, search logs, and download them.
-
-**Includes:**
-- Processing history list page (run date, filename, status, event count)
-- Run detail page (per-step status indicators + log lines)
-- Log viewer: searchable (HTMX filter), structured display
-- Download logs endpoint (JSON response)
-
----
-
-### Slice 7 — Notifications (Email + SMS)
-**Delivers:** Users receive branded email and SMS after processing runs (success and failure).
-
-**Includes:**
-- Resend integration (branded HTML email template: OrganizeMe header, event summary table, dashboard link)
-- Twilio SMS integration (success: count + link; failure: details + link)
-- Settings > Notifications tab: toggle SMS on/off, toggle email on/off
-- `onboarding_notifications_done` flag set when user saves notification prefs
-
----
-
-### Slice 8 — Dropbox + S3 Storage Providers
-**Delivers:** Settings > Storage tab fully supports all three providers.
-
-**Includes:**
-- Dropbox `StorageProvider` implementation (OAuth 2.0 flow)
-- S3 `StorageProvider` implementation (manual credentials: access key, secret, bucket, region)
-- Settings > Storage tab updated: provider selector shows all three; form fields conditionally shown per provider (Alpine.js)
-
----
-
-### Slice 9 — Automated File Watch (Cloud Scheduler)
-**Delivers:** System automatically detects and processes new files from connected storage every 15 minutes.
-
-**Includes:**
-- `/internal/trigger-scan` endpoint (authenticated with a shared secret header)
-- Celery scan task: for each user with active storage config, list new files and enqueue `FileProcessTask` per file
-- GCP Cloud Scheduler job configuration (POST every 15 min)
-- File lifecycle: move to `processed/` on success, `failed/` on failure
+| 1 | [slice-1.md](slices/slice-1.md) | Project scaffold + auth (email/Google/reset) + profile + CI/CD |
+| 2 | [slice-2.md](slices/slice-2.md) | Settings: Google Drive storage connect/disconnect |
+| 3 | [slice-3.md](slices/slice-3.md) | LLM prompt page (view/edit/reset) |
+| 4 | [slice-4.md](slices/slice-4.md) | Manual upload + 7-step processing pipeline + SSE progress |
+| 5 | [slice-5.md](slices/slice-5.md) | Events dashboard (filter/sort/paginate/calendar/delete) |
+| 6 | [slice-6.md](slices/slice-6.md) | Processing history + searchable/downloadable logs |
+| 7 | [slice-7.md](slices/slice-7.md) | Notifications (Resend email + Twilio SMS) |
+| 8 | [slice-8.md](slices/slice-8.md) | Dropbox + S3 storage providers |
+| 9 | [slice-9.md](slices/slice-9.md) | Automated file watch (Cloud Scheduler) |
 
 ---
 
@@ -354,7 +255,7 @@ All under `/api/v1/`:
 - **Storage provider tests**: inject `FakeStorageProvider` (implements ABC) — never hit live credentials
 - **Notification tests**: stub Resend + Twilio at delivery boundary; assert payloads
 - **End-to-end pipeline test** (one real Gemini call): upload `examples/example.whatsapp.txt`, run full pipeline, assert dashboard rows match `examples/example.lmmoutput.txt`
-- **Browser tests**: dark/light mode toggle persistence, notification toggles, storage config form conditional fields
+- **Browser tests (Playwright)**: a `e2e/` suite runs against the deployed QA Cloud Run instance (`e2e-qa` CI job, after `deploy-qa`) to validate each slice's overall UX delivery — e.g. Slice 1 covers landing page, register/login/logout, forgot/reset password, dark/light mode toggle persistence, profile edit, account deletion, and sidebar nav. Google OAuth is excluded (unreliable to drive headlessly against Google's real consent screen) and stays covered by backend tests. Later slices add their own Playwright specs to the same suite (e.g. storage config form conditional fields, notification toggles) rather than a separate one-off suite per slice.
 
 ---
 

@@ -23,7 +23,7 @@
 | Storage SDKs | dropbox, google-api-python-client, boto3 |
 | Email notifications | Resend (3 000 emails/month free) |
 | SMS notifications | Twilio (~$0.008/message — paid) |
-| Testing | pytest + httpx + pytest-asyncio + factory_boy |
+| Testing | pytest + httpx + pytest-asyncio + factory_boy (backend); Playwright (E2E UX, against deployed QA) |
 | Containerisation | Dockerfile + supervisord (app + Celery worker in one container) |
 | CI/CD | GitHub Actions |
 | Deployment | GCP Cloud Run (app + workers) |
@@ -224,6 +224,7 @@ Two GitHub Actions workflows:
 2. `mypy --strict`
 3. Docker build + push to Artifact Registry
 4. Deploy to Cloud Run (QA)
+5. Playwright E2E suite against the deployed QA instance (`e2e-qa` job, added in Slice 1 issue #23) — required check
 
 **`deploy.yml`** — runs on merge to `main`:
 1. Same test suite

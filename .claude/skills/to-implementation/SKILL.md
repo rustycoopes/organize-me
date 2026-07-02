@@ -8,6 +8,9 @@ description: Implement the new feature onto a branch. Ensure there is a loop to 
 Implement the work described by the issues.
 When starting the issue, move the status to inprogress.
 
+Read only the relevant per-slice spec for this issue — `docs/slices/slice-N.md` (each embeds
+the schema, endpoints, and utilities that slice needs). Don't load the full
+`docs/implementation-plan.md`, PRD, or technical-approach unless a specific question requires it.
 
 Use /tdd where possible, at pre-agreed seams.
 
@@ -18,9 +21,12 @@ Treat this chnage as a major feature and follow the steps defined in claude.md t
 
 Assume mulitple agents are running so use a seperate directory / worktree for this work
 
-Implement this feature as efficiently as possible using multiple agents. When finished compare the changes to the original PRD and suggest at least 5 changes that would improve the code or align better with what is required. 
+Implement this feature as efficiently as possible.
 
-Once done, compare the work done to the original issue.  Suggest and implement 5 improvements.
+Once the implementation is working, do a SINGLE improvement pass: compare the work against the
+original issue (and the slice spec) and list up to 3 concrete improvements that would improve the
+code or align better with what is required. Get the user's approval, then implement only the
+approved ones — do not implement improvements the user hasn't confirmed.
 
 Once done, use /review to review the work.
 
