@@ -59,4 +59,11 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     # SQLAlchemyUserDatabase._get_user, and tests/test_db_session.py). "selectin" wouldn't remove
     # this cost, just turn the join into a second query fired on every load; not worth the
     # complexity of a per-call-site override at this app's scale.
-    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(lazy="joined")
+    # passive_deletes="all" (not plain True): OAuthAccount.user_id is NOT NULL, so without this
+    # SQLAlchemy's unit-of-work would try to NULL it out on session.delete(user) instead of
+    # letting the DB's ON DELETE CASCADE handle it, raising an IntegrityError before the delete
+    # ever reaches Postgres. Plain passive_deletes=True only skips *loading* an unloaded
+    # collection before nulling it - useless here since lazy="joined" means oauth_accounts is
+    # always already loaded, so the "already in the session" null-out still fires. "all" is the
+    # value that actually suppresses the null-out for already-loaded children too.
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(lazy="joined", passive_deletes="all")
