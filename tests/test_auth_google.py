@@ -66,7 +66,9 @@ async def google_login(
         location = authorize_response.headers["location"]
         state = parse_qs(urlparse(location).query)["state"][0]
         return await client.get(
-            "/api/v1/auth/google/callback", params={"code": "fake-code", "state": state}
+            "/api/v1/auth/google/callback",
+            params={"code": "fake-code", "state": state},
+            follow_redirects=False,
         )
     finally:
         del app.dependency_overrides[get_google_oauth_client]
@@ -92,10 +94,28 @@ async def test_google_callback_creates_new_user_on_first_login(client: AsyncClie
 
     response = await google_login(client, email)
 
-    assert response.status_code in (200, 204)
+    # The callback is reached via a full-page browser redirect from Google, so on success it
+    # must 302 the browser back into the app - a bare 204 (fastapi-users' default cookie login
+    # response) leaves the browser stranded on Google's consent page (issue #27).
+    assert response.status_code == 302
+    assert response.headers["location"] == "/profile"
     me = await client.get("/api/v1/users/me")
     assert me.status_code == 200
     assert me.json()["email"] == email
+
+
+async def test_google_callback_redirects_into_app_on_success_carrying_auth_cookie(
+    client: AsyncClient,
+) -> None:
+    """Regression test for issue #27: a successful callback must redirect the browser into the
+    app AND set the auth cookie on that same redirect response. Returning fastapi-users' bare
+    204 login response left the browser sitting on Google's page, appearing to hang forever."""
+    response = await google_login(client, unique_email())
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/profile"
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert any(h.lower().startswith("organizeme_auth=") for h in set_cookie_headers)
 
 
 async def test_google_callback_reuses_existing_user_on_repeat_login(client: AsyncClient) -> None:
@@ -127,7 +147,8 @@ async def test_google_callback_links_to_existing_email_password_account(
 
     response = await google_login(client, email)
 
-    assert response.status_code in (200, 204)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/profile"
     me = await client.get("/api/v1/users/me")
     assert me.json()["id"] == password_account_id
 
