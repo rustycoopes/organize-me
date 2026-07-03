@@ -25,8 +25,10 @@ Implement this feature as efficiently as possible.
 
 Once the implementation is working, do a SINGLE improvement pass: compare the work against the
 original issue (and the slice spec) and list up to 3 concrete improvements that would improve the
-code or align better with what is required. Get the user's approval, then implement only the
-approved ones — do not implement improvements the user hasn't confirmed.
+code or align better with what is required. 
+implement the improvements you recommend for addressing now. 
+For all other suggested improvements Create a GitHub issue with the status of intake. And a label with the slice name. Also add a label  "modelsuggested". 
+
 
 Once done, use /review to review the work.
 
