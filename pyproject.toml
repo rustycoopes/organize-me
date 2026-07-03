@@ -17,6 +17,7 @@ dependencies = [
     "httpx-oauth>=0.16.1",
     "pydantic-settings>=2.14.2",
     "resend>=2.32.2",
+    "cryptography>=44.0.0",
 ]
 
 [dependency-groups]
