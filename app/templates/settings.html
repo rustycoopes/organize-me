@@ -1,0 +1,120 @@
+{% extends "authenticated_base.html" %}
+
+{% block title %}Settings — OrganizeMe{% endblock %}
+
+{% block page %}
+<div class="flex justify-center">
+  <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h1 class="card-title">Settings</h1>
+
+      {# Storage is the only tab in this slice; more land in later ones. #}
+      <div role="tablist" class="tabs tabs-bordered mt-2">
+        <a role="tab" class="tab tab-active" aria-selected="true">Storage</a>
+      </div>
+
+      {#
+        Single-quoted x-data so the double-quoted JS strings inside don't terminate the attribute
+        (the register.html bug from #23). storage_data seeds provider + folder_path from the server.
+      #}
+      <div
+        class="mt-4"
+        x-data='{
+          ...{{ storage_data | tojson }},
+          saving: false,
+          error: "",
+          success: false,
+          async save() {
+            this.saving = true;
+            this.error = "";
+            this.success = false;
+            try {
+              const response = await fetch("/api/v1/storage-config", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  provider: this.provider,
+                  folder_path: this.folder_path,
+                }),
+              });
+              if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                this.error = data.detail || "Could not save changes. Please try again.";
+                return;
+              }
+              this.success = true;
+            } catch (e) {
+              this.error = "Could not save changes. Please try again.";
+            } finally {
+              this.saving = false;
+            }
+          },
+        }'
+      >
+        <div role="alert" class="alert alert-success mt-2" x-show="success" x-cloak>
+          <span>Storage settings saved.</span>
+        </div>
+        <div role="alert" class="alert alert-error mt-2" x-show="error" x-cloak>
+          <span x-text="error"></span>
+        </div>
+
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text">Storage provider</span></div>
+          <select
+            id="provider"
+            name="provider"
+            x-model="provider"
+            class="select select-bordered w-full"
+          >
+            <option value="google_drive" {% if storage_data.provider == "google_drive" %}selected{% endif %}>Google Drive</option>
+            <option value="dropbox" {% if storage_data.provider == "dropbox" %}selected{% endif %}>Dropbox</option>
+            <option value="s3" {% if storage_data.provider == "s3" %}selected{% endif %}>Amazon S3</option>
+          </select>
+        </label>
+
+        {# Google Drive fields: the only provider wired up in this slice. Live OAuth connect
+           lands in #47; here you set the watch-folder path. #}
+        <form
+          class="flex flex-col gap-4 mt-4"
+          x-show="provider === 'google_drive'"
+          @submit.prevent="save"
+        >
+          {# Connection state comes from is_connected (seeded from the stored OAuth token). Always
+             "not connected" in this slice; the connect flow lands in #47. #}
+          <div class="alert mt-2" x-show="!is_connected" x-cloak>
+            <span>Google Drive isn't connected yet — you'll be able to connect it in a later step.</span>
+          </div>
+
+          <label class="form-control w-full">
+            <div class="label"><span class="label-text">Folder path</span></div>
+            <input
+              type="text"
+              id="folder_path"
+              name="folder_path"
+              x-model="folder_path"
+              value="{{ storage_data.folder_path }}"
+              placeholder="/OrganizeMe"
+              required
+              class="input input-bordered w-full"
+            />
+          </label>
+          <button type="submit" class="btn btn-primary mt-2" :disabled="saving">
+            <span x-show="!saving">Save changes</span>
+            <span x-show="saving" x-cloak>Saving...</span>
+          </button>
+        </form>
+
+        {# Dropbox / S3 are reserved in the provider enum but have no implementation yet: shown
+           only when explicitly selected (so the conditional-field behaviour is real), never by
+           default. #}
+        <div class="mt-4" x-show="provider === 'dropbox'" x-cloak>
+          <p class="text-sm opacity-70">Dropbox support is coming soon.</p>
+        </div>
+        <div class="mt-4" x-show="provider === 's3'" x-cloak>
+          <p class="text-sm opacity-70">Amazon S3 support is coming soon.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
