@@ -54,6 +54,11 @@ class StorageConfig(Base):
     # ones are populated depends on the provider.
     oauth_access_token: Mapped[str | None] = mapped_column(nullable=True)
     oauth_refresh_token: Mapped[str | None] = mapped_column(nullable=True)
+    # When the stored access token expires (from Google's expires_in). Nullable - unset until a
+    # successful Google Drive connection (#47); lets the Slice 4 pipeline refresh proactively.
+    oauth_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     s3_access_key: Mapped[str | None] = mapped_column(nullable=True)
     s3_secret_key: Mapped[str | None] = mapped_column(nullable=True)
     s3_bucket_name: Mapped[str | None] = mapped_column(nullable=True)

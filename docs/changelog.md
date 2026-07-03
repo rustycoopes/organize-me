@@ -44,6 +44,29 @@
   pytest guard asserts `E2E_TEST_MODE` never appears in `deploy.yml` (prod). A separate
   reset-password raw-JSON UX gap surfaced during this work is recorded in `project-status.md`
   (Suggestions for Future Review #21) for a follow-up.
+- **Issue #47** — Slice 2.2 Google Drive OAuth connect/disconnect + onboarding flag (branch
+  `feature/slice-2-gdrive-oauth`). The live Drive connect/disconnect flow layered onto the Storage
+  tab. New `app/api/v1/storage_google_drive.py`: `POST /auth` (same-origin fetch → returns Google's
+  consent URL as JSON + sets a CSRF cookie; drive scope, `access_type=offline`/`prompt=consent` for
+  a refresh token; a fetch, not a top-level form POST, because the SameSite=Lax auth cookie
+  wouldn't ride a POST navigation), `GET /callback` (validates CSRF, exchanges the code, stores the
+  access + refresh tokens **encrypted at rest** via the #45 Fernet cipher, records the token expiry,
+  and flips `onboarding_storage_done` on first connect), and `POST /disconnect`. Distinct from the
+  Slice 1 *login* Google OAuth: this authorizes Drive file access, not identity. Storage tab gains
+  Connect/Disconnect controls (Connect gated behind a saved folder path) + result banners.
+  Improvement pass (all three user-selected): Disconnect now **revokes the token at Google**
+  (best-effort — local clear still succeeds on revoke failure); `POST /auth` returns **409** for the
+  no-config case instead of a 200-with-error body; and the access-token **expiry is persisted** (new
+  nullable `oauth_token_expires_at` column + migration `b2c3d4e5f6a7`) for the Slice 4 pipeline to
+  refresh proactively. Callback/disconnect are tested with a fake OAuth client + fake revoker + a
+  throwaway cipher key (no live Google creds, no dependency on a configured `ENCRYPTION_KEY`). Live
+  Google consent stays out of the Playwright suite (unreliable headlessly, per #23); the E2E spec
+  covers the in-app Connect-control appearing after save. **Human setup before this works live:**
+  (1) register the Drive callback redirect URI
+  (`https://organizeme-<qa|prod>-…/api/v1/storage-config/google-drive/callback`) on the Google OAuth
+  client and add the `https://www.googleapis.com/auth/drive` scope (a Google "restricted" scope —
+  may need verification); (2) create the `ENCRYPTION_KEY` secret (flagged since #45) — the callback
+  can't store tokens without it.
 - **Issue #46** — Slice 2.1 Settings > Storage tab + storage-config read/write (branch
   `feature/slice-2-storage-tab`). The Storage tab plus its config endpoints, end to end, using the
   reserved `storage_configs` row from #45 — no live OAuth yet (that's #47). New

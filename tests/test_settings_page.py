@@ -4,6 +4,9 @@ import uuid
 from html.parser import HTMLParser
 
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.storage_config import StorageConfig, StorageProviderType
 
 
 def unique_email() -> str:
@@ -55,7 +58,7 @@ async def test_settings_page_hides_dropbox_and_s3_by_default(client: AsyncClient
     assert "x-show=\"provider === 'google_drive'\"" in body
 
 
-async def test_settings_page_shows_not_connected_hint_for_google_drive(
+async def test_settings_page_shows_connect_controls_for_disconnected_drive(
     client: AsyncClient,
 ) -> None:
     await _register_and_login(client)
@@ -64,9 +67,40 @@ async def test_settings_page_shows_not_connected_hint_for_google_drive(
 
     assert response.status_code == 200
     body = response.text
-    # A fresh user has no stored OAuth token, so the tab surfaces the not-connected hint.
-    assert "isn't connected yet" in body
+    # A fresh user has no stored OAuth token: the tab offers a Connect control and gates it behind
+    # saving a folder path first.
+    assert 'id="connect-drive"' in body
+    assert "Connect Google Drive" in body
+    assert "Save your folder path first" in body
     assert 'x-show="!is_connected"' in body
+
+
+async def test_settings_page_shows_disconnect_control_when_drive_connected(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _register_and_login(client)
+    me = await client.get("/api/v1/users/me")
+    user_id = uuid.UUID(me.json()["id"])
+    # Simulate a connected config (a stored, encrypted-at-rest token) directly in the DB.
+    db_session.add(
+        StorageConfig(
+            user_id=user_id,
+            provider=StorageProviderType.GOOGLE_DRIVE,
+            folder_path="/OrganizeMe",
+            oauth_access_token="ciphertext-token",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="disconnect-drive"' in body
+    assert "Disconnect Google Drive" in body
+    # is_connected is seeded true into the x-data, so the tab renders the connected branch
+    # (tolerant of tojson's spacing).
+    assert '"is_connected":true' in body.replace(" ", "")
 
 
 async def test_settings_page_prefills_saved_folder_path(client: AsyncClient) -> None:

@@ -36,9 +36,12 @@ async def settings_page(
             config.provider.value if config is not None else StorageProviderType.GOOGLE_DRIVE.value
         ),
         "folder_path": config.folder_path if config is not None else "",
-        # Always false in this slice (no connect flow yet); drives the "not connected" hint on the
-        # tab and reflects reality once issue #47 stores OAuth tokens.
+        # Whether Drive is authenticated (a token is stored) - drives the connected/disconnected
+        # state of the tab's Connect/Disconnect controls (#47).
         "is_connected": config.oauth_access_token is not None if config is not None else False,
+        # Whether a config row exists at all: Connect can only run once a folder path is saved
+        # (the tokens attach to that row), so the button is gated on this.
+        "has_config": config is not None,
     }
     return templates.TemplateResponse(
         request,

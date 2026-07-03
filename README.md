@@ -175,4 +175,4 @@ The `examples/` folder contains reference files used for development and testing
 
 ## Status
 
-**In development** — Slice 1 (project scaffold, auth, CI/CD) complete; Slice 2 (Google Drive storage) underway: the storage foundation and the Settings > Storage tab (`GET`/`PUT /api/v1/storage-config`) are in, with live Google Drive OAuth still to come. See [Project Status](docs/project-status.md).
+**In development** — Slice 1 (project scaffold, auth, CI/CD) complete; Slice 2 (Google Drive storage) nearly done: the storage foundation, the Settings > Storage tab (`GET`/`PUT /api/v1/storage-config`), and the Google Drive OAuth connect/disconnect flow (tokens encrypted at rest) are all in. See [Project Status](docs/project-status.md). **Human setup** for Drive connect to work live: register the Drive OAuth callback redirect URI + `drive` scope on the Google client, and set the `ENCRYPTION_KEY` secret.
