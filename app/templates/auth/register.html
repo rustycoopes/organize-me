@@ -36,7 +36,7 @@
               this.error = detail.reason;
             } else if (Array.isArray(detail) && detail[0] && detail[0].msg) {
               // FastAPI's own 422 shape for a request that fails pydantic validation
-              // (e.g. a malformed email bypassing the input's own type="email" check).
+              // (e.g. a malformed email bypassing the input's own type=email check).
               this.error = detail[0].msg;
             } else {
               this.error = 'Could not create your account. Please try again.';

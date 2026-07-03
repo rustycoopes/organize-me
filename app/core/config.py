@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # restricts delivery to the account owner's own verified address until one is set up.
     # Swap via EMAIL_FROM once a custom domain is verified.
     email_from: str = "OrganizeMe <onboarding@resend.dev>"
+    # Enables the test-only Playwright helper endpoints (app.api.v1.internal_e2e). MUST only
+    # ever be true on the QA Cloud Run service, never prod - it exposes a way to mint a valid
+    # password-reset token for any registered email. Defaults false so those routes return 404
+    # everywhere it isn't explicitly switched on.
+    e2e_test_mode: bool = False
 
 
 @lru_cache
