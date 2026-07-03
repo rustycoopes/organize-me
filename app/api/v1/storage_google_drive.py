@@ -1,0 +1,256 @@
+"""Google Drive OAuth connect/disconnect for the Storage tab (issue #47).
+
+Layers the live Google Drive authorization flow onto the storage config from #46. Distinct from
+the *login* Google OAuth (`app/api/v1/auth.py`): that one authenticates identity; this one
+authorizes access to the signed-in user's Drive files and stores the resulting access/refresh
+tokens **encrypted at rest** (via `app.core.security`) on their `storage_configs` row.
+
+Flow:
+- `POST /auth` (same-origin fetch from the tab) returns Google's consent URL as JSON and sets a
+  CSRF cookie. The tab then navigates the browser there. A fetch (not a top-level form POST) is
+  used deliberately: the `organizeme_auth` cookie is SameSite=Lax, which a top-level POST
+  navigation would *not* send - a same-origin fetch always does.
+- `GET /callback` is the top-level redirect back from Google (Lax cookies flow on a top-level GET),
+  so the user is identified by their existing auth cookie; it exchanges the code and stores the
+  encrypted tokens, flipping `onboarding_storage_done` on the first successful connection.
+- `POST /disconnect` revokes the token at Google (best-effort) then clears it locally (leaving
+  provider/folder and the onboarding flag).
+
+The token exchange is injected via `get_google_oauth_client`, so tests use a fake and never touch
+live Google credentials (mirrors the Slice 1.3 login-OAuth tests).
+"""
+
+import logging
+import secrets
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timezone
+
+import httpx
+import jwt as pyjwt
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
+from fastapi_users.jwt import decode_jwt, generate_jwt
+from httpx_oauth.clients.google import GoogleOAuth2
+from httpx_oauth.oauth2 import GetAccessTokenError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.v1.storage_config import get_user_storage_config
+from app.auth.backend import COOKIE_SECURE
+from app.auth.oauth import get_google_oauth_client
+from app.auth.users import current_active_user, current_active_user_optional
+from app.core.config import get_settings
+from app.core.security import CredentialCipher, get_credential_cipher
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.storage_config import StorageConfigRead
+
+logger = logging.getLogger(__name__)
+
+# Google's OAuth token revocation endpoint (RFC 7009). Revoking a refresh token invalidates the
+# whole grant (and its access tokens).
+GOOGLE_TOKEN_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+
+router = APIRouter(prefix="/api/v1/storage-config/google-drive", tags=["storage-config"])
+
+# Full Drive access: the processing pipeline (Slice 4) has to list, download, and move files in an
+# arbitrary user-chosen folder, which the narrower drive.file scope (app-created files only) can't
+# do. This is a Google "sensitive/restricted" scope - see the human-setup note in the PR/docs.
+GOOGLE_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+# Anti-CSRF double-submit for the Drive flow, separate from the login flow's cookie/audience so the
+# two can't be cross-used. Same pattern as app/api/v1/auth.py's Google login.
+DRIVE_OAUTH_STATE_AUDIENCE = "organizeme:drive-oauth-state"
+DRIVE_OAUTH_STATE_COOKIE_NAME = "organizeme_drive_oauth_csrf"
+DRIVE_OAUTH_STATE_LIFETIME_SECONDS = 600
+
+DRIVE_CALLBACK_PATH = "/api/v1/storage-config/google-drive/callback"
+# Where callback outcomes send the browser. The tab reads these query flags to show a banner.
+SETTINGS_PATH = "/settings"
+
+
+def get_cipher_factory() -> Callable[[], CredentialCipher]:
+    """Return the cipher *getter*, not the cipher itself, so the callback constructs the cipher
+    (and enforces ENCRYPTION_KEY) only after validation passes - the CSRF-reject and expired-session
+    paths never touch it, and don't 500 when the key isn't set. Stays overridable in tests via
+    dependency_overrides."""
+    return get_credential_cipher
+
+
+async def revoke_google_token(token: str) -> None:
+    """Ask Google to revoke an OAuth token. Raises on network/HTTP error - the caller treats
+    revocation as best-effort and still clears the local copy."""
+    async with httpx.AsyncClient() as client:
+        response = await client.post(GOOGLE_TOKEN_REVOKE_URL, data={"token": token})
+        response.raise_for_status()
+
+
+def get_token_revoker() -> Callable[[str], Awaitable[None]]:
+    """Indirection over revoke_google_token so tests inject a fake that never calls Google."""
+    return revoke_google_token
+
+
+def _drive_redirect_uri(request: Request) -> str:
+    """The absolute callback URL, built from the incoming request's host so it's correct on both
+    the QA and prod Cloud Run domains without a separate per-environment setting (same approach as
+    the password-reset link in app/auth/users.py). Must exactly match a redirect URI registered on
+    the Google OAuth client."""
+    return str(request.base_url).rstrip("/") + DRIVE_CALLBACK_PATH
+
+
+@router.post("/auth")
+async def google_drive_authorize(
+    request: Request,
+    response: Response,
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+    oauth_client: GoogleOAuth2 = Depends(get_google_oauth_client),
+) -> dict[str, str]:
+    """Start the Drive OAuth flow: return Google's consent URL (the tab navigates to it) and set
+    the CSRF cookie. Requires a saved storage config first, since the tokens attach to that row."""
+    config = await get_user_storage_config(db, user.id)
+    if config is None:
+        # No row to hang the tokens on yet - the tab surfaces this as "save a folder path first".
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="save_folder_first")
+
+    settings = get_settings()
+    csrf_token = secrets.token_urlsafe(32)
+    state = generate_jwt(
+        {"csrf": csrf_token, "aud": DRIVE_OAUTH_STATE_AUDIENCE},
+        settings.jwt_secret,
+        DRIVE_OAUTH_STATE_LIFETIME_SECONDS,
+    )
+    authorization_url = await oauth_client.get_authorization_url(
+        _drive_redirect_uri(request),
+        state=state,
+        scope=GOOGLE_DRIVE_SCOPES,
+        # access_type=offline + prompt=consent are what make Google return a refresh_token (and
+        # re-issue one on every reconnect), so the pipeline can keep accessing Drive after the
+        # short-lived access token expires.
+        extras_params={"access_type": "offline", "prompt": "consent"},
+    )
+    response.set_cookie(
+        DRIVE_OAUTH_STATE_COOKIE_NAME,
+        csrf_token,
+        max_age=DRIVE_OAUTH_STATE_LIFETIME_SECONDS,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+    )
+    return {"authorization_url": authorization_url}
+
+
+@router.get("/callback")
+async def google_drive_callback(
+    request: Request,
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+    drive_csrf_cookie: str | None = Cookie(default=None, alias=DRIVE_OAUTH_STATE_COOKIE_NAME),
+    user: User | None = Depends(current_active_user_optional),
+    db: AsyncSession = Depends(get_db),
+    oauth_client: GoogleOAuth2 = Depends(get_google_oauth_client),
+    cipher_factory: Callable[[], CredentialCipher] = Depends(get_cipher_factory),
+) -> RedirectResponse:
+    """Google's top-level redirect back. Identify the user via their auth cookie, validate CSRF,
+    exchange the code, and store the encrypted tokens on their config."""
+
+    def failure_redirect(reason: str = "google_drive_auth_failed") -> RedirectResponse:
+        redirect = RedirectResponse(
+            f"{SETTINGS_PATH}?error={reason}", status_code=status.HTTP_302_FOUND
+        )
+        redirect.delete_cookie(DRIVE_OAUTH_STATE_COOKIE_NAME)
+        return redirect
+
+    # The auth cookie can lapse mid-flow (the consent screen has no time limit); send them to log
+    # back in rather than 401 a full-page navigation.
+    if user is None:
+        return RedirectResponse("/login", status_code=status.HTTP_302_FOUND)
+
+    state_data: dict[str, object] = {}
+    if state is not None:
+        try:
+            state_data = decode_jwt(
+                state, get_settings().jwt_secret, audience=[DRIVE_OAUTH_STATE_AUDIENCE]
+            )
+        except pyjwt.PyJWTError:
+            state_data = {}
+
+    if error is not None or code is None or not state_data:
+        return failure_redirect()
+
+    csrf_from_state = str(state_data.get("csrf", ""))
+    # Reject non-ASCII cookie values up front: secrets.compare_digest raises TypeError on them, and
+    # the cookie is attacker-controllable on a direct request to this endpoint (same reasoning as
+    # the login callback in app/api/v1/auth.py).
+    if (
+        not drive_csrf_cookie
+        or not drive_csrf_cookie.isascii()
+        or not secrets.compare_digest(drive_csrf_cookie, csrf_from_state)
+    ):
+        return failure_redirect()
+
+    config = await get_user_storage_config(db, user.id)
+    if config is None:
+        return failure_redirect("save_folder_first")
+
+    try:
+        token = await oauth_client.get_access_token(code, _drive_redirect_uri(request))
+    except GetAccessTokenError:
+        # A replayed/expired code (e.g. a reloaded callback URL) or a transient Google-side error.
+        return failure_redirect()
+
+    # Construct the cipher only now that everything has validated - this is the first point that
+    # actually needs ENCRYPTION_KEY.
+    cipher = cipher_factory()
+    config.oauth_access_token = cipher.encrypt(token["access_token"])
+    refresh_token = token.get("refresh_token")
+    if refresh_token:
+        # Google only returns a refresh_token with access_type=offline + prompt=consent (set on the
+        # auth request); keep any previously stored one if a reconnect somehow omits it.
+        config.oauth_refresh_token = cipher.encrypt(refresh_token)
+    # httpx_oauth's OAuth2Token computes `expires_at` (epoch seconds) from Google's expires_in; store
+    # it so the Slice 4 pipeline can refresh the short-lived access token proactively.
+    expires_at = token.get("expires_at")
+    config.oauth_token_expires_at = (
+        datetime.fromtimestamp(expires_at, tz=timezone.utc) if expires_at else None
+    )
+    # First successful connection completes the storage onboarding step; it stays true thereafter
+    # (a later disconnect doesn't reset it).
+    user.onboarding_storage_done = True
+    await db.commit()
+
+    redirect = RedirectResponse(f"{SETTINGS_PATH}?connected=1", status_code=status.HTTP_302_FOUND)
+    redirect.delete_cookie(DRIVE_OAUTH_STATE_COOKIE_NAME)
+    return redirect
+
+
+@router.post("/disconnect", response_model=StorageConfigRead)
+async def google_drive_disconnect(
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+    cipher_factory: Callable[[], CredentialCipher] = Depends(get_cipher_factory),
+    revoke_token: Callable[[str], Awaitable[None]] = Depends(get_token_revoker),
+) -> StorageConfigRead:
+    """Revoke the Drive token at Google (best-effort) then clear it locally, returning the tab to
+    the disconnected state. Provider, folder path, and the onboarding flag are left intact."""
+    config = await get_user_storage_config(db, user.id)
+    if config is None:
+        return StorageConfigRead()
+
+    # Revoking the refresh token invalidates the whole grant; fall back to the access token if
+    # that's all we have. Best-effort: a decrypt or network failure must not block the local clear
+    # (otherwise a user could never disconnect a partially-broken connection).
+    encrypted = config.oauth_refresh_token or config.oauth_access_token
+    if encrypted is not None:
+        try:
+            await revoke_token(cipher_factory().decrypt(encrypted))
+        except Exception:
+            logger.exception("Failed to revoke Google Drive token for user %s", user.id)
+
+    config.oauth_access_token = None
+    config.oauth_refresh_token = None
+    config.oauth_token_expires_at = None
+    await db.commit()
+    return StorageConfigRead(
+        provider=config.provider, folder_path=config.folder_path, is_connected=False
+    )

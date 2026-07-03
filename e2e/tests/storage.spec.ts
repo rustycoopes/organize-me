@@ -27,6 +27,25 @@ test.describe('Settings > Storage', () => {
     await expect(dropboxStub).toBeHidden();
   });
 
+  test('Connect Google Drive control appears once a folder path is saved', async ({ page }) => {
+    await registerNewUser(page, 'storage-connect');
+    await page.goto('/settings');
+
+    // A brand-new user has no saved config: Connect is gated behind saving a folder path first.
+    const connectButton = page.locator('#connect-drive');
+    await expect(connectButton).toBeHidden();
+    await expect(page.getByText('Save your folder path first')).toBeVisible();
+
+    await page.locator('#folder_path').fill('/OrganizeMe');
+    await page.locator('form button[type="submit"]').click();
+    await expect(page.getByText('Storage settings saved.')).toBeVisible();
+
+    // Saving creates the config row, so the Connect control becomes available without a reload.
+    // (Actually completing the Google OAuth redirect stays out of E2E, per the #23 decision;
+    // the callback is covered by the fake-client pytest in tests/test_storage_google_drive.py.)
+    await expect(connectButton).toBeVisible();
+  });
+
   test('folder path round-trips through a save and reload', async ({ page }) => {
     await registerNewUser(page, 'storage-persist');
     await page.goto('/settings');
