@@ -176,7 +176,7 @@ async def test_patch_ignores_privileged_fields(
     original_password_login = await client.post(
         "/api/v1/auth/login", data={"email": email, "password": password}
     )
-    assert original_password_login.status_code in (200, 204)
+    assert original_password_login.status_code == 302  # success redirect to /profile (issue #43)
 
 
 async def test_delete_removes_user_and_invalidates_cookie(

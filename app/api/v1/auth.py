@@ -49,12 +49,32 @@ GOOGLE_OAUTH_ALLOWED_NEXT_PATHS = {"/login", "/register"}
 # client-side redirect target in templates/auth/login.html.
 GOOGLE_OAUTH_SUCCESS_REDIRECT = "/profile"
 
+# Where a successful email/password login lands the browser. Same target as the Google sign-in
+# and login.html's client-side redirect - kept here so the endpoint itself navigates the browser
+# (issue #43) instead of depending on that client JS. Repoint to /dashboard alongside
+# GOOGLE_OAUTH_SUCCESS_REDIRECT once the dashboard exists.
+LOGIN_SUCCESS_REDIRECT = "/profile"
+
 
 def _sanitize_next(value: object) -> str:
     """Used at both /google (a query param) and /google/callback (a decoded JWT state
     value) - falls back to the default for anything outside the allowlist so this can never
     become an open redirect."""
     return value if isinstance(value, str) and value in GOOGLE_OAUTH_ALLOWED_NEXT_PATHS else GOOGLE_OAUTH_DEFAULT_NEXT
+
+
+def _redirect_with_login_cookie(login_response: Response, target: str) -> RedirectResponse:
+    """Turn fastapi-users' bare-204 cookie login response into a 302 to `target` that still
+    carries the auth cookie. A browser following a full-page redirect just renders the bare 204
+    as a blank page, stranding the user (email/password login #43; Google callback #27) - so both
+    flows navigate the browser themselves instead. Copying the backend's Set-Cookie header(s)
+    across keeps the cookie's name/max-age/secure/samesite defined in one place
+    (app.auth.backend.cookie_transport)."""
+    redirect = RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+    for header_name, header_value in login_response.raw_headers:
+        if header_name.lower() == b"set-cookie":
+            redirect.raw_headers.append((header_name, header_value))
+    return redirect
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -108,7 +128,13 @@ async def login(
     if updated_hash is not None:
         await user_manager.user_db.update(user, {"hashed_password": updated_hash})
 
-    return await auth_backend.login(strategy, user)
+    # auth_backend.login returns fastapi-users' default cookie login response - a bare 204 No
+    # Content (issue #43). A plain full-page form POST (JS disabled, or any non-fetch caller) is
+    # then left stranded on /login with no navigation; today it only appears to work because
+    # login.html's client-side JS does the redirect. Instead 302 to /profile carrying the auth
+    # cookie, so the endpoint is correct without relying on client JS - same fix as #27.
+    login_response = await auth_backend.login(strategy, user)
+    return _redirect_with_login_cookie(login_response, LOGIN_SUCCESS_REDIRECT)
 
 
 @router.post("/forgot-password")
@@ -290,16 +316,11 @@ async def google_callback(
         return failure_redirect()
 
     # This endpoint is only ever reached via a full-page browser redirect from Google, so the
-    # success response has to navigate the browser back into the app itself. auth_backend.login
-    # returns fastapi-users' default cookie login response - a bare 204 No Content - which a
-    # browser following a redirect simply renders as nothing, leaving the user stranded on
-    # Google's consent page (issue #27). Instead, 302 to /profile and carry the auth cookie
-    # across by copying the backend's Set-Cookie header(s) onto the redirect, so the cookie's
-    # name/max-age/secure/samesite stay defined in one place (app.auth.backend.cookie_transport).
+    # success response has to navigate the browser back into the app itself - a bare 204 would
+    # leave the user stranded on Google's consent page (issue #27). 302 to /profile carrying the
+    # auth cookie (shared with the email/password login #43), then clear the one-shot CSRF state
+    # cookie.
     login_response = await auth_backend.login(strategy, user)
-    redirect = RedirectResponse(GOOGLE_OAUTH_SUCCESS_REDIRECT, status_code=status.HTTP_302_FOUND)
-    for header_name, header_value in login_response.raw_headers:
-        if header_name.lower() == b"set-cookie":
-            redirect.raw_headers.append((header_name, header_value))
+    redirect = _redirect_with_login_cookie(login_response, GOOGLE_OAUTH_SUCCESS_REDIRECT)
     redirect.delete_cookie(GOOGLE_OAUTH_STATE_COOKIE_NAME)
     return redirect

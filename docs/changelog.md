@@ -10,6 +10,14 @@
 ## [Unreleased]
 
 ### Fixed
+- **Issue #43** — `POST /api/v1/auth/login` returned fastapi-users' bare `204 No Content`, so a
+  plain full-page form POST (JS disabled / any non-fetch caller) was stranded on `/login` with no
+  navigation — it only appeared to work because `login.html`'s client-side JS did the redirect
+  (the same class of bug as #27, masked by JS). Now the endpoint itself `302`s to `/profile`,
+  carrying the auth cookie across from the backend login response, so it's correct without relying
+  on client JS. The Set-Cookie-carrying redirect used by both this flow and the Google callback
+  (#27) was extracted into a shared `_redirect_with_login_cookie` helper. Branch
+  `fix/auth-login-302-redirect`.
 - **Issue #27** — Google sign-in hung on Google's consent page and never returned to the app
   (branch `fix/google-oauth-callback-redirect`). The `/api/v1/auth/google/callback` success path
   returned fastapi-users' default cookie login response — a bare `204 No Content` — so the
