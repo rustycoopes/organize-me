@@ -24,7 +24,7 @@ class ProcessingRun(Base):
     """One end-to-end processing attempt for an uploaded/detected file.
 
     Parent of the per-step rows (ProcessingStep) and the extracted Events. This model + its
-    migration are the Slice 4.0 foundation (#51); the upload endpoint and Celery pipeline that
+    migration are the Slice 4.0 foundation (#51); the upload endpoint and in-process pipeline that
     create and drive runs land in #52.
     """
 

@@ -39,6 +39,15 @@ class StorageProvider(ABC):
     """
 
     @abstractmethod
+    async def upload_file(self, name: str, content: bytes) -> RemoteFile:
+        """Write ``content`` into the watched folder as ``name`` and return the created file.
+
+        Used by the manual-upload path (Slice 4.1): the uploaded bytes land in the user's watch
+        folder so the pipeline processes and then moves them exactly like a file the user dropped
+        there themselves."""
+        ...
+
+    @abstractmethod
     async def list_new_files(self) -> list[RemoteFile]:
         """Return the files currently in the watched folder that still need processing
         (i.e. not already under a processed/ or failed/ subfolder)."""
@@ -53,3 +62,11 @@ class StorageProvider(ABC):
     async def move_file(self, file: RemoteFile, destination: FileDestination) -> None:
         """Move `file` into the provider's processed/ or failed/ subfolder once handled."""
         ...
+
+    async def aclose(self) -> None:
+        """Release any resources the provider holds (e.g. an HTTP client).
+
+        Concrete default is a no-op so in-memory providers (the fake) need not implement it; the
+        pipeline calls it once a run finishes so a network-backed provider can close its client
+        instead of leaking a connection pool per upload."""
+        return None

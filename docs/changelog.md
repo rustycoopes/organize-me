@@ -21,6 +21,35 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #52 implemented** — Slice 4.1 upload page + 7-step processing pipeline (branch
+  `feature/slice-4.1-upload-pipeline`). The end-to-end path from uploading a WhatsApp export to
+  extracted events landing in the DB, on the #51 foundation. `POST /api/v1/upload` (`.txt`/`.zip`/
+  `.csv`, 10 MB cap, bounded read) gates on a connected Google Drive, writes the file into the
+  user's watch folder, records a `processing_runs` row, flips `onboarding_first_upload_done`, and
+  kicks off the pipeline as an **in-process asyncio background task** (NOT Celery — per #52's
+  resolved decision; the `app/worker.py` Celery stub stays dormant). The 7 steps
+  (`app/services/pipeline/runner.py`) each write a `processing_steps` row: File Received → Extract
+  (unzip `.zip`; skip `.txt`/`.csv`) → Filter by Date (default 7-day window, parameterised) → Call
+  Gemini (fatal on error, no retry) → Parse LLM Response (Pydantic `ExtractedEvent`) → Deduplicate &
+  Save (`UNIQUE(user_id, description, resolved_date)` + `resolved_date_earliest` via
+  `parse_earliest_date`) → Notify. Gemini/parse failure ⇒ run `failed`, file → `failed/`, error in
+  the step log, failure notification; a zero-new-events run is a success (file → `processed/`,
+  "0 new events" notice). New stubbed **notification boundary**
+  (`app/services/notifications/pipeline.py`: `NotificationSender` Protocol + `LoggingNotificationSender`
+  + `FakeNotificationSender` + `get_pipeline_notifier`) — real Resend/Twilio delivery is Slice 7.
+  New concrete **`GoogleDriveStorageProvider`** (`app/services/storage/google_drive.py`, Drive REST
+  v3 via httpx, on-demand token refresh, `aclose()` to release its client) plus a `build_storage_provider`
+  factory that returns the `FakeStorageProvider` under `E2E_TEST_MODE`. New **Upload page**
+  (`app/pages/upload.py` + `upload.html`) with drag-and-drop + file picker, moved off the
+  placeholder router. Tests: a stubbed pipeline integration test (all 7 steps, events in DB), unit
+  tests for the date filter / notifier / Drive provider (via `httpx.MockTransport`), endpoint gating/
+  validation/onboarding, page render, and a skip-unless-`GEMINI_API_KEY` real-Gemini e2e test.
+  `mypy --strict` clean. Improvement pass: bounded upload read + provider `aclose()` implemented;
+  Drive token-persistence deferred as #68. **Human setup before live:** (1) wire a real
+  `GEMINI_API_KEY` secret into QA/prod; (2) enable Cloud Run "CPU always allocated"
+  (`--no-cpu-throttling` and/or `min-instances=1`) so the background task keeps running after the
+  HTTP response returns; (3) verify `GoogleDriveStorageProvider` against a real connected Drive
+  account — its live behaviour (esp. the multipart upload encoding) is not exercised by CI.
 - **Issue #51 implemented** — Slice 4.0 pipeline foundation (branch
   `feature/slice-4.0-pipeline-foundation`). The reusable, no-UI foundation the upload pipeline
   (#52) and SSE progress page (#53) build on. Three new models + one migration

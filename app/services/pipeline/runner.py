@@ -1,0 +1,339 @@
+"""The 7-step processing pipeline (Slice 4.1, #52).
+
+Turns one uploaded/detected file into extracted ``events`` rows. Runs **in-process** as an
+asyncio task (no Celery/Redis - see #52's resolved decisions); state lives entirely in Postgres
+via the ``processing_runs`` / ``processing_steps`` / ``events`` rows this writes as it goes, so the
+SSE progress page (#53) can watch a run advance by polling those rows.
+
+``run_pipeline`` is deliberately pure and fully injected - it takes the DB session and its
+collaborators (storage, Gemini, notifier) as arguments rather than resolving them from globals - so
+the integration test drives the whole thing with a ``FakeStorageProvider`` + ``FakeGeminiClient``
+and asserts events land in the DB. The upload endpoint (app.api.v1.upload) wires the real
+collaborators and runs this in a background task with its own session.
+
+The 7 steps: (1) File Received, (2) Extract, (3) Filter by Date, (4) Call Gemini, (5) Parse LLM
+Response, (6) Deduplicate & Save, (7) Notify. Per the Slice 4 spec the Gemini step is fatal on
+error: any failure marks the run ``failed``, moves the file to ``failed/``, records the error in the
+step log, and still fires a (failure) notification. A run that produces zero new events (everything
+was a duplicate) is a *success*: the file moves to ``processed/`` and a "0 new events" notice fires.
+"""
+
+import io
+import json
+import logging
+import re
+import uuid
+import zipfile
+from collections.abc import Iterable
+from datetime import datetime, timezone
+
+from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.date_parser import parse_earliest_date
+from app.core.message_filter import filter_messages_within_window
+from app.models.event import Event
+from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.processing_step import ProcessingStep, ProcessingStepStatus
+from app.schemas.pipeline import ExtractedEvent
+from app.services.llm.gemini import GeminiClient, GeminiError
+from app.services.notifications.pipeline import (
+    NotificationOutcome,
+    NotificationSender,
+    PipelineNotification,
+)
+from app.services.storage.base import FileDestination, RemoteFile, StorageProvider
+
+logger = logging.getLogger(__name__)
+
+# The 7 steps, in order. Kept here as the single source of truth so the pipeline and the SSE
+# progress page (#53) agree on the count, numbering, and names.
+STEP_FILE_RECEIVED = (1, "File Received")
+STEP_EXTRACT = (2, "Extract")
+STEP_FILTER_BY_DATE = (3, "Filter by Date")
+STEP_CALL_GEMINI = (4, "Call Gemini LLM")
+STEP_PARSE_RESPONSE = (5, "Parse LLM Response")
+STEP_DEDUPLICATE_SAVE = (6, "Deduplicate & Save")
+STEP_NOTIFY = (7, "Notify")
+
+DEFAULT_DATE_WINDOW_DAYS = 7
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def _begin_step(
+    session: AsyncSession, run_id: uuid.UUID, step: tuple[int, str]
+) -> ProcessingStep:
+    """Create a step row in ``in_progress`` and commit it, so the SSE page (#53) sees the step
+    start the moment work on it begins."""
+    number, name = step
+    row = ProcessingStep(
+        run_id=run_id,
+        step_number=number,
+        step_name=name,
+        status=ProcessingStepStatus.IN_PROGRESS,
+        log_lines=[],
+        started_at=_utcnow(),
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
+async def _finish_step(
+    session: AsyncSession,
+    step: ProcessingStep,
+    status: ProcessingStepStatus,
+    log_lines: Iterable[str],
+) -> None:
+    step.status = status
+    # Reassign (not mutate-in-place) so SQLAlchemy detects the JSONB change.
+    step.log_lines = list(log_lines)
+    step.completed_at = _utcnow()
+    await session.commit()
+
+
+def _extract_zip(content: bytes) -> tuple[bytes, str]:
+    """Return the bytes + name of the first regular file inside a zip archive. Raises if the
+    archive is unreadable or contains no files."""
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        names = [n for n in archive.namelist() if not n.endswith("/")]
+        if not names:
+            raise ValueError("archive contains no files")
+        first = names[0]
+        return archive.read(first), first
+
+
+def _parse_events(raw: str) -> list[ExtractedEvent]:
+    """Validate Gemini's raw text into ``ExtractedEvent``s. Tolerates a ```json ...``` markdown
+    fence (Gemini sometimes wraps JSON in one). Raises ``ValueError``/``ValidationError`` on
+    anything that isn't a JSON array of valid event objects - the caller fails the run."""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z0-9]*\n?", "", cleaned)
+        cleaned = re.sub(r"\n?```$", "", cleaned).strip()
+    data = json.loads(cleaned)
+    if not isinstance(data, list):
+        raise ValueError("expected a JSON array of events")
+    return [ExtractedEvent.model_validate(item) for item in data]
+
+
+async def _deduplicate_and_save(
+    session: AsyncSession,
+    run: ProcessingRun,
+    user_id: uuid.UUID,
+    events: list[ExtractedEvent],
+) -> int:
+    """Insert events that aren't already present for this user, returning the new-event count.
+
+    Duplicate detection mirrors the ``UNIQUE(user_id, description, resolved_date)`` constraint: an
+    event already stored (from a prior run) is skipped, and repeats *within this batch* are
+    collapsed too, so the constraint is never actually hit."""
+    new_count = 0
+    seen_in_batch: set[tuple[str, str]] = set()
+    for event in events:
+        key = (event.description, event.resolved_date)
+        if key in seen_in_batch:
+            continue
+        seen_in_batch.add(key)
+        already_exists = await session.scalar(
+            select(Event.id).where(
+                Event.user_id == user_id,
+                Event.description == event.description,
+                Event.resolved_date == event.resolved_date,
+            )
+        )
+        if already_exists is not None:
+            continue
+        session.add(
+            Event(
+                user_id=user_id,
+                run_id=run.id,
+                type=event.type,
+                description=event.description,
+                resolved_date=event.resolved_date,
+                resolved_date_earliest=parse_earliest_date(event.resolved_date),
+                raw_date_text=event.raw_date_text,
+                agreed_by=list(event.agreed_by),
+            )
+        )
+        new_count += 1
+    await session.flush()
+    return new_count
+
+
+async def _notify(
+    session: AsyncSession,
+    run: ProcessingRun,
+    user_id: uuid.UUID,
+    notifier: NotificationSender,
+    outcome: NotificationOutcome,
+    new_count: int,
+    message: str,
+) -> None:
+    """Run step 7: send the notification and record the step. Used by both the success and the
+    failure paths so the user is always told how a run ended."""
+    step = await _begin_step(session, run.id, STEP_NOTIFY)
+    await notifier.send(
+        PipelineNotification(
+            user_id=user_id,
+            run_id=run.id,
+            filename=run.filename,
+            outcome=outcome,
+            new_event_count=new_count,
+            message=message,
+        )
+    )
+    await _finish_step(session, step, ProcessingStepStatus.SUCCESS, [f"Notified user: {message}"])
+
+
+async def _fail_run(
+    session: AsyncSession,
+    run: ProcessingRun,
+    user_id: uuid.UUID,
+    storage: StorageProvider,
+    remote_file: RemoteFile,
+    notifier: NotificationSender,
+    message: str,
+) -> None:
+    """Terminate a run as failed: mark it, move the file to ``failed/``, and fire the failure
+    notification (step 7). Any leftover new-event count is irrelevant - a failed run saves none."""
+    run.status = ProcessingRunStatus.FAILED
+    run.completed_at = _utcnow()
+    await session.commit()
+    await storage.move_file(remote_file, FileDestination.FAILED)
+    await _notify(session, run, user_id, notifier, NotificationOutcome.FAILED, 0, message)
+
+
+async def run_pipeline(
+    session: AsyncSession,
+    *,
+    run: ProcessingRun,
+    user_id: uuid.UUID,
+    remote_file: RemoteFile,
+    storage: StorageProvider,
+    gemini: GeminiClient,
+    notifier: NotificationSender,
+    prompt_text: str,
+    window_days: int = DEFAULT_DATE_WINDOW_DAYS,
+) -> None:
+    """Execute the full 7-step pipeline for ``run``, writing steps + events as it goes.
+
+    Never raises for an expected failure (bad archive, Gemini error, unparseable response): those
+    mark the run ``failed`` and return. Intended to be awaited directly in tests and run as a
+    background task in production."""
+    run.status = ProcessingRunStatus.IN_PROGRESS
+    run.started_at = _utcnow()
+    await session.commit()
+
+    # Step 1 - File Received (download the bytes the upload placed in the watch folder).
+    step = await _begin_step(session, run.id, STEP_FILE_RECEIVED)
+    try:
+        content = await storage.download_file(remote_file)
+    except Exception as exc:  # a storage/network error before any processing - fail cleanly.
+        logger.exception("pipeline: could not download %s", run.filename)
+        await _finish_step(session, step, ProcessingStepStatus.FAILED, [f"Download failed: {exc}"])
+        await _fail_run(
+            session, run, user_id, storage, remote_file, notifier,
+            "Could not read the uploaded file.",
+        )
+        return
+    await _finish_step(
+        session, step, ProcessingStepStatus.SUCCESS,
+        [f"Received {run.filename} ({len(content)} bytes)"],
+    )
+
+    # Step 2 - Extract (unzip .zip; skip for .txt/.csv).
+    step = await _begin_step(session, run.id, STEP_EXTRACT)
+    if run.filename.lower().endswith(".zip"):
+        try:
+            content, inner_name = _extract_zip(content)
+        except Exception as exc:
+            await _finish_step(
+                session, step, ProcessingStepStatus.FAILED, [f"Could not unzip archive: {exc}"]
+            )
+            await _fail_run(
+                session, run, user_id, storage, remote_file, notifier,
+                "Could not extract the uploaded archive.",
+            )
+            return
+        await _finish_step(
+            session, step, ProcessingStepStatus.SUCCESS, [f"Extracted {inner_name}"]
+        )
+    else:
+        await _finish_step(
+            session, step, ProcessingStepStatus.SKIPPED, ["Not a .zip; extraction skipped"]
+        )
+
+    conversation = content.decode("utf-8", errors="replace")
+
+    # Step 3 - Filter by Date (keep only the recent window before the LLM sees it).
+    step = await _begin_step(session, run.id, STEP_FILTER_BY_DATE)
+    filtered = filter_messages_within_window(conversation, window_days)
+    await _finish_step(
+        session, step, ProcessingStepStatus.SUCCESS,
+        [f"Kept messages within the last {window_days} days of the conversation"],
+    )
+
+    # Step 4 - Call Gemini (fatal on error, no retry).
+    step = await _begin_step(session, run.id, STEP_CALL_GEMINI)
+    try:
+        raw_response = await gemini.extract(prompt=prompt_text, conversation=filtered)
+    except GeminiError as exc:
+        await _finish_step(
+            session, step, ProcessingStepStatus.FAILED, [f"Gemini call failed: {exc}"]
+        )
+        await _fail_run(
+            session, run, user_id, storage, remote_file, notifier,
+            "The AI extraction step failed. Please try again.",
+        )
+        return
+    await _finish_step(
+        session, step, ProcessingStepStatus.SUCCESS, ["Gemini returned a response"]
+    )
+
+    # Step 5 - Parse LLM Response (Pydantic validation).
+    step = await _begin_step(session, run.id, STEP_PARSE_RESPONSE)
+    try:
+        events = _parse_events(raw_response)
+    except (ValueError, ValidationError) as exc:
+        await _finish_step(
+            session, step, ProcessingStepStatus.FAILED, [f"Could not parse LLM response: {exc}"]
+        )
+        await _fail_run(
+            session, run, user_id, storage, remote_file, notifier,
+            "The AI response could not be understood. Please try again.",
+        )
+        return
+    await _finish_step(
+        session, step, ProcessingStepStatus.SUCCESS, [f"Parsed {len(events)} events"]
+    )
+
+    # Step 6 - Deduplicate & Save.
+    step = await _begin_step(session, run.id, STEP_DEDUPLICATE_SAVE)
+    new_count = await _deduplicate_and_save(session, run, user_id, events)
+    run.events_extracted_count = new_count
+    await _finish_step(
+        session, step, ProcessingStepStatus.SUCCESS,
+        [f"Saved {new_count} new events; skipped {len(events) - new_count} duplicate(s)"],
+    )
+
+    # Success (including the zero-new-events case): move the file to processed/ and notify.
+    run.status = ProcessingRunStatus.SUCCESS
+    run.completed_at = _utcnow()
+    await session.commit()
+    await storage.move_file(remote_file, FileDestination.PROCESSED)
+
+    if new_count == 0:
+        await _notify(
+            session, run, user_id, notifier, NotificationOutcome.NO_NEW_EVENTS, 0,
+            "Processing finished: no new events found.",
+        )
+    else:
+        await _notify(
+            session, run, user_id, notifier, NotificationOutcome.SUCCESS, new_count,
+            f"Processing finished: {new_count} new event(s) added.",
+        )
