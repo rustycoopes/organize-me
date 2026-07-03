@@ -94,7 +94,6 @@ chosen issue. From there, `to-implementation` owns the branch/worktree, build lo
 marking the issue done — this skill's job is finished once the right issue is handed over.
 
 IF there are open questions which the user does not respond to within 60 seconds, please choose your recommendation and document the decision in docs/model-report/model-decisions.md
-IF there are recommendations for changes, which the user does not respond to within 60 seconds, please document in docs/model-report/model-recommendations.md
 
 
 ## Notes
