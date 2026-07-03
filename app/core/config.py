@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # (cryptography.fernet.Fernet.generate_key()); wire ENCRYPTION_KEY into QA/prod before the
     # storage-config write paths (issues #46/#47) go live.
     encryption_key: str = ""
+    # API key for the Gemini LLM (google-genai SDK), used by the processing pipeline's
+    # extraction step (Slice 4). Empty default (like RESEND_API_KEY / ENCRYPTION_KEY) so
+    # deploys/CI that don't set it yet don't fail Settings construction - GoogleGeminiClient
+    # raises a clear error if it's actually used while unset. Tests never call the live API
+    # (they inject FakeGeminiClient), so they don't need a real key. Wire GEMINI_API_KEY into
+    # QA/prod before the upload pipeline (issue #52) goes live.
+    gemini_api_key: str = ""
 
 
 @lru_cache
