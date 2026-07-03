@@ -21,6 +21,19 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #48 implemented** — Slice 3.0 prompt foundation (branch
+  `feature/slice-3.0-prompt-foundation`). New `llm_prompts` table (`id`, `user_id` FK→users
+  `ON DELETE CASCADE` **UNIQUE**, `prompt_text` TEXT NOT NULL, `created_at`/`updated_at`) via
+  Alembic migration `d3e4f5a6b7c8`. A single factory-default extraction prompt constant
+  (`app/core/prompts.py::FACTORY_DEFAULT_PROMPT`, verbatim from the issue, based on
+  `examples/example.lmmoutput.txt`) is the shared source of truth for both seeding and the later
+  Reset button (#49). Every new account is seeded with exactly one prompt row via
+  `UserManager.on_after_register` (`app/auth/users.py`) — a single seam that fastapi-users fires
+  from both `create()` (email/password) and `oauth_callback()` when it creates a *new* Google
+  user, and never when Google is merely linked to an existing account, so both registration paths
+  are covered with no double-seed. Covered by `tests/test_llm_prompt_model.py` (persistence +
+  unique-per-user) and `tests/test_prompt_seed.py` (email/password seed, Google seed, no
+  double-seed on link).
 - **Issue #23 implemented** — Slice 1.8 Playwright E2E suite (branch
   `feature/slice-1-e2e-playwright`). New `e2e/` TypeScript suite drives the deployed QA app
   end-to-end: landing page, register→login→logout, forgot→reset password, profile edit +

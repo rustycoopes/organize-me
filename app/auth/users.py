@@ -1,6 +1,7 @@
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from typing import cast
 
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, exceptions, schemas
@@ -12,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.backend import auth_backend
 from app.core.config import get_settings
+from app.core.prompts import FACTORY_DEFAULT_PROMPT
 from app.db.session import get_db
+from app.models.llm_prompt import LLMPrompt
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.services.notifications.email import EmailSender, ResendEmailSender
@@ -49,6 +52,20 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self.reset_password_token_secret = secret
         self.verification_token_secret = secret
         self.email_sender = email_sender
+
+    async def on_after_register(self, user: User, request: Request | None = None) -> None:
+        # Seed every new account with the factory-default extraction prompt, so a user has a
+        # working prompt from the moment they register. fastapi-users fires this hook from both
+        # create() (email/password registration) and oauth_callback() when it creates a *new*
+        # user (Google sign-up) — and not when oauth_callback merely links Google to an existing
+        # account — so this single seam covers both registration paths and never double-seeds.
+        # self.user_db.session is the same AsyncSession the just-created user was committed on;
+        # committing here persists the prompt alongside it. cast: BaseUserManager widens user_db
+        # to BaseUserDatabase (no .session), but this app only ever constructs the manager with a
+        # SQLAlchemyUserDatabase (see get_user_manager), which exposes the session.
+        session = cast(SQLAlchemyUserDatabase[User, uuid.UUID], self.user_db).session
+        session.add(LLMPrompt(user_id=user.id, prompt_text=FACTORY_DEFAULT_PROMPT))
+        await session.commit()
 
     async def validate_password(self, password: str, user: schemas.UC | User) -> None:
         if len(password) < MIN_PASSWORD_LENGTH:
