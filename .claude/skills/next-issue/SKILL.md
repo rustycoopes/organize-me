@@ -26,6 +26,14 @@ don't sink effort into low-priority polish while higher-value work sits waiting.
 ready work — an earlier slice is the foundation later ones build on, so it gets drained before the
 next one starts. Only once a slice has no `Todo` work does selection move to the next slice up.
 
+**Ignore `In Progress` issues completely.** An `In Progress` issue is already claimed — assume
+another worker (or a concurrent loop session) owns it. Never pick, resume, or hand off to an
+`In Progress` issue, even if it would otherwise be the highest-priority next thing to do. Select
+only from work that has **not been started** (`Todo`). If the item you'd expect to pick next is
+`In Progress`, skip it and take the next-best not-started `Todo` item instead. The gathering helper
+in Step 1 already filters to `Todo`, so `In Progress` issues won't appear in the candidate list —
+do not go around that filter to look them up.
+
 ## Step 1 — Gather what's ready
 
 Run the bundled helper to get every `Todo` issue across all slices, grouped by slice number and
@@ -100,7 +108,9 @@ IF there are open questions which the user does not respond to within 60 seconds
 
 - **Only one issue.** Even if several are ready, hand off exactly one; the user can re-run this
   skill for the next.
-- **Something already In Progress?** If the board shows any issue already `In Progress`,
-  mention it — the user may want to finish that rather than start something new.
+- **Never resume `In Progress` work.** Treat any `In Progress` issue as owned by another worker and
+  skip it — do not offer to finish it, do not hand off to it. Always pick the next not-started
+  (`Todo`) item instead (see the "Ignore `In Progress` issues completely" rule above). This avoids
+  two sessions colliding on the same branch/PR.
 - **Ties within a tier** are where your judgment earns its keep; make the reasoning visible so the
   user can override it if they know something you don't.
