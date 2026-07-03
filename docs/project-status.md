@@ -8,6 +8,8 @@
 
 **Slice 1 in progress.** All prerequisites provisioned (issues #1–#9, closed). Slice 1 broken into 8 TDD-sized issues (#10–#17), plus a 9th (#23) added 2026-07-02 to validate the whole slice with automated Playwright E2E tests. Issues #10 (project scaffold + CI/CD, PR #18), #11 (DB foundation, PR #19), #12 (email/password auth, PR #20), #13 (Google OAuth login, PR #22), #14 (forgot/reset password, PR #21), #15 (profile — view/edit, dark mode, account deletion, PR #24), and #16 (landing page, PR #25) are all merged into `main`; `ci.yml` (QA) and `deploy.yml` (prod) run green, and `/health`, `/`, `/register`/`/login` (incl. Google sign-in), `/forgot-password`/`/reset-password`, `/profile`, and `/api/v1/users/me` are confirmed live on both Cloud Run services. Two live bugs reported by the user after #16 shipped: `/register`/`/login`'s plain HTML forms landed users on a raw JSON response instead of any page (filed as issue #26, fixed on branch `fix/auth-form-json-response`, PR #28) and Google sign-in hanging on Google's consent page (filed as issue #27). #26 is merged (PR #28). #27 root cause found and fixed on branch `fix/google-oauth-callback-redirect`: the `/api/v1/auth/google/callback` success path returned fastapi-users' bare `204 No Content`, so the full-page redirect from Google had nothing to navigate to — now `302`s to `/profile` with the auth cookie. Follow-up #43 filed for the same latent `204` on `POST /auth/login` (masked today by client-side JS). #27 has since merged (PR #44). Issue #17 (sidebar shell + placeholder pages) merged into `main` (PR #50). Issue #23 (Playwright E2E) — the last Slice 1 issue — is now implemented on branch `feature/slice-1-e2e-playwright`: an `e2e/` Playwright/TypeScript suite driving the deployed QA app (landing, register→login→logout, forgot→reset password, profile edit + dark-mode persistence, account deletion, sidebar nav), wired into `ci.yml` as an `e2e-qa` job after `deploy-qa`, backed by a test-only `GET /api/v1/internal/e2e/last-reset-token` endpoint gated behind a new `E2E_TEST_MODE` flag (QA-only, 404 + schema-hidden elsewhere). With #23, Slice 1 is functionally complete.
 
+**Slice 2 (Google Drive storage) has begun.** Issue #45 (Slice 2.0 — storage foundation) is implemented on branch `feature/slice-2-storage-foundation`: the `storage_configs` table + migration, the `StorageProvider` ABC + `FakeStorageProvider`, and Fernet-based credential-encryption helpers (`app/core/security.py`). Pure plumbing that #46 (Settings > Storage tab) and #47 (Google Drive OAuth) build on. New **human setup** before those write paths go live: create an `ENCRYPTION_KEY` GitHub secret (a `Fernet.generate_key()` value) — it's already wired into `ci.yml`/`deploy.yml` and defaults empty until then.
+
 ## Completed Milestones
 
 | Date | Milestone |
@@ -47,6 +49,9 @@
    - #17 Sidebar shell + placeholder pages — ✅ merged (PR #50)
    - #23 Automated E2E UX tests (Playwright, against QA deploy) — 🔨 implemented on `feature/slice-1-e2e-playwright` (PR open); last Slice 1 issue
 2. **Slice 2** — Google Drive storage integration
+   - #45 Storage foundation (`storage_configs` + `StorageProvider` ABC + encryption helpers) — 🔨 implemented on `feature/slice-2-storage-foundation` (PR open)
+   - #46 Settings > Storage tab + storage-config read/write — next
+   - #47 Google Drive OAuth connect/disconnect + onboarding flag
 3. **Slice 3** — LLM Prompt page
 
 ## Open Decisions

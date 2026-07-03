@@ -20,6 +20,9 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
+      # Storage-credential encryption key (issue #45). Empty until the ENCRYPTION_KEY secret is
+      # created; the current tests inject their own keys, so they pass either way.
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,6 +78,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
@@ -84,6 +88,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
           E2E_TEST_MODE: "true"
+          ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
           EOF
 
       - name: Build image

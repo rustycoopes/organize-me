@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # password-reset token for any registered email. Defaults false so those routes return 404
     # everywhere it isn't explicitly switched on.
     e2e_test_mode: bool = False
+    # Fernet key used to encrypt stored storage-provider credentials at rest (see
+    # app.core.security). Empty default (like RESEND_API_KEY) so existing deploys/CI that don't
+    # set it yet don't fail Settings construction - get_credential_cipher() raises a clear error
+    # if it's actually used while unset. Must be a urlsafe-base64 32-byte key
+    # (cryptography.fernet.Fernet.generate_key()); wire ENCRYPTION_KEY into QA/prod before the
+    # storage-config write paths (issues #46/#47) go live.
+    encryption_key: str = ""
 
 
 @lru_cache
