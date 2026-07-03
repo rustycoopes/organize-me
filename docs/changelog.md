@@ -21,6 +21,21 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #45** — Slice 2.0 storage foundation (branch `feature/slice-2-storage-foundation`).
+  First piece of Slice 2, pure plumbing that #46/#47 build on. Adds: the `storage_configs` table
+  (model `app/models/storage_config.py` + migration — one row per user, unique on `user_id`,
+  native `storage_provider` enum with lowercase labels via `values_callable`, nullable
+  encrypted-at-rest credential columns); the `StorageProvider` ABC
+  (`app/services/storage/base.py`: async `list_new_files`/`download_file`/`move_file`, plus a
+  `RemoteFile` value object and `FileDestination` enum) with an in-memory `FakeStorageProvider`
+  for tests; and Fernet-based credential encryption helpers (`app/core/security.py` —
+  `CredentialCipher` with an injectable key + a `get_credential_cipher()` factory reading the new
+  `ENCRYPTION_KEY` setting, which raises a clear error if unset). `ENCRYPTION_KEY` is wired into
+  `ci.yml`/`deploy.yml` (empty until the secret is created; tests inject their own keys so they
+  pass regardless). No user-facing surface; verified by unit tests (encryption round-trip,
+  provider contract, model persistence + unique constraint). **Human setup:** create an
+  `ENCRYPTION_KEY` GitHub secret (a `Fernet.generate_key()` value) and the matching Cloud Run env
+  before #46/#47's credential-write paths go live.
 - **Issue #10** — project scaffold + CI/CD (branch `feature/slice-1-scaffold-cicd`). → [archive](changelog-archive.md#issue-10--project-scaffold--cicd-pipeline-branch-feature-slice-1-scaffold-cicd)
 - **Issue #11** — DB foundation: Supabase connection + `users` table (branch `feature/slice-1-db-foundation`). → [archive](changelog-archive.md#issue-11--db-foundation-supabase-connection--users-table-branch-feature-slice-1-db-foundation)
 - **Issue #12** — email/password auth: register, login, logout (branch `feature/slice-1-auth-register-login`). → [archive](changelog-archive.md#issue-12--emailpassword-auth-register-login-logout-branch-feature-slice-1-auth-register-login)
