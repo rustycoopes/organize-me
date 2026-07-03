@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{#
+  Shared layout for every authenticated page. Renders the persistent left sidebar
+  (from the nav_items global — see app/pages/nav.py) and exposes a `page` block for
+  the actual page content. The active item is derived from the request path.
+#}
+
+{% block content %}
+<div class="drawer lg:drawer-open">
+  <input id="sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
+
+  <div class="drawer-content flex flex-col min-h-screen">
+    <!-- Top bar: only the hamburger on small screens; sidebar is always visible on lg+. -->
+    <div class="navbar bg-base-100 border-b border-base-300 lg:hidden">
+      <label for="sidebar-drawer-toggle" class="btn btn-square btn-ghost" aria-label="Open navigation">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </label>
+      <span class="text-lg font-semibold px-2">OrganizeMe</span>
+    </div>
+
+    <main class="flex-1 p-4 lg:p-8">
+      {% block page %}{% endblock %}
+    </main>
+  </div>
+
+  <div class="drawer-side z-10">
+    <label for="sidebar-drawer-toggle" class="drawer-overlay" aria-label="Close navigation"></label>
+    <aside class="flex min-h-full w-64 flex-col bg-base-100 border-r border-base-300">
+      <div class="px-4 py-4 text-xl font-bold">OrganizeMe</div>
+      <ul id="sidebar-nav" class="menu w-full grow gap-1 px-2" aria-label="Main navigation">
+        {% for item in nav_items %}
+        <li>
+          <a
+            href="{{ item.path }}"
+            {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
+          >{{ item.label }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="border-t border-base-300 p-2" x-data="{ loggingOut: false }">
+        <button
+          type="button"
+          class="btn btn-ghost btn-block justify-start"
+          :disabled="loggingOut"
+          @click="loggingOut = true; fetch('/api/v1/auth/logout', { method: 'POST' })
+            .finally(() => { window.location.href = '/login'; })"
+        >
+          <span x-show="!loggingOut">Log out</span>
+          <span x-show="loggingOut" x-cloak>Logging out...</span>
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

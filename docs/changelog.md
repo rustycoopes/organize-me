@@ -28,6 +28,14 @@
 - **Issue #14** — forgot/reset password (branch `feature/slice-1-forgot-reset-password`). → [archive](changelog-archive.md#issue-14--forgotreset-password-branch-feature-slice-1-forgot-reset-password-picked-up-ahead-of-13-per-direct-request)
 - **Issue #15** — profile view/edit, dark mode, account deletion (branch `feature/slice-1-profile`). → [archive](changelog-archive.md#issue-15--profile-viewedit-dark-mode-account-deletion-branch-feature-slice-1-profile)
 - **Issue #16** — public landing page (branch `feature/slice-1-landing-page`). → [archive](changelog-archive.md#issue-16--public-landing-page-branch-feature-slice-1-landing-page)
+- **Issue #17** — sidebar shell + placeholder pages (branch `feature/slice1-sidebar-shell`).
+  Persistent left sidebar for authenticated users (Dashboard → Upload → Processing → Logs →
+  Prompt → Settings → Profile) via a new `authenticated_base.html` layout, driven by a single
+  `NAV_ITEMS` source (`app/pages/nav.py`). Six new auth-gated placeholder routes
+  (`/dashboard`, `/upload`, `/processing`, `/logs`, `/prompt`, `/settings`), each redirecting to
+  `/login` when anonymous; `/profile` re-parented onto the same layout. Current route is marked
+  `aria-current="page"`; sidebar includes a Log out action. Sidebar is not shown on public
+  (landing/login/register) pages.
 - **Docs restructure** — split `implementation-plan.md`'s 9 slice specs into self-contained
   per-slice files under `docs/slices/`; `implementation-plan.md` is now a thin index + shared
   reference (stack, full schema, endpoint map, utilities, testing). Reduces per-issue context read
