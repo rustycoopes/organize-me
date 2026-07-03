@@ -17,9 +17,9 @@ from app.pages.nav import NAV_ITEMS
 router = APIRouter(tags=["pages"])
 
 # Placeholder pages are every nav destination except the ones with their own router and real
-# content (/profile, /settings). Derived from NAV_ITEMS so paths/labels have a single source
-# of truth.
-PAGES_WITH_OWN_ROUTER = {"/profile", "/settings"}
+# content (/profile, /settings, /prompt). Derived from NAV_ITEMS so paths/labels have a single
+# source of truth.
+PAGES_WITH_OWN_ROUTER = {"/profile", "/settings", "/prompt"}
 PLACEHOLDER_PAGES: list[tuple[str, str]] = [
     (item.path, item.label) for item in NAV_ITEMS if item.path not in PAGES_WITH_OWN_ROUTER
 ]

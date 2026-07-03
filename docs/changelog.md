@@ -21,6 +21,22 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #49 implemented** — Slice 3.1 prompt page + endpoints (branch
+  `feature/slice-3.1-prompt-page`). The Prompt page and the API behind it, end to end, letting a
+  user view/edit/reset the extraction prompt. New `app/api/v1/llm_prompt.py`:
+  `GET /api/v1/llm-prompt` (returns the user's stored prompt, falling back to
+  `FACTORY_DEFAULT_PROMPT` without writing for a legacy account with no seeded row),
+  `PUT /api/v1/llm-prompt` (saves edited text; trims + rejects blank via a Pydantic validator,
+  20 000-char cap), and `POST /api/v1/llm-prompt/reset` (restores the factory default). Edit and
+  reset both funnel through one `set_user_prompt` create-or-update helper (unique on `user_id`, so
+  never a second row) — reset is just that helper called with the #48 constant. New Prompt page
+  (`app/pages/prompt.py` + `templates/prompt.html`): a textarea editor with Save + Reset-to-Default
+  buttons wired to the endpoints via Alpine `fetch`, seeded from the server with the current prompt;
+  `/prompt` moves off the placeholder router onto its own real page (sidebar/nav unchanged). New
+  Playwright spec `e2e/tests/prompt.spec.ts` (edit → save → reload → reset round-trip) added to the
+  `e2e-qa` job. pytest covers the endpoints (GET default, PUT round-trip, blank rejection, reset,
+  single-row invariant, auth-gating), a direct reset-logic unit test on `set_user_prompt`, and the
+  page (render, saved-edit reflection, `x-data` truncation guard).
 - **Issue #48 implemented** — Slice 3.0 prompt foundation (branch
   `feature/slice-3.0-prompt-foundation`). New `llm_prompts` table (`id`, `user_id` FK→users
   `ON DELETE CASCADE` **UNIQUE**, `prompt_text` TEXT NOT NULL, `created_at`/`updated_at`) via
