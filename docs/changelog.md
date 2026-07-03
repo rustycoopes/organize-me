@@ -44,6 +44,22 @@
   pytest guard asserts `E2E_TEST_MODE` never appears in `deploy.yml` (prod). A separate
   reset-password raw-JSON UX gap surfaced during this work is recorded in `project-status.md`
   (Suggestions for Future Review #21) for a follow-up.
+- **Issue #46** — Slice 2.1 Settings > Storage tab + storage-config read/write (branch
+  `feature/slice-2-storage-tab`). The Storage tab plus its config endpoints, end to end, using the
+  reserved `storage_configs` row from #45 — no live OAuth yet (that's #47). New
+  `GET`/`PUT /api/v1/storage-config` (`app/api/v1/storage_config.py`): GET returns the current
+  user's `{provider, folder_path, is_connected}` or an all-null unset state; PUT upserts the single
+  per-user row (create-or-update, never a second row). The read schema deliberately exposes only
+  those three fields and **never** echoes the encrypted credential columns; `is_connected` is
+  derived from OAuth-token presence (always false this slice, surfaced now so the tab shows
+  connection state without a later schema change). New Settings page (`app/pages/settings.py` +
+  `templates/settings.html`) with a Storage tab: a provider dropdown whose Alpine.js `x-show`
+  reveals the Google Drive fields (folder path + a "not connected yet" hint) and hides the
+  Dropbox/S3 stubs until selected — no page reload. `/settings` moves off the generic placeholder
+  router onto its own real page. Folder path is trimmed + rejected-if-blank server-side and
+  round-trips through save→reload. New Playwright spec `e2e/tests/storage.spec.ts` (conditional
+  fields + folder-path persistence) added to the `e2e-qa` job, plus pytest coverage for the
+  endpoints, page render/gating, credential non-leak, and an `x-data` truncation guard.
 - **Issue #45** — Slice 2.0 storage foundation (branch `feature/slice-2-storage-foundation`).
   First piece of Slice 2, pure plumbing that #46/#47 build on. Adds: the `storage_configs` table
   (model `app/models/storage_config.py` + migration — one row per user, unique on `user_id`,

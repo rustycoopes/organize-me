@@ -175,4 +175,4 @@ The `examples/` folder contains reference files used for development and testing
 
 ## Status
 
-**In development** — Slice 1 (project scaffold, auth, CI/CD) underway. See [Project Status](docs/project-status.md).
+**In development** — Slice 1 (project scaffold, auth, CI/CD) complete; Slice 2 (Google Drive storage) underway: the storage foundation and the Settings > Storage tab (`GET`/`PUT /api/v1/storage-config`) are in, with live Google Drive OAuth still to come. See [Project Status](docs/project-status.md).
