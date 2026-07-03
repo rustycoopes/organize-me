@@ -1,0 +1,168 @@
+"""Tests for POST /api/v1/upload (#52).
+
+The endpoint's own logic - Drive gating, file validation, run creation, the onboarding flip, and
+handing off to the pipeline scheduler - is tested here with the storage provider and scheduler
+overridden; the full pipeline behaviour is covered in tests/test_pipeline_runner.py.
+"""
+
+import uuid
+
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.v1.upload import get_pipeline_scheduler, get_upload_storage
+from app.core.prompts import FACTORY_DEFAULT_PROMPT
+from app.main import app
+from app.models.processing_run import ProcessingRun
+from app.models.user import User
+from app.services.storage.base import RemoteFile, StorageProvider
+from app.services.storage.fake import FakeStorageProvider
+
+
+def unique_email() -> str:
+    return f"upload-{uuid.uuid4().hex}@example.com"
+
+
+async def _register_and_login(client: AsyncClient) -> uuid.UUID:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+    me = await client.get("/api/v1/users/me")
+    return uuid.UUID(me.json()["id"])
+
+
+class _RecordingScheduler:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def schedule(self, **kwargs: object) -> None:
+        self.calls.append(kwargs)
+
+
+def _override_storage(provider: StorageProvider) -> None:
+    app.dependency_overrides[get_upload_storage] = lambda: provider
+
+
+def _override_scheduler(scheduler: _RecordingScheduler) -> None:
+    app.dependency_overrides[get_pipeline_scheduler] = lambda: scheduler
+
+
+async def test_upload_requires_authentication(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"hi", "text/plain")}
+    )
+    assert response.status_code == 401
+
+
+async def test_upload_rejected_when_drive_not_connected(client: AsyncClient) -> None:
+    # No storage override: the real gating dependency runs against a user with no Drive connection.
+    await _register_and_login(client)
+
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"hi", "text/plain")}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "connect_google_drive_first"
+
+
+async def test_upload_rejects_unsupported_extension(client: AsyncClient) -> None:
+    await _register_and_login(client)
+    _override_storage(FakeStorageProvider())
+    _override_scheduler(_RecordingScheduler())
+
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("notes.pdf", b"hi", "application/pdf")}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "unsupported_file_type"
+
+
+async def test_upload_rejects_file_over_size_cap(client: AsyncClient) -> None:
+    await _register_and_login(client)
+    _override_storage(FakeStorageProvider())
+    _override_scheduler(_RecordingScheduler())
+
+    oversized = b"x" * (10 * 1024 * 1024 + 1)
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", oversized, "text/plain")}
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "file_too_large"
+
+
+async def test_upload_rejects_empty_file(client: AsyncClient) -> None:
+    await _register_and_login(client)
+    _override_storage(FakeStorageProvider())
+    _override_scheduler(_RecordingScheduler())
+
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"", "text/plain")}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "empty_file"
+
+
+async def test_successful_upload_creates_run_flips_onboarding_and_schedules(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    storage = FakeStorageProvider()
+    scheduler = _RecordingScheduler()
+    _override_storage(storage)
+    _override_scheduler(scheduler)
+
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"5/30/26, 10:00 - Russ: hi", "text/plain")}
+    )
+
+    assert response.status_code == 202
+    run_id = uuid.UUID(response.json()["run_id"])
+
+    # The bytes were written to the watch folder and a run row was created.
+    assert storage.uploaded == ["chat.txt"]
+    run = await db_session.get(ProcessingRun, run_id)
+    assert run is not None
+    assert run.filename == "chat.txt"
+
+    # First upload flips the onboarding flag.
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    assert user.onboarding_first_upload_done is True
+
+    # The pipeline was handed off exactly once with the created run + resolved prompt.
+    assert len(scheduler.calls) == 1
+    call = scheduler.calls[0]
+    assert call["run_id"] == run_id
+    assert call["storage"] is storage
+    assert isinstance(call["remote_file"], RemoteFile)
+    assert call["prompt_text"] == FACTORY_DEFAULT_PROMPT
+
+
+async def test_e2e_test_mode_bypasses_the_drive_gate(client: AsyncClient) -> None:
+    """Under E2E_TEST_MODE the fake provider is used with no connected-Drive requirement, so QA's
+    Playwright suite (#53) can upload without real OAuth. Runs on the rolled-back db_session via the
+    ``client`` fixture; only get_settings + the scheduler are additionally overridden."""
+    from app.core.config import Settings, get_settings
+
+    await _register_and_login(client)
+    scheduler = _RecordingScheduler()
+
+    def e2e_settings() -> Settings:
+        # Same config as normal, but with E2E_TEST_MODE flipped on for the endpoint's Depends.
+        return get_settings().model_copy(update={"e2e_test_mode": True})
+
+    app.dependency_overrides[get_settings] = e2e_settings
+    _override_scheduler(scheduler)
+
+    # No Drive connection saved, but E2E mode lets the upload through.
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"hi", "text/plain")}
+    )
+
+    assert response.status_code == 202
+    assert len(scheduler.calls) == 1

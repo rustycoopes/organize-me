@@ -13,6 +13,7 @@ def test_storage_provider_cannot_be_instantiated_directly() -> None:
 
 def test_storage_provider_declares_the_expected_abstract_methods() -> None:
     assert StorageProvider.__abstractmethods__ == {
+        "upload_file",
         "list_new_files",
         "download_file",
         "move_file",

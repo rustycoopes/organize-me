@@ -1,0 +1,109 @@
+{% extends "authenticated_base.html" %}
+
+{% block title %}Upload — OrganizeMe{% endblock %}
+
+{% block page %}
+<div class="flex justify-center">
+  <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h1 class="card-title">Upload a conversation</h1>
+      <p class="text-sm opacity-70">
+        Upload a WhatsApp export (<code>.txt</code>, <code>.zip</code>, or <code>.csv</code>). We'll
+        extract the agreed events and add them to your dashboard.
+      </p>
+
+      {#
+        Single-quoted x-data so the double-quoted JS strings inside don't terminate the attribute
+        (the register.html bug from #23). drive_connected seeds whether Drive is set up.
+      #}
+      <div
+        class="mt-4"
+        x-data='{
+          uploading: false,
+          error: "",
+          dragover: false,
+          driveConnected: {{ drive_connected | tojson }},
+          async submitFile(fileList) {
+            if (!fileList || !fileList.length) return;
+            if (!this.driveConnected) {
+              this.error = "Connect Google Drive in Settings before uploading.";
+              return;
+            }
+            this.error = "";
+            this.uploading = true;
+            try {
+              const form = new FormData();
+              form.append("file", fileList[0]);
+              const response = await fetch("/api/v1/upload", { method: "POST", body: form });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                this.error = this.messageFor(data.detail) || "Upload failed. Please try again.";
+                this.uploading = false;
+                return;
+              }
+              // Follow the run to the live progress page (#53).
+              window.location = "/processing?run=" + encodeURIComponent(data.run_id);
+            } catch (e) {
+              this.error = "Upload failed. Please try again.";
+              this.uploading = false;
+            }
+          },
+          messageFor(detail) {
+            const map = {
+              connect_google_drive_first: "Connect Google Drive in Settings before uploading.",
+              unsupported_file_type: "Please upload a .txt, .zip, or .csv file.",
+              file_too_large: "That file is too large (the maximum is 10 MB).",
+              empty_file: "That file is empty.",
+            };
+            return map[detail];
+          },
+        }'
+      >
+        {# Not connected: steer the user to Settings; the dropzone below stays disabled. #}
+        <div role="alert" class="alert alert-warning" x-show="!driveConnected" x-cloak>
+          <span>
+            Connect Google Drive in
+            <a href="/settings" class="link">Settings</a>
+            before uploading.
+          </span>
+        </div>
+
+        <div role="alert" class="alert alert-error mt-2" x-show="error" x-cloak>
+          <span x-text="error"></span>
+        </div>
+
+        {# Drag-and-drop zone. Clicking it opens the hidden file picker; dropping a file uploads it. #}
+        <div
+          id="upload-dropzone"
+          class="mt-4 flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-base-300 p-8 text-center transition-colors"
+          :class="{ 'border-primary bg-base-200': dragover, 'opacity-50 pointer-events-none': !driveConnected }"
+          @dragover.prevent="dragover = true"
+          @dragleave.prevent="dragover = false"
+          @drop.prevent="dragover = false; submitFile($event.dataTransfer.files)"
+          @click="$refs.fileInput.click()"
+          role="button"
+          tabindex="0"
+          aria-label="Upload a file by dragging it here or clicking to browse"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.9A5 5 0 1115.9 6.1 4.5 4.5 0 0117 15h-1m-5-2v9m0-9l-3 3m3-3l3 3" />
+          </svg>
+          <p class="font-medium" x-show="!uploading">
+            Drag a file here, or <span class="link link-primary">browse</span>
+          </p>
+          <p class="font-medium" x-show="uploading" x-cloak>Uploading…</p>
+          <p class="text-xs opacity-60">.txt, .zip or .csv · up to 10 MB</p>
+          <input
+            type="file"
+            id="file-input"
+            x-ref="fileInput"
+            class="hidden"
+            accept=".txt,.zip,.csv"
+            @change="submitFile($event.target.files)"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -26,8 +26,8 @@ class ProcessingStepStatus(str, Enum):
 class ProcessingStep(Base):
     """One of the 7 steps of a ProcessingRun, with its own status and captured log lines.
 
-    Rows are created and updated by the Celery pipeline (#52); the SSE progress page (#53) streams
-    their status changes. This model + its migration are the Slice 4.0 foundation (#51).
+    Rows are created and updated by the in-process pipeline (#52); the SSE progress page (#53)
+    streams their status changes. This model + its migration are the Slice 4.0 foundation (#51).
     """
 
     __tablename__ = "processing_steps"
