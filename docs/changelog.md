@@ -21,6 +21,29 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #23 implemented** — Slice 1.8 Playwright E2E suite (branch
+  `feature/slice-1-e2e-playwright`). New `e2e/` TypeScript suite drives the deployed QA app
+  end-to-end: landing page, register→login→logout, forgot→reset password, profile edit +
+  server-side dark-mode persistence, account deletion, and sidebar nav (order + unauthenticated
+  redirect). Wired into `ci.yml` as an `e2e-qa` job that runs after `deploy-qa` and uploads the
+  Playwright HTML report as an artifact on failure. Backed by a test-only endpoint
+  `GET /api/v1/internal/e2e/last-reset-token` (module `app/api/v1/internal_e2e.py`) that mints a
+  valid reset-token JWT, gated behind the new `E2E_TEST_MODE` setting — hidden from the OpenAPI
+  schema and 404 everywhere except QA, where `ci.yml` sets `E2E_TEST_MODE=true` on the Cloud Run
+  env (never prod). Google OAuth stays out of E2E scope (unreliable headlessly), covered by #13's
+  backend tests. Making `e2e-qa` a required status check on `main` is a one-time branch-protection
+  step to apply after this merges. **The suite caught a real production bug on first run**:
+  `register.html`'s Alpine `x-data` attribute was truncated by an embedded `type="email"` double
+  quote inside a JS comment, so the register component threw `Unexpected token ')'` and never
+  initialised — the email/password register form was broken in real browsers, yet passed every
+  `pytest` check (which only string-match HTML, never run the JS). Fixed the comment and added a
+  pytest guard that parses the page as a browser would and asserts the `x-data` expression isn't
+  truncated. Two E2E hardening improvements applied after an improvement-pass review: the
+  account-deletion test now replays the exact pre-deletion cookie against `/api/v1/users/me` and
+  asserts `401` (proving the token is dead server-side, not just dropped by the browser), and a
+  pytest guard asserts `E2E_TEST_MODE` never appears in `deploy.yml` (prod). A separate
+  reset-password raw-JSON UX gap surfaced during this work is recorded in `project-status.md`
+  (Suggestions for Future Review #21) for a follow-up.
 - **Issue #45** — Slice 2.0 storage foundation (branch `feature/slice-2-storage-foundation`).
   First piece of Slice 2, pure plumbing that #46/#47 build on. Adds: the `storage_configs` table
   (model `app/models/storage_config.py` + migration — one row per user, unique on `user_id`,

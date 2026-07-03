@@ -67,6 +67,9 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
+      # NOTE: E2E_TEST_MODE=true is written here for QA ONLY. It enables the test-only
+      # /api/v1/internal/e2e/* helper endpoints (issue #23). It must never appear in prod's
+      # deploy (deploy.yml) - those routes return 404 wherever the flag is unset.
       - name: Write Cloud Run env vars file
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
@@ -84,6 +87,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
+          E2E_TEST_MODE: "true"
           ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
           EOF
 
@@ -107,3 +111,41 @@ jobs:
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
             --quiet
+
+  e2e-qa:
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    env:
+      # The QA Cloud Run URL the freshly-deployed revision now serves. Kept in sync with the
+      # GOOGLE_OAUTH_REDIRECT_URI host above and e2e/playwright.config.ts's fallback.
+      PLAYWRIGHT_BASE_URL: https://organizeme-qa-170051512639.northamerica-northeast1.run.app
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests against QA
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7

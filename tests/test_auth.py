@@ -1,5 +1,6 @@
 import re
 import uuid
+from html.parser import HTMLParser
 
 from httpx import AsyncClient
 from sqlalchemy import delete
@@ -198,6 +199,40 @@ async def test_register_page_submits_via_js_and_auto_logs_in(client: AsyncClient
     # If auto-login unexpectedly fails after a successful registration, the user should land
     # on /login with an explanation rather than silently.
     assert "window.location.href = '/login?registered=1'" in body
+
+
+class _XDataCollector(HTMLParser):
+    """Collects every `x-data` attribute value the HTML parser sees. Because the parser honours
+    HTML attribute-quote termination, a stray double-quote inside a double-quoted x-data value
+    truncates the collected value exactly as a real browser would - which is how we catch it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.x_data_values: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        for name, value in attrs:
+            if name == "x-data" and value is not None:
+                self.x_data_values.append(value)
+
+
+async def test_register_page_x_data_attribute_is_not_truncated_by_a_stray_quote(
+    client: AsyncClient,
+) -> None:
+    # Regression guard for the Alpine x-data attribute being cut short by an embedded double
+    # quote (a JS comment containing `type="email"` inside the double-quoted x-data broke the
+    # whole register form - caught by the #23 Playwright suite, since pytest string-matching
+    # never executes the JS). Parse the page as a browser would and assert the register
+    # component's expression still contains code that lives AFTER the historical break point.
+    response = await client.get("/register")
+    collector = _XDataCollector()
+    collector.feed(response.text)
+
+    register_x_data = [v for v in collector.x_data_values if "register(event)" in v]
+    assert register_x_data, "register page has no x-data component with a register() method"
+    # This assignment sits well past the comment that used to truncate the attribute; if the
+    # value were cut short at a stray quote, it wouldn't survive HTML attribute parsing.
+    assert "window.location.href = '/profile'" in register_x_data[0]
 
 
 async def test_register_page_shows_google_auth_failed_via_alpine_init(client: AsyncClient) -> None:

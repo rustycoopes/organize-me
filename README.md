@@ -111,6 +111,25 @@ uv run pytest
 uv run mypy app tests
 ```
 
+### End-to-end tests (Playwright)
+
+The `e2e/` folder holds a Playwright/TypeScript suite that drives the **real deployed QA app**
+end-to-end (landing, register/login/logout, forgot/reset password, profile edit, dark-mode
+persistence, account deletion, sidebar nav). It's separate from the Python `pytest` suite and
+runs in CI as the `e2e-qa` job after QA deploys.
+
+```bash
+cd e2e
+npm ci
+npx playwright install --with-deps chromium
+npx playwright test                     # targets QA by default
+PLAYWRIGHT_BASE_URL=http://localhost:8000 npx playwright test   # or a local run
+```
+
+The forgot/reset test reads a reset token from a **test-only** endpoint
+(`GET /api/v1/internal/e2e/last-reset-token`) that only exists when `E2E_TEST_MODE=true`.
+That flag is set on QA's Cloud Run env vars **only** — never prod, where the endpoint 404s.
+
 ### Docker
 
 ```bash
@@ -122,7 +141,7 @@ The container runs the FastAPI app and the Celery worker as separate processes u
 
 ### CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy --strict`, then build and push the Docker image to Artifact Registry and deploy to Cloud Run — QA on every PR, prod on merge to `main`.
+GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy --strict`, then build and push the Docker image to Artifact Registry and deploy to Cloud Run — QA on every PR, prod on merge to `main`. On PRs, a final `e2e-qa` job runs the Playwright suite against the freshly-deployed QA instance and uploads an HTML report artifact on failure.
 
 ---
 
