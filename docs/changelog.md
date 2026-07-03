@@ -21,6 +21,26 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #51 implemented** — Slice 4.0 pipeline foundation (branch
+  `feature/slice-4.0-pipeline-foundation`). The reusable, no-UI foundation the upload pipeline
+  (#52) and SSE progress page (#53) build on. Three new models + one migration
+  (`e5f6a7b8c9d0`, up/down round-trip verified against QA): `processing_runs`
+  (status enum pending/in_progress/success/failed, `events_extracted_count`),
+  `processing_steps` (status enum incl. `skipped`, `log_lines` JSONB), and `events`
+  (`resolved_date_earliest` DATE nullable, `agreed_by` JSONB, and the
+  `UNIQUE(user_id, description, resolved_date)` duplicate-detection constraint). New
+  `app/core/date_parser.py::parse_earliest_date` — reduces the LLM's free-text `resolved_date`
+  (single, timed, or comma-separated multi-date) to the earliest calendar date, `None` for
+  "TBC"/unparseable; validated against all 22 real `resolved_date` values in
+  `examples/example.lmmoutput.txt`. New `app/services/llm/gemini.py` — a `GeminiClient` Protocol
+  with `GoogleGeminiClient` (google-genai SDK, blocking call off the event loop, **raises
+  immediately on error — no retry**), `FakeGeminiClient` (returns a canned payload, records
+  calls), and a `get_gemini_client` factory overridable in tests, mirroring the email sender.
+  Added deps `google-genai` + `python-dateutil`; new optional `GEMINI_API_KEY` setting (empty
+  default, clear error when used unset — tests inject the fake and never call the live API).
+  Deferred model-suggested improvements filed as #64 (structured-JSON Gemini output) and #65
+  (configurable model name). **Human setup before the pipeline (#52) runs live:** wire a real
+  `GEMINI_API_KEY` secret into QA/prod.
 - **Issue #49 implemented** — Slice 3.1 prompt page + endpoints (branch
   `feature/slice-3.1-prompt-page`). The Prompt page and the API behind it, end to end, letting a
   user view/edit/reset the extraction prompt. New `app/api/v1/llm_prompt.py`:
