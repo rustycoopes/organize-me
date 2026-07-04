@@ -407,3 +407,4 @@
 - `docs/changelog.md` — this file
 - `examples/example.whatsapp.txt` — canonical WhatsApp export sample (630 lines)
 - `examples/example.lmmoutput.txt` — canonical LLM output sample (22 extracted events, JSON)
+
