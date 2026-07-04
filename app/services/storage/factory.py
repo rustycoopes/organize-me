@@ -7,19 +7,25 @@ Central place that turns a user's saved ``storage_configs`` row into a concrete 
   live OAuth (per #52's resolved testability decision).
 - Otherwise it decrypts the stored Google Drive OAuth tokens (via ``CredentialCipher``, #47) and
   builds a ``GoogleDriveStorageProvider`` pointed at the user's watched folder.
+- If storage config is unavailable or decryption fails (issue #79), falls back to
+  ``EphemeralStorageProvider`` (in-memory, non-persistent) so uploads can still proceed.
 
 The same provider instance is used for the upload write and then handed to the background pipeline
 task, so its underlying HTTP client lives for the whole run.
 """
 
 import httpx
+import logging
 
 from app.core.config import Settings
 from app.core.security import CredentialCipher
 from app.models.storage_config import StorageConfig
 from app.services.storage.base import StorageProvider
+from app.services.storage.ephemeral import EphemeralStorageProvider
 from app.services.storage.fake import FakeStorageProvider
 from app.services.storage.google_drive import GoogleDriveStorageProvider
+
+logger = logging.getLogger(__name__)
 
 # Generous per-call timeout: Drive uploads/downloads of a chat export are small, but the refresh +
 # API round-trips shouldn't hang a background task forever.
@@ -52,13 +58,24 @@ def build_storage_provider(
     config: StorageConfig | None,
     settings: Settings,
     cipher: CredentialCipher | None,
+    fallback_to_ephemeral: bool = False,
 ) -> StorageProvider:
     """Resolve the provider for a run: the E2E fake under test mode, else a real Drive provider.
 
     ``config`` and ``cipher`` are required for the real path; callers gate on a connected config
-    before reaching it (see app.api.v1.upload)."""
+    before reaching it (see app.api.v1.upload).
+
+    If ``fallback_to_ephemeral`` is True and no config/cipher is available, returns an
+    EphemeralStorageProvider instead of raising. Used for issue #79 graceful degradation.
+    """
     if settings.e2e_test_mode:
         return FakeStorageProvider()
-    if config is None or cipher is None:  # pragma: no cover - guarded by the caller
+    if config is None or cipher is None:
+        if fallback_to_ephemeral:
+            logger.warning(
+                "storage config unavailable, falling back to ephemeral (in-memory) storage"
+            )
+            return EphemeralStorageProvider()
+        # pragma: no cover - guarded by the caller
         raise ValueError("a storage config and cipher are required outside E2E_TEST_MODE")
     return build_google_drive_provider(config, settings, cipher)

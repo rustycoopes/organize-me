@@ -49,17 +49,23 @@ async def get_upload_storage(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> StorageProvider:
-    """Resolve the storage provider for this upload, gating on a connected Google Drive.
+    """Resolve the storage provider for this upload.
 
     Under ``E2E_TEST_MODE`` the fake provider is returned unconditionally (QA has no real Drive).
-    Otherwise the user must have saved a folder path *and* connected Drive (a stored token), else the
-    upload is rejected with a clear message - there is no local fallback."""
+    Otherwise attempts to use the user's connected Google Drive. If not available, falls back to
+    ephemeral (in-memory) storage so uploads can proceed without data loss (issue #79).
+    Ephemeral uploads are logged with a warning so operators are aware."""
     if settings.e2e_test_mode:
         return build_storage_provider(config=None, settings=settings, cipher=None)
     config = await get_user_storage_config(db, user.id)
     if config is None or config.oauth_access_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="connect_google_drive_first"
+        # Graceful fallback to ephemeral storage instead of rejecting the upload (issue #79).
+        logger.warning(
+            "user %s uploading without configured Google Drive storage, using ephemeral fallback",
+            user.id,
+        )
+        return build_storage_provider(
+            config=None, settings=settings, cipher=None, fallback_to_ephemeral=True
         )
     return build_storage_provider(
         config=config, settings=settings, cipher=get_credential_cipher()

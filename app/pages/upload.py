@@ -33,14 +33,19 @@ async def upload_page(
     if user is None:
         return RedirectResponse("/login", status_code=302)
     config = await get_user_storage_config(db, user.id)
-    # Under E2E_TEST_MODE the upload endpoint uses the fake storage provider and accepts uploads
-    # without a real Drive connection (see app.api.v1.upload / app.services.storage.factory), so the
-    # page must enable the dropzone too — otherwise the Playwright suite (#53) couldn't upload.
+    # Check if Google Drive is actually connected (token present and decryptable)
     drive_connected = settings.e2e_test_mode or (
         config is not None and config.oauth_access_token is not None
     )
+    # If no storage configured, uploads will fall back to ephemeral storage (issue #79)
+    using_ephemeral = not settings.e2e_test_mode and not drive_connected
     return templates.TemplateResponse(
         request,
         "upload.html",
-        {"user": user, "dark_mode": user.dark_mode, "drive_connected": drive_connected},
+        {
+            "user": user,
+            "dark_mode": user.dark_mode,
+            "drive_connected": drive_connected,
+            "using_ephemeral": using_ephemeral,
+        },
     )

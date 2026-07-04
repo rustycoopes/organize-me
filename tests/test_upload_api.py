@@ -55,16 +55,33 @@ async def test_upload_requires_authentication(client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_upload_rejected_when_drive_not_connected(client: AsyncClient) -> None:
+async def test_upload_succeeds_with_ephemeral_fallback_when_drive_not_connected(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     # No storage override: the real gating dependency runs against a user with no Drive connection.
-    await _register_and_login(client)
+    # With issue #79, uploads fall back to ephemeral storage instead of rejecting (issue #79).
+    user_id = await _register_and_login(client)
+    scheduler = _RecordingScheduler()
+    _override_scheduler(scheduler)
 
     response = await client.post(
         "/api/v1/upload", files={"file": ("chat.txt", b"hi", "text/plain")}
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "connect_google_drive_first"
+    # Upload succeeds with ephemeral storage provider as fallback.
+    assert response.status_code == 202
+    run_id = uuid.UUID(response.json()["run_id"])
+
+    # Run was created and scheduled.
+    run = await db_session.get(ProcessingRun, run_id)
+    assert run is not None
+    assert run.filename == "chat.txt"
+    assert len(scheduler.calls) == 1
+    call = scheduler.calls[0]
+    assert call["run_id"] == run_id
+    # Storage provider is ephemeral since Drive is not connected.
+    from app.services.storage.ephemeral import EphemeralStorageProvider
+    assert isinstance(call["storage"], EphemeralStorageProvider)
 
 
 async def test_upload_rejects_unsupported_extension(client: AsyncClient) -> None:
