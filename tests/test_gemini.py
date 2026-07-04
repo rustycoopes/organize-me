@@ -105,3 +105,26 @@ async def test_google_client_raises_when_api_key_is_missing() -> None:
 
 def test_get_gemini_client_returns_the_google_implementation() -> None:
     assert isinstance(get_gemini_client(), GoogleGeminiClient)
+
+
+async def test_get_gemini_client_returns_the_fake_under_e2e_test_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Under E2E_TEST_MODE the factory returns a fake seeded with a canned, schema-valid payload so
+    # the Playwright suite (#53) can run the pipeline to success without a real GEMINI_API_KEY.
+    import app.services.llm.gemini as gemini_module
+    from app.core.config import get_settings
+
+    e2e_settings = get_settings().model_copy(update={"e2e_test_mode": True})
+    monkeypatch.setattr(gemini_module, "get_settings", lambda: e2e_settings)
+
+    client = get_gemini_client()
+
+    assert isinstance(client, FakeGeminiClient)
+    payload = await client.extract(prompt="p", conversation="c")
+    # The canned payload parses as the events JSON the pipeline expects.
+    import json
+
+    events = json.loads(payload)
+    assert isinstance(events, list) and events
+    assert {"type", "description", "resolved_date"} <= events[0].keys()

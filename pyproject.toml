@@ -20,6 +20,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "google-genai>=2.10.0",
     "python-dateutil>=2.9.0.post0",
+    "sse-starlette>=2.1.0",
 ]
 
 [dependency-groups]
