@@ -245,6 +245,15 @@ async def run_pipeline(
     run.started_at = _utcnow()
     await session.commit()
 
+    # Log which storage provider is being used (issue #79 - diagnostics for ephemeral fallback).
+    provider_type = type(storage).__name__
+    logger.info(
+        "pipeline: starting run %s for user %s using %s storage provider",
+        run.id,
+        user_id,
+        provider_type,
+    )
+
     # Step 1 - File Received (download the bytes the upload placed in the watch folder).
     step = await _begin_step(session, run.id, STEP_FILE_RECEIVED)
     try:

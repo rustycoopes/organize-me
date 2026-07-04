@@ -43,14 +43,19 @@ async def test_upload_page_renders_dropzone_and_file_picker(client: AsyncClient)
     assert "/api/v1/upload" in body
 
 
-async def test_upload_page_warns_when_drive_not_connected(client: AsyncClient) -> None:
+async def test_upload_page_warns_when_drive_not_connected_with_ephemeral_fallback(
+    client: AsyncClient,
+) -> None:
     await _register_and_login(client)
 
     response = await client.get("/upload")
 
     body = response.text
-    # A fresh user has no Drive connection: seed drive_connected=false and show the Settings steer.
+    # A fresh user has no Drive connection but can still upload (issue #79).
     assert "driveConnected:false" in body.replace(" ", "")
+    assert "usingEphemeral:true" in body.replace(" ", "")
+    # Page warns about ephemeral storage and links to Settings to enable persistent storage.
+    assert "Google Drive is not connected" in body
     assert "/settings" in body
 
 
