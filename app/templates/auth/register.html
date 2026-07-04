@@ -1,12 +1,11 @@
 {% extends "base.html" %}
+{% from "macros/ui.html" import card_page %}
 
 {% block title %}Register — OrganizeMe{% endblock %}
 
 {% block content %}
-<div class="flex min-h-screen items-center justify-center px-4">
-  <div
-    class="card w-full max-w-sm bg-base-100 shadow-xl"
-    x-data="{
+<div
+  x-data="{
       error: '',
       submitting: false,
       init() {
@@ -62,13 +61,11 @@
           this.submitting = false;
         }
       },
-    }"
-  >
-    <div class="card-body">
-      <h1 class="card-title">Create your account</h1>
-      <p class="text-sm text-base-content/70">Self-registration is open — no invite needed.</p>
+  }"
+>
+{% call card_page("Create your account", subtitle="Self-registration is open — no invite needed.") %}
 
-      <div role="alert" aria-live="polite" class="alert alert-error mt-2" x-show="error" x-cloak>
+  <div role="alert" aria-live="polite" class="alert alert-error mt-2" x-show="error" x-cloak>
         <span x-text="error"></span>
       </div>
 
@@ -127,7 +124,7 @@
         Already have an account?
         <a href="/login" class="link link-primary">Log in</a>
       </p>
-    </div>
-  </div>
+
+{% endcall %}
 </div>
 {% endblock %}
