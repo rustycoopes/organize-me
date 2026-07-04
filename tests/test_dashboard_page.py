@@ -1,0 +1,226 @@
+"""Tests for the Events dashboard page (#54)."""
+
+import uuid
+from datetime import date
+
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.event import Event
+from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+
+
+def unique_email() -> str:
+    return f"dashboard-page-{uuid.uuid4().hex}@example.com"
+
+
+async def _register_and_login(client: AsyncClient) -> uuid.UUID:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+    me = await client.get("/api/v1/users/me")
+    return uuid.UUID(me.json()["id"])
+
+
+async def _make_run(db: AsyncSession, user_id: uuid.UUID) -> ProcessingRun:
+    run = ProcessingRun(user_id=user_id, filename="chat.txt", status=ProcessingRunStatus.SUCCESS)
+    db.add(run)
+    await db.flush()
+    return run
+
+
+async def test_dashboard_redirects_anonymous_visitor_to_login(client: AsyncClient) -> None:
+    response = await client.get("/dashboard")
+
+    assert response.status_code in (302, 303, 307)
+    assert response.headers["location"] == "/login"
+
+
+async def test_dashboard_shows_empty_state_with_no_events(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "No events yet" in response.text
+
+
+async def test_dashboard_renders_event_row_with_all_columns(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    event = Event(
+        user_id=user_id,
+        run_id=run.id,
+        type="Medical",
+        description="Dentist appointment",
+        resolved_date="Saturday 6 June 2026",
+        resolved_date_earliest=date(2026, 6, 6),
+        raw_date_text="Saturday",
+        agreed_by=["Russ Cooper", "Christine Cooper"],
+    )
+    db_session.add(event)
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    body = response.text
+    assert "Medical" in body
+    assert "Dentist appointment" in body
+    assert "Saturday 6 June 2026" in body
+    assert "Saturday" in body
+    assert "Russ Cooper" in body
+    assert "Christine Cooper" in body
+    assert "calendar.google.com" in body
+    assert "tasks.google.com" in body
+    assert f"openConfirm('{event.id}')" in body
+
+
+async def test_dashboard_shows_no_date_placeholder_for_unresolved_events(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id,
+            run_id=run.id,
+            type="Other",
+            description="TBC event",
+            resolved_date="TBC",
+            resolved_date_earliest=None,
+            raw_date_text="sometime",
+            agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "No date" in response.text
+
+
+async def test_dashboard_paginates_across_multiple_pages(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(55):
+        db_session.add(
+            Event(
+                user_id=user_id,
+                run_id=run.id,
+                type="Other",
+                description=f"Event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1),
+                raw_date_text="x",
+                agreed_by=[],
+            )
+        )
+    await db_session.flush()
+
+    first_page = await client.get("/dashboard")
+    second_page = await client.get("/dashboard", params={"page": 2})
+
+    assert "Page 1 of 2" in first_page.text
+    assert "Next" in first_page.text
+    assert "Page 2 of 2" in second_page.text
+    assert "Previous" in second_page.text
+
+
+async def test_dashboard_shows_total_event_count(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(3):
+        db_session.add(
+            Event(
+                user_id=user_id,
+                run_id=run.id,
+                type="Other",
+                description=f"Event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1),
+                raw_date_text="x",
+                agreed_by=[],
+            )
+        )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    assert "3 events total" in response.text
+
+
+async def test_dashboard_redirects_out_of_range_page_to_last_valid_page(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(3):
+        db_session.add(
+            Event(
+                user_id=user_id,
+                run_id=run.id,
+                type="Other",
+                description=f"Event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1),
+                raw_date_text="x",
+                agreed_by=[],
+            )
+        )
+    await db_session.flush()
+
+    # Only 1 page exists (3 events, 50/page); page=5 is out of range.
+    response = await client.get("/dashboard", params={"page": 5})
+
+    assert response.status_code in (302, 303, 307)
+    assert response.headers["location"] == "/dashboard?page=1"
+
+
+async def test_dashboard_does_not_redirect_when_there_are_zero_events(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client)
+
+    # No events at all: an out-of-range page must not redirect (there's no valid page to redirect
+    # to) - it should fall through to the normal empty-state render.
+    response = await client.get("/dashboard", params={"page": 5})
+
+    assert response.status_code == 200
+    assert "No events yet" in response.text
+
+
+async def test_dashboard_delete_button_gated_behind_confirm_modal(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id,
+            run_id=run.id,
+            type="Medical",
+            description="Dentist",
+            resolved_date="Saturday 6 June 2026",
+            resolved_date_earliest=date(2026, 6, 6),
+            raw_date_text="Saturday",
+            agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    # Delete opens a confirm modal (not a direct fetch on click); the modal itself is present.
+    assert 'class="modal"' in body
+    assert "openConfirm(" in body
+    assert "confirmDelete" in body

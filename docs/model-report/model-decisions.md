@@ -2,6 +2,36 @@
 
 Decisions taken by the model during autonomous implementation runs, recorded for later review.
 
+## 2026-07-04 — #54 Slice 5.1 events dashboard
+
+### No official Google Tasks "quick add" URL scheme
+Google Calendar has a long-standing, widely used `render?action=TEMPLATE` convention for
+pre-filling a new event via a plain link. Google has **never published an equivalent for Tasks** -
+there is no documented way to pre-fill a task's title/due-date via URL. `build_google_tasks_url`
+(`app/core/calendar_url.py`) implements a best-effort `title`/`due` query string; whether Google's
+frontend actually honours it is unverified and needs a manual check against a real account (the
+same class of caveat as #52's Google Drive multipart-upload verification). Even if Google ignores
+the params, the link still opens Google Tasks - it just won't be pre-filled. Flagged in the PR
+rather than filed as a separate `modelsuggested` issue, since it's inherent third-party-behaviour
+uncertainty (nothing in the codebase to "fix") rather than a code improvement.
+
+### Improvement pass
+Compared against issue #54 + `docs/slices/slice-5.md`. All 3 slots used on implemented fixes (no
+deferred issue needed this round):
+
+1. **New migration `f6a7b8c9d0e1`** - added `ix_events_user_id_resolved_date_earliest_created_at`
+   on `events(user_id, resolved_date_earliest, created_at)`. The dashboard's every-page-load query
+   filters by `user_id` and sorts by `resolved_date_earliest DESC NULLS LAST, created_at DESC`; the
+   existing `uq_events_user_description_resolved_date` unique index starts with `user_id` but is
+   otherwise keyed on text columns unrelated to this sort, so it can't serve the query. Up/down/up
+   round-trip verified against QA (sole active branch at the time - merged promptly per the
+   shared-QA migration convention).
+2. **Redirect an out-of-range dashboard `page`** to the last valid page (e.g. a stale bookmark, or
+   deleting the only event on the last page) instead of showing a misleading "No events yet" -
+   the JSON API still returns an honest empty list for the same out-of-range `page` rather than
+   redirecting a request a client didn't ask to be redirected from.
+3. **Show the total event count** near the dashboard heading (`"N events total"`) - cheap, and
+   gives the pagination controls useful context.
 ## 2026-07-04 — Issue selection for autonomous run (picked #53)
 
 ### Board Status was not directly readable — reconstructed it

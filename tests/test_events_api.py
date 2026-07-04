@@ -1,0 +1,243 @@
+"""Tests for GET/DELETE /api/v1/events (#54).
+
+Run against the QA DB inside the rolled-back db_session fixture (see conftest), so nothing
+persists. Auth is a real register + cookie login through the app, matching other endpoint tests.
+"""
+
+import uuid
+from datetime import date, timedelta
+
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.event import Event
+from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.user import User
+
+
+def unique_email() -> str:
+    return f"events-api-{uuid.uuid4().hex}@example.com"
+
+
+async def _register_and_login(client: AsyncClient) -> uuid.UUID:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+    me = await client.get("/api/v1/users/me")
+    return uuid.UUID(me.json()["id"])
+
+
+async def _make_run(db: AsyncSession, user_id: uuid.UUID) -> ProcessingRun:
+    run = ProcessingRun(user_id=user_id, filename="chat.txt", status=ProcessingRunStatus.SUCCESS)
+    db.add(run)
+    await db.flush()
+    return run
+
+
+def _event(user_id: uuid.UUID, run_id: uuid.UUID, **overrides: object) -> Event:
+    fields: dict[str, object] = {
+        "user_id": user_id,
+        "run_id": run_id,
+        "type": "Medical",
+        "description": "Dentist appointment",
+        "resolved_date": "Saturday 6 June 2026",
+        "resolved_date_earliest": date(2026, 6, 6),
+        "raw_date_text": "Saturday",
+        "agreed_by": ["Russ"],
+    }
+    fields.update(overrides)
+    return Event(**fields)
+
+
+async def test_get_events_requires_authentication(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/events")
+    assert response.status_code == 401
+
+
+async def test_get_events_returns_only_the_requesting_users_events(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="Mine", resolved_date="1 Jan"))
+
+    other_user = User(email=unique_email(), hashed_password="x")
+    db_session.add(other_user)
+    await db_session.flush()
+    other_run = await _make_run(db_session, other_user.id)
+    db_session.add(_event(other_user.id, other_run.id, description="Not mine", resolved_date="2 Jan"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    assert response.status_code == 200
+    body = response.json()
+    descriptions = [e["description"] for e in body["events"]]
+    assert "Mine" in descriptions
+    assert "Not mine" not in descriptions
+
+
+async def test_get_events_default_sort_is_newest_resolved_date_first(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="Earlier",
+            resolved_date_earliest=date(2026, 6, 1), resolved_date="1 June",
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id, description="Later",
+            resolved_date_earliest=date(2026, 6, 20), resolved_date="20 June",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions.index("Later") < descriptions.index("Earlier")
+
+
+async def test_get_events_unresolved_dates_sort_last(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="Has date",
+            resolved_date_earliest=date(2026, 6, 1), resolved_date="1 June",
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id, description="TBC",
+            resolved_date_earliest=None, resolved_date="TBC",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions[-1] == "TBC"
+
+
+async def test_get_events_paginates_at_50_per_page(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(60):
+        db_session.add(
+            _event(
+                user_id, run.id,
+                description=f"Event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1) + timedelta(days=i),
+            )
+        )
+    await db_session.flush()
+
+    first_page = await client.get("/api/v1/events")
+    second_page = await client.get("/api/v1/events", params={"page": 2})
+
+    assert first_page.status_code == 200
+    body1 = first_page.json()
+    assert len(body1["events"]) == 50
+    assert body1["total"] == 60
+    assert body1["page"] == 1
+
+    body2 = second_page.json()
+    assert len(body2["events"]) == 10
+    assert body2["page"] == 2
+
+
+async def test_events_include_calendar_and_tasks_urls(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    event = response.json()["events"][0]
+    assert event["calendar_url"].startswith("https://calendar.google.com/")
+    assert event["tasks_url"].startswith("https://tasks.google.com/")
+
+
+async def test_events_with_no_resolved_date_have_null_links(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="TBC event",
+            resolved_date="TBC", resolved_date_earliest=None,
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    event = response.json()["events"][0]
+    assert event["calendar_url"] is None
+    assert event["tasks_url"] is None
+
+
+async def test_delete_event_removes_it(client: AsyncClient, db_session: AsyncSession) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    event = _event(user_id, run.id)
+    db_session.add(event)
+    await db_session.flush()
+    event_id = event.id
+
+    response = await client.delete(f"/api/v1/events/{event_id}")
+
+    assert response.status_code == 204
+    remaining = await db_session.scalar(select(Event).where(Event.id == event_id))
+    assert remaining is None
+
+
+async def test_delete_event_requires_authentication(client: AsyncClient) -> None:
+    response = await client.delete(f"/api/v1/events/{uuid.uuid4()}")
+    assert response.status_code == 401
+
+
+async def test_delete_nonexistent_event_returns_404(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.delete(f"/api/v1/events/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+async def test_delete_another_users_event_returns_404_and_does_not_delete(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _register_and_login(client)  # the authenticated caller
+
+    other_user = User(email=unique_email(), hashed_password="x")
+    db_session.add(other_user)
+    await db_session.flush()
+    other_run = await _make_run(db_session, other_user.id)
+    other_event = _event(other_user.id, other_run.id)
+    db_session.add(other_event)
+    await db_session.flush()
+    other_event_id = other_event.id
+
+    response = await client.delete(f"/api/v1/events/{other_event_id}")
+
+    assert response.status_code == 404
+    still_there = await db_session.scalar(select(Event).where(Event.id == other_event_id))
+    assert still_there is not None

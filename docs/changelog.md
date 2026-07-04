@@ -47,6 +47,25 @@
   transaction mode. `main` green; prod `/health` live. → [archive](changelog-archive.md#post-merge-prod-deploy-hotfixes-direct-to-main-after-pr-19-merged)
 
 ### Added
+- **Issue #54 implemented** — Slice 5.1 events dashboard (branch
+  `feature/slice-5.1-events-dashboard`). The first user-visible payoff of the whole pipeline:
+  `GET /api/v1/events` (current user's events only, 50/page, newest `resolved_date_earliest` first
+  — `NULLS LAST` so unresolved "TBC" dates sort to the bottom, not the top) and
+  `DELETE /api/v1/events/{id}` (owner-scoped; 404 for both "doesn't exist" and "someone else's
+  event", never confirming another user's event exists). New `app/core/calendar_url.py`:
+  `build_google_calendar_url` (Google's well-known `render?action=TEMPLATE` all-day-event
+  convention; title=description, dates=`resolved_date_earliest`/`+1day`, details=raw date text +
+  `agreed_by`) and `build_google_tasks_url` (a **best-effort** `title`/`due` query string — Google
+  has no officially documented Tasks quick-add URL scheme, unlike Calendar's; needs manual
+  verification against a real account). Both return `None` for an event with no resolvable date.
+  Dashboard page (`app/pages/dashboard.py` + `dashboard.html`) replaces the `/dashboard` placeholder
+  with a real table (type, description, resolved date, raw date text, `agreed_by` chips, Calendar/
+  Tasks links, Delete gated behind a DaisyUI confirm modal), pagination, and a total-count line.
+  New migration `f6a7b8c9d0e1` — `ix_events_user_id_resolved_date_earliest_created_at` index
+  covering the dashboard's exact filter+sort (the existing UNIQUE constraint doesn't help this
+  query). Improvement pass: the index migration, redirecting an out-of-range `page` to the last
+  valid one (API still returns an honest empty list for the same case), and the total-count line.
+  `mypy --strict` clean; full suite green.
 - **Issue #52 implemented** — Slice 4.1 upload page + 7-step processing pipeline (branch
   `feature/slice-4.1-upload-pipeline`). The end-to-end path from uploading a WhatsApp export to
   extracted events landing in the DB, on the #51 foundation. `POST /api/v1/upload` (`.txt`/`.zip`/
