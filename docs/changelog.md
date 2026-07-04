@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+### Changed
+- **Issue #72 (partial)** — wired `GEMINI_API_KEY` into the QA/prod Cloud Run env-vars files in
+  `.github/workflows/ci.yml` and `deploy.yml`, and added `--no-cpu-throttling` to both
+  `gcloud run deploy` commands so the in-process pipeline background task (#52) isn't frozen by
+  Cloud Run's default CPU throttling once the HTTP response returns. This only wires the plumbing —
+  the `GEMINI_API_KEY` GitHub Actions secret still needs to be created manually, and item 3 (live
+  Google Drive QA) remains a manual step; see the issue for the full checklist.
+
 ### Added
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
