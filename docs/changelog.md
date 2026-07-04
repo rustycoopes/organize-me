@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Issue #78** — Live Google Drive connect crashed with a raw "Internal Error" page. Root cause:
+  the `ENCRYPTION_KEY` GitHub secret (flagged as an outstanding human-setup step since #45/#61) had
+  never actually been created, so `get_credential_cipher()`'s `RuntimeError` went unhandled inside
+  `GET /callback`. Fixed on branch `fix/issue-78-encryption-key-callback`: generated a `Fernet` key
+  and set the `ENCRYPTION_KEY` repo secret (shared by `ci.yml`/QA and `deploy.yml`/prod — resolves
+  that part of #61 too), and the callback now catches the missing-cipher case and redirects to
+  `/settings?error=storage_not_configured` with a clear banner instead of a 500. #61's remaining
+  scope (Google Cloud Console redirect URI + `drive` scope registration) is still an open manual
+  task.
+
 ### Added
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
