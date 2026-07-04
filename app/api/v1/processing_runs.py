@@ -1,11 +1,14 @@
-"""SSE stream for live pipeline progress (Slice 4.2, #53) and list processing runs (Slice 6.1, #83).
+"""SSE stream for live pipeline progress (Slice 4.2, #53), list processing runs (Slice 6.1, #83),
+and run detail + logs (Slice 6.2, #84).
 
 ``GET /api/v1/processing-runs`` backs the logs page: the user's processing runs, paginated 50/page,
-newest ``created_at`` first. ``GET /api/v1/processing-runs/{run_id}/sse`` streams a run's step-status
-transitions to the browser so the progress page (app.pages.processing) can advance its 7 indicators
-live via the HTMX SSE extension — no manual refresh. The heavy lifting (polling, change detection,
-fragment rendering, terminal close) lives in app.services.pipeline.progress; this module only
-resolves + ownership-gates the run and wraps the generator in an ``EventSourceResponse``.
+newest ``created_at`` first. ``GET /api/v1/processing-runs/{run_id}`` returns a single run with its
+step statuses and detail. ``GET /api/v1/processing-runs/{run_id}/logs`` returns structured log lines
+for one step (paginated, searchable). ``GET /api/v1/processing-runs/{run_id}/sse`` streams a run's
+step-status transitions to the browser so the progress page can advance its 7 indicators live via
+HTMX SSE — no manual refresh. The heavy lifting (polling, change detection, fragment rendering,
+terminal close) lives in app.services.pipeline.progress; this module only resolves + ownership-gates
+the run and wraps the generator in an ``EventSourceResponse``.
 
 A run is only ever exposed to the user who owns it (404 otherwise), matching every other user-owned
 resource in the app.
@@ -14,15 +17,22 @@ resource in the app.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from app.auth.users import current_active_user
 from app.db.session import get_db
 from app.models.processing_run import ProcessingRun
+from app.models.processing_step import ProcessingStep
 from app.models.user import User
-from app.schemas.processing_run import ProcessingRunListRead, ProcessingRunRead
+from app.schemas.processing_run import (
+    ProcessingLogLineRead,
+    ProcessingRunDetailRead,
+    ProcessingRunListRead,
+    ProcessingRunRead,
+    ProcessingStepRead,
+)
 from app.services.pipeline.progress import stream_run_progress
 
 router = APIRouter(prefix="/api/v1", tags=["processing-runs"])
@@ -69,6 +79,86 @@ async def read_processing_runs(
         runs=[to_processing_run_read(r) for r in runs],
         page=page,
         page_size=PAGE_SIZE,
+        total=total,
+    )
+
+
+@router.get("/processing-runs/{run_id}")
+async def read_processing_run(
+    run_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProcessingRunDetailRead:
+    """Run detail with all steps and their statuses (Slice 6.2, #84)."""
+    run = await db.get(ProcessingRun, run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run_not_found")
+
+    steps_result = await db.scalars(
+        select(ProcessingStep).where(ProcessingStep.run_id == run_id).order_by(ProcessingStep.step_number)
+    )
+    steps = [
+        ProcessingStepRead(
+            step_number=s.step_number,
+            step_name=s.step_name,
+            status=s.status,
+            started_at=s.started_at,
+            completed_at=s.completed_at,
+        )
+        for s in steps_result.all()
+    ]
+
+    return ProcessingRunDetailRead(
+        id=run.id,
+        filename=run.filename,
+        status=run.status,
+        events_extracted_count=run.events_extracted_count,
+        created_at=run.created_at,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        steps=steps,
+    )
+
+
+@router.get("/processing-runs/{run_id}/logs")
+async def read_processing_run_logs(
+    run_id: uuid.UUID,
+    step_number: int = Query(..., ge=1, le=7),
+    page: int = Query(default=1, ge=1),
+    search: str | None = Query(default=None),
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProcessingLogLineRead:
+    """Structured log lines for one step, paginated and searchable (Slice 6.2, #84)."""
+    run = await db.get(ProcessingRun, run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run_not_found")
+
+    step = await db.scalar(
+        select(ProcessingStep).where(
+            and_(ProcessingStep.run_id == run_id, ProcessingStep.step_number == step_number)
+        )
+    )
+    if step is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="step_not_found")
+
+    log_lines = step.log_lines or []
+    if search:
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        log_lines = [line for line in log_lines if escaped.lower() in line.lower()]
+
+    total = len(log_lines)
+    page_size = 50
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated = log_lines[start:end]
+
+    return ProcessingLogLineRead(
+        step_number=step.step_number,
+        step_name=step.step_name,
+        log_lines=paginated,
+        page=page,
+        page_size=page_size,
         total=total,
     )
 
