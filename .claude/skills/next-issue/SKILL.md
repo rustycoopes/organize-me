@@ -29,7 +29,8 @@ next one starts. Only once a slice has no `Todo` work does selection move to the
 **Ignore `In Progress` issues completely.** An `In Progress` issue is already claimed — assume
 another worker (or a concurrent loop session) owns it. Never pick, resume, or hand off to an
 `In Progress` issue, even if it would otherwise be the highest-priority next thing to do. Select
-only from work that has **not been started** (`Todo`). If the item you'd expect to pick next is
+only from work that has **not been started** (`Todo`) and work identified as an "enhancement" not a "future-enhancement. 
+If the item you'd expect to pick next is
 `In Progress`, skip it and take the next-best not-started `Todo` item instead. The gathering helper
 in Step 1 already filters to `Todo`, so `In Progress` issues won't appear in the candidate list —
 do not go around that filter to look them up.
