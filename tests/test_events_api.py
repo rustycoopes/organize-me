@@ -501,3 +501,53 @@ async def test_get_events_free_text_search_matches_agreed_by(
 
     descriptions = [e["description"] for e in response.json()["events"]]
     assert descriptions == ["Meeting with Alice"]
+
+
+async def test_get_events_multiple_filters_compose_with_and_logic(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """All filters should combine with AND logic - an event must match type AND date range AND search."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    # Matches type and date but not search
+    db_session.add(
+        _event(
+            user_id, run.id, type="Medical", description="Dentist",
+            resolved_date_earliest=date(2026, 6, 15), resolved_date="15 June",
+        )
+    )
+    # Matches type and search but not date
+    db_session.add(
+        _event(
+            user_id, run.id, type="Medical", description="Medical checkup",
+            resolved_date_earliest=date(2026, 12, 15), resolved_date="15 Dec",
+        )
+    )
+    # Matches date and search but not type
+    db_session.add(
+        _event(
+            user_id, run.id, type="School", description="Medical lecture",
+            resolved_date_earliest=date(2026, 6, 20), resolved_date="20 June",
+        )
+    )
+    # Matches all: type=Medical, date in June, and search matches "checkup" in description
+    db_session.add(
+        _event(
+            user_id, run.id, type="Medical", description="Checkup appointment",
+            resolved_date_earliest=date(2026, 6, 10), resolved_date="10 June",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get(
+        "/api/v1/events",
+        params={
+            "type": "Medical",
+            "date_from": "2026-06-01",
+            "date_to": "2026-06-30",
+            "q": "checkup",
+        },
+    )
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Checkup appointment"]
