@@ -127,8 +127,6 @@ async def dashboard_page(
         "prev_url": url_for(page=page - 1, sort=sort) if page > 1 else None,
         "next_url": url_for(page=page + 1, sort=sort) if page < total_pages else None,
         "sort_toggle_url": url_for(page=1, sort="asc" if sort == "desc" else "desc"),
-        "onboarding_steps": build_onboarding_steps(user),
-        "onboarding_complete": onboarding_complete(user),
     }
     template_name = (
         "partials/dashboard_body.html"
