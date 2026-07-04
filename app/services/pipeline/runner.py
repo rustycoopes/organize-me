@@ -57,6 +57,18 @@ STEP_PARSE_RESPONSE = (5, "Parse LLM Response")
 STEP_DEDUPLICATE_SAVE = (6, "Deduplicate & Save")
 STEP_NOTIFY = (7, "Notify")
 
+# The 7 steps in order, as (number, name). The single source of truth the pipeline writes and the
+# SSE progress page (#53) renders from, so the two never disagree on the count/numbering/names.
+PIPELINE_STEPS: list[tuple[int, str]] = [
+    STEP_FILE_RECEIVED,
+    STEP_EXTRACT,
+    STEP_FILTER_BY_DATE,
+    STEP_CALL_GEMINI,
+    STEP_PARSE_RESPONSE,
+    STEP_DEDUPLICATE_SAVE,
+    STEP_NOTIFY,
+]
+
 DEFAULT_DATE_WINDOW_DAYS = 7
 
 
@@ -199,13 +211,17 @@ async def _fail_run(
     notifier: NotificationSender,
     message: str,
 ) -> None:
-    """Terminate a run as failed: mark it, move the file to ``failed/``, and fire the failure
-    notification (step 7). Any leftover new-event count is irrelevant - a failed run saves none."""
+    """Terminate a run as failed: fire the failure notification (step 7), mark the run failed, and
+    move the file to ``failed/`` - in that order (step 7 recorded before the terminal status; see
+    the SSE note below). Any leftover new-event count is irrelevant - a failed run saves none."""
+    # Record the Notify step (step 7) *before* flipping the run to a terminal status, so the SSE
+    # progress stream (#53) never observes a terminal run before all 7 step rows exist (which would
+    # close the stream with the Notify indicator stuck "pending"). The file move comes last.
+    await _notify(session, run, user_id, notifier, NotificationOutcome.FAILED, 0, message)
     run.status = ProcessingRunStatus.FAILED
     run.completed_at = _utcnow()
     await session.commit()
     await storage.move_file(remote_file, FileDestination.FAILED)
-    await _notify(session, run, user_id, notifier, NotificationOutcome.FAILED, 0, message)
 
 
 async def run_pipeline(
@@ -321,12 +337,10 @@ async def run_pipeline(
         [f"Saved {new_count} new events; skipped {len(events) - new_count} duplicate(s)"],
     )
 
-    # Success (including the zero-new-events case): move the file to processed/ and notify.
-    run.status = ProcessingRunStatus.SUCCESS
-    run.completed_at = _utcnow()
-    await session.commit()
-    await storage.move_file(remote_file, FileDestination.PROCESSED)
-
+    # Success (including the zero-new-events case): record the Notify step (step 7) and fire the
+    # notification, then mark the run terminal, then move the file to processed/. Marking the run
+    # terminal *after* step 7 is written keeps the SSE progress stream (#53) from closing before all
+    # 7 step rows exist (which would leave the Notify indicator stuck "pending").
     if new_count == 0:
         await _notify(
             session, run, user_id, notifier, NotificationOutcome.NO_NEW_EVENTS, 0,
@@ -337,3 +351,8 @@ async def run_pipeline(
             session, run, user_id, notifier, NotificationOutcome.SUCCESS, new_count,
             f"Processing finished: {new_count} new event(s) added.",
         )
+
+    run.status = ProcessingRunStatus.SUCCESS
+    run.completed_at = _utcnow()
+    await session.commit()
+    await storage.move_file(remote_file, FileDestination.PROCESSED)

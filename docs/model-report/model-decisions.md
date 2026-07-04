@@ -32,6 +32,57 @@ deferred issue needed this round):
    redirecting a request a client didn't ask to be redirected from.
 3. **Show the total event count** near the dashboard heading (`"N events total"`) - cheap, and
    gives the pagination controls useful context.
+## 2026-07-04 — Issue selection for autonomous run (picked #53)
+
+### Board Status was not directly readable — reconstructed it
+The OrganizeMe Projects v2 board Status field (`backlog / Todo / In Progress / Done`) could not be
+read this session: `gh` is not installed and the agent proxy serves only a pinned set of PR-review
+GraphQL operations (Projects v2 needs GraphQL, and there is no REST equivalent). The
+`next-issue` helper (`todo_issues.py`) therefore could not run. Board state was instead
+reconstructed from `docs/project-status.md`, merged PRs, open PRs, and existing branches.
+
+### Pick: #53 (Slice 4.2 — Live SSE pipeline progress page)
+- Slice 4 is the earliest slice with actionable planned work: its foundation #51 (PR #66) and #52
+  (PR #69) are merged, and #53 — the next Slice 4 enhancement — is open, unblocked (blocker #52
+  merged), with **no branch and no PR**, so it is not In Progress.
+- #43 has an open PR (#70) → treated as In Progress / owned by another worker → skipped.
+- Slice 1 issues #29–#42 are all `future-enhancement` — the deliberately-deferred backlog the
+  project has advanced past; this decisions log already records that such items sit in the
+  **backlog** column, not Todo, so they are not competing Todo work.
+- Slice 5 (#54–#56) is a higher-numbered slice → loses to Slice 4's remaining #53.
+- No user was available to confirm within the 60s window (autonomous run); recording the choice
+  here per the `next-issue` no-response rule.
+
+## 2026-07-04 — #53 Slice 4.2 live SSE pipeline progress page
+
+### Branch — used the assigned run branch, not a `feature/…` branch
+This autonomous run was assigned the branch `claude/admiring-carson-bzzfow` (and told never to push
+elsewhere), so all work landed there rather than on a `feature/slice-4.2-…` branch as CLAUDE.md's
+convention would otherwise suggest. The branch was reset from the latest `origin/main` and developed
+in the primary checkout (already the isolated per-session container), so a second worktree was
+unnecessary.
+
+### Board status could not be moved to "In Progress"
+The board's Status is a Projects v2 field, only mutable via GraphQL, which the session's egress
+proxy blocks (only pinned PR-review GraphQL ops are served) — and `gh` isn't installed. So the issue
+could not be programmatically moved to In Progress / Done. Recorded here; the PR closes #53 on merge,
+and the final board move is noted as a manual follow-up in the issue comment.
+
+### E2E Gemini fake wired into the factory (not just tests)
+The Playwright acceptance test needs a *successful* run in CI, but `E2E_TEST_MODE` only faked the
+storage provider, not Gemini — so `get_gemini_client` now returns a `FakeGeminiClient` under
+`E2E_TEST_MODE`, seeded with a small **inline** canned payload rather than reading
+`examples/example.lmmoutput.txt` (that fixture is excluded from the deployed image by
+`.dockerignore`, so it can't be read at runtime on QA). The Upload page also treats `E2E_TEST_MODE`
+as Drive-connected so its dropzone is enabled. This mirrors the resolved-decision comment ("the
+Gemini step to the injected fake").
+
+### SSE reads via per-statement fresh selects, no cross-poll transaction reset
+`stream_run_progress` re-selects the step/run rows each poll using column selects (not ORM-identity
+reads). Under Postgres READ COMMITTED each statement takes a fresh snapshot, so the in-process
+pipeline's commits are visible poll-to-poll without ending the stream's read-only transaction —
+important because the same session object is a rolled-back SAVEPOINT in tests (a `rollback()` between
+polls would have discarded the seeded run).
 
 ## 2026-07-03 — #52 Slice 4.1 upload page + 7-step pipeline
 
