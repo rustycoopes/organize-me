@@ -10,6 +10,14 @@
 ## [Unreleased]
 
 ### Changed
+- **Issue #31** — Extracted a shared `card_page` Jinja macro (`app/templates/macros/ui.html`) that
+  renders the centred DaisyUI card shell (centering wrapper + `card`/`card-body`/`card-title` +
+  optional subtitle). All five auth/profile templates (`login`, `register`, `forgot_password`,
+  `reset_password`, `profile`) now import and call the macro instead of repeating the wrapper
+  markup. Alpine.js `x-data` is placed on an ancestor `<div>` outside the macro call so directives
+  inside the card body still resolve against the reactive scope. Regression tests added in
+  `tests/test_card_macro.py`.
+
 - **Issue #72 (partial)** — wired `GEMINI_API_KEY` into the QA/prod Cloud Run env-vars files in
   `.github/workflows/ci.yml` and `deploy.yml`, and added `--no-cpu-throttling` to both
   `gcloud run deploy` commands so the in-process pipeline background task (#52) isn't frozen by
