@@ -36,5 +36,7 @@ async def test_logging_notifier_sends_without_error() -> None:
     await LoggingNotificationSender().send(_notification())
 
 
-def test_factory_returns_the_logging_sender() -> None:
-    assert isinstance(get_pipeline_notifier(), LoggingNotificationSender)
+def test_factory_returns_the_real_sender() -> None:
+    from app.services.notifications.sender import RealNotificationSender
+
+    assert isinstance(get_pipeline_notifier(), RealNotificationSender)

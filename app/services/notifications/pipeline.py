@@ -84,4 +84,6 @@ class FakeNotificationSender:
 
 def get_pipeline_notifier() -> NotificationSender:
     """Return the production notifier. Overridable via ``dependency_overrides`` in tests."""
-    return LoggingNotificationSender()
+    from app.services.notifications.sender import RealNotificationSender
+
+    return RealNotificationSender()

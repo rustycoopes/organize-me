@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # (they inject FakeGeminiClient), so they don't need a real key. Wire GEMINI_API_KEY into
     # QA/prod before the upload pipeline (issue #52) goes live.
     gemini_api_key: str = ""
+    # Base URL for the app, used in notification emails (Slice 7).
+    # Defaults to https://organize-me.app for production; override to http://localhost:3000 in dev.
+    base_url: str = "https://organize-me.app"
 
 
 @lru_cache
