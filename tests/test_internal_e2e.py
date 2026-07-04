@@ -80,7 +80,7 @@ async def test_last_reset_token_mints_token_that_completes_reset_flow(client: As
     new_login = await client.post(
         "/api/v1/auth/login", data={"email": email, "password": new_password}
     )
-    assert new_login.status_code in (200, 204)
+    assert new_login.status_code == 302  # success redirect to /profile (issue #43)
 
 
 @pytest.mark.usefixtures("e2e_mode_enabled")
