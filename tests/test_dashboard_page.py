@@ -8,10 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.user import User
 
 
 def unique_email() -> str:
     return f"dashboard-page-{uuid.uuid4().hex}@example.com"
+
+
+async def _complete_onboarding(db: AsyncSession, user_id: uuid.UUID) -> None:
+    user = await db.get(User, user_id)
+    assert user is not None
+    user.onboarding_storage_done = True
+    user.onboarding_notifications_done = True
+    user.onboarding_first_upload_done = True
+    await db.flush()
 
 
 async def _register_and_login(client: AsyncClient) -> uuid.UUID:
@@ -196,6 +206,82 @@ async def test_dashboard_does_not_redirect_when_there_are_zero_events(
 
     assert response.status_code == 200
     assert "No events yet" in response.text
+
+
+async def test_dashboard_shows_onboarding_checklist_for_a_new_user(
+    client: AsyncClient,
+) -> None:
+    # A freshly-registered user has all three onboarding flags False by default.
+    await _register_and_login(client)
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert response.status_code == 200
+    assert "Getting Started" in body
+    assert 'id="onboarding-checklist"' in body
+    # All three steps incomplete → each is a link to its page. Assert the full checklist anchor
+    # (label + sr-only "(to do)") rather than a bare href, so the sidebar nav's own /settings,
+    # /upload, /profile links can't satisfy these assertions.
+    assert (
+        '<a href="/settings" class="link link-primary">Connect Storage'
+        '<span class="sr-only"> (to do)</span></a>'
+    ) in body
+    assert (
+        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<span class="sr-only"> (to do)</span></a>'
+    ) in body
+    assert (
+        '<a href="/upload" class="link link-primary">Upload First File'
+        '<span class="sr-only"> (to do)</span></a>'
+    ) in body
+
+
+async def test_dashboard_onboarding_checklist_marks_done_steps_and_keeps_incomplete_ones_linked(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    # Complete only Connect Storage and Upload First File; leave notifications incomplete.
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.onboarding_storage_done = True
+    user.onboarding_first_upload_done = True
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert response.status_code == 200
+    # Checklist still shown (one step incomplete).
+    assert 'id="onboarding-checklist"' in body
+    # The two done steps render struck-through with an sr-only "(done)" marker, not as links.
+    assert (
+        '<span class="line-through opacity-70">Connect Storage'
+        '<span class="sr-only"> (done)</span></span>'
+    ) in body
+    assert (
+        '<span class="line-through opacity-70">Upload First File'
+        '<span class="sr-only"> (done)</span></span>'
+    ) in body
+    # The one incomplete step still renders as a link to its page (checklist-specific anchor, so
+    # the sidebar nav's own /profile link can't be what satisfies this).
+    assert (
+        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<span class="sr-only"> (to do)</span></a>'
+    ) in body
+
+
+async def test_dashboard_hides_onboarding_checklist_once_all_steps_done(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _complete_onboarding(db_session, user_id)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'id="onboarding-checklist"' not in response.text
+    assert "Getting Started" not in response.text
 
 
 async def test_dashboard_delete_button_gated_behind_confirm_modal(

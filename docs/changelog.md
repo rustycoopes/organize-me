@@ -36,6 +36,17 @@
   task.
 
 ### Added
+- **Issue #56 implemented** — Slice 5.3 Getting Started onboarding checklist on the dashboard
+  (branch `claude/admiring-carson-v5qr9b`). A 3-step checklist (Connect Storage → `/settings`,
+  Set Notification Preferences → `/profile`, Upload First File → `/upload`) renders above the
+  events table, its per-step done/incomplete state read from the `onboarding_storage_done` /
+  `onboarding_notifications_done` / `onboarding_first_upload_done` booleans on the user record, and
+  the whole block is hidden once all three are true. Server-rendered (state reflects on next page
+  load); done steps show struck-through with an sr-only "(done)" marker for screen readers,
+  incomplete steps link to their page. New pure `app/core/onboarding.py` view-model
+  (`build_onboarding_steps` / `onboarding_complete`) with a unit test, plus dashboard page tests
+  for the show / mixed / hidden states. `onboarding_notifications_done` stays unchecked until
+  Slice 7 wires notifications — no blocker. Deferred e2e coverage filed as #91.
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
   indicators and streams each step's status transition live via the HTMX SSE extension — no manual

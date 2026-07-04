@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-04 (issue #78 fix)
+**Last updated:** 2026-07-04 (issue #56 — Slice 5.3 onboarding checklist)
 
 ---
 
@@ -16,12 +16,27 @@
 
 **Slice 5 (events dashboard) started.** Slice 4 fully drained. Issue #54 (Slice 5.1 — events dashboard table + calendar/tasks links + delete), the first user-visible payoff of the whole pipeline, is implemented on branch `feature/slice-5.1-events-dashboard` in an isolated worktree: `GET /api/v1/events` (50/page, newest `resolved_date_earliest` first, `NULLS LAST` so unresolved dates sort to the bottom) and `DELETE /api/v1/events/{id}` (owner-scoped, 404 either way for a non-owned/nonexistent id). New `app/core/calendar_url.py` — `build_google_calendar_url` (the well-known Calendar "quick add" URL convention) and `build_google_tasks_url` (a **best-effort, unverified** URL scheme — Google has no documented Tasks equivalent). Dashboard page replaces the `/dashboard` placeholder: table with Calendar/Tasks links + a DaisyUI-confirm-gated Delete, pagination, and a total-count line. New migration `f6a7b8c9d0e1` adds an index covering the dashboard's filter+sort. Improvement pass: the index migration, redirecting an out-of-range page to the last valid one, and the total-count line. `mypy --strict` clean; full suite green. **Manual verification needed:** whether Google's Tasks frontend actually honours the pre-fill query params (flagged in the PR, same class of caveat as #52's Drive verification). #55 (filters/sort/search) is next, blocked by this.
 
+**Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
+`claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set
+Notification Preferences → `/profile`, Upload First File → `/upload`) renders above the events
+table on `/dashboard`, its per-step done/incomplete state read from the `onboarding_storage_done` /
+`onboarding_notifications_done` / `onboarding_first_upload_done` user booleans, and the whole block
+is hidden once all three are true. Server-rendered (state reflects on next page load); done steps
+render struck-through with an sr-only "(done)" marker, incomplete steps link to their page. New
+pure `app/core/onboarding.py` view-model (`build_onboarding_steps` / `onboarding_complete`) with a
+unit test, plus dashboard page tests for the show / mixed / hidden states; `mypy --strict` clean.
+`onboarding_notifications_done` isn't flipped until Slice 7 (notifications), so that step stays
+unchecked and the checklist stays visible until then — per the issue's resolved decision, no
+blocker. Deferred e2e coverage filed as #91. #55 (5.2 filters/sort/search) is the remaining Slice 5
+issue (In Progress on another branch).
+
 **Bug #78 fixed (live Google Drive connect crashed with "Internal Error").** Root cause: the `ENCRYPTION_KEY` GitHub secret (flagged as an outstanding human-setup step since #45/#61) had never actually been created, so `get_credential_cipher()` raised `RuntimeError` unhandled inside `GET /callback`. Fixed on branch `fix/issue-78-encryption-key-callback`, in an isolated worktree: (1) generated a `Fernet` key and set it as the `ENCRYPTION_KEY` repo secret (shared by both `ci.yml`/QA and `deploy.yml`/prod) — resolves that part of #61 too; (2) the callback now catches a missing-cipher `RuntimeError` and redirects to `/settings?error=storage_not_configured` with a clear banner instead of a raw 500, so any future misconfiguration degrades gracefully. Regression test added. Issue #61's remaining scope (registering the Drive redirect URI + `drive` scope on the Google OAuth client) is Google-Cloud-Console-side and still an open manual task.
 
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-04 | Issue #56 (Slice 5.3 — Getting Started onboarding checklist) implemented on branch `claude/admiring-carson-v5qr9b`. A 3-step checklist (Connect Storage → `/settings`, Set Notification Preferences → `/profile`, Upload First File → `/upload`) renders above the events table on `/dashboard`, per-step done state from the `onboarding_*_done` user booleans, hidden once all three are true. Server-rendered; done steps struck-through with an sr-only "(done)" marker, incomplete steps link to their page. New pure `app/core/onboarding.py` view-model + unit test; dashboard page tests for show/mixed/hidden; `mypy --strict` clean. `onboarding_notifications_done` stays unchecked until Slice 7 (no blocker, per the issue's resolved decision). Deferred e2e coverage filed as #91 |
 | 2026-07-04 | Issue #72 (Slice 4 human-setup checklist) partially automated on branch `ops/issue-72-gemini-key-cpu-throttling`: wired `GEMINI_API_KEY` into `ci.yml`/`deploy.yml`'s Cloud Run env-vars files and added `--no-cpu-throttling` to both `gcloud run deploy` commands so the in-process pipeline task survives past the HTTP response. Improvement pass also fixed `GoogleDriveStorageProvider.upload_file`'s multipart encoding (httpx `files=` produces `multipart/form-data`, not the `multipart/related` Drive expects) by switching to a two-request create-then-media-upload approach. Creating the `GEMINI_API_KEY` GitHub Actions secret and manual QA of the live `GoogleDriveStorageProvider` remain human/ops steps — see the issue |
 | 2026-07-04 | Bug #78 (live Google Drive connect returned "Internal Error") fixed on branch `fix/issue-78-encryption-key-callback`, in an isolated worktree. Root cause: the `ENCRYPTION_KEY` GitHub secret (flagged since #45/#61) had never been created, so `get_credential_cipher()`'s `RuntimeError` went unhandled inside `GET /callback`. Generated a `Fernet` key and set the `ENCRYPTION_KEY` repo secret (shared by `ci.yml`/QA and `deploy.yml`/prod) — resolves that part of #61 too. Callback now catches the missing-cipher case and redirects to `/settings?error=storage_not_configured` with a banner instead of a 500; regression test added. #61's remaining scope (Google Cloud Console redirect URI + `drive` scope registration) is still an open manual task |
 | 2026-07-04 | Issue #54 (Slice 5.1 — events dashboard) implemented on branch `feature/slice-5.1-events-dashboard`, in an isolated worktree. `GET /api/v1/events` (50/page, newest `resolved_date_earliest` first, `NULLS LAST`) + `DELETE /api/v1/events/{id}` (owner-scoped, 404 either way). New `app/core/calendar_url.py` (Calendar's well-known quick-add convention; Tasks is a best-effort, unverified scheme — no official Google URL exists). Dashboard page replaces the `/dashboard` placeholder: table, Calendar/Tasks links, confirm-gated Delete, pagination, total count. New index migration `f6a7b8c9d0e1` covering the dashboard's filter+sort. Improvement pass: the index, out-of-range-page redirect, total-count line. `mypy --strict` clean; full suite green. Manual verification needed: does Google Tasks actually honour the pre-fill params. #55 next, blocked by this |

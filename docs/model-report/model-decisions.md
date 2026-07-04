@@ -148,3 +148,28 @@ unset every issue's status if done wrong, so it was judged too risky to do auton
 the two issues were given an **`intake` label** and placed in the **`backlog`** column (the closest
 existing not-yet-scheduled state). If a real `intake` status column is wanted, add it to the board
 manually and re-file these.
+
+## 2026-07-04 — Autonomous loop issue selection
+
+**Picked: #56 (Slice 5.3 — Getting Started onboarding checklist).**
+
+Board Status (Projects v2) is unreadable this session: the agent proxy blocks
+GitHub GraphQL ("only the pinned set of PR-review operations is served"), and
+`gh` is not installed (and would use the same blocked GraphQL). Reconstructed
+Todo/In-Progress/Done from issue state, open PRs, branches, and in-issue
+"starting work" markers instead.
+
+- Slices 1–4 drained; remaining slice1 issues (#29–#43) are Backlog
+  `future-enhancement`, slice4 (#64/#65/#68) are `intake` — not Todo.
+- Slice 5 is the earliest slice with Todo work. #54 (5.1) is merged.
+  - #79 (slice5 **bug**, higher tier) SKIPPED: owner explicitly deferred it
+    ("likely resolved by #72, will complete that first and retest"); #72 is a
+    manual human-ops task (real GEMINI_API_KEY secret + Cloud Run CPU) that
+    can't be done autonomously, and points 2–4 need a post-#78 human retest to
+    confirm they still reproduce. Not a clean start.
+  - #55 (5.2) SKIPPED: In Progress (branch claude/admiring-carson-usbhzr).
+  - #56 (5.3) chosen: ready, unclaimed, blocker #54 done, decisions resolved
+    in-issue.
+
+Decision made autonomously per the pre-approved loop (no user available to
+confirm within 60s).
