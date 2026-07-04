@@ -455,3 +455,49 @@ async def test_get_events_search_escapes_like_wildcards(
 
     descriptions = [e["description"] for e in response.json()["events"]]
     assert descriptions == ["50% off tickets"]
+
+
+async def test_get_events_free_text_search_matches_event_type(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Search should match the event type field."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, type="Medical", description="Dentist", resolved_date="1 Jan"))
+    db_session.add(_event(user_id, run.id, type="School", description="Class", resolved_date="2 Jan"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"q": "medical"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Dentist"]
+
+
+async def test_get_events_free_text_search_matches_agreed_by(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Search should match names in the agreed_by array."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id,
+            description="Meeting with Alice",
+            resolved_date="1 Jan",
+            agreed_by=["Alice", "Bob"],
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id,
+            description="Meeting with Charlie",
+            resolved_date="2 Jan",
+            agreed_by=["Charlie"],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"q": "alice"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Meeting with Alice"]
