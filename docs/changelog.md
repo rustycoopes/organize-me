@@ -16,6 +16,13 @@
   Cloud Run's default CPU throttling once the HTTP response returns. This only wires the plumbing —
   the `GEMINI_API_KEY` GitHub Actions secret still needs to be created manually, and item 3 (live
   Google Drive QA) remains a manual step; see the issue for the full checklist.
+- **Issue #72 improvement pass** — `GoogleDriveStorageProvider.upload_file` (#52) switched from a
+  single `uploadType=multipart` request built with httpx's `files=` (which encodes
+  `multipart/form-data`, not the `multipart/related` Drive's multipart upload expects — the exact
+  risk #72 flagged as untested) to a two-request approach: a metadata-only `POST /drive/v3/files`
+  create, then a `PATCH .../upload/drive/v3/files/{id}?uploadType=media` body upload. Avoids the
+  encoding mismatch entirely without hand-rolling a `multipart/related` body. Unit test updated to
+  assert both requests' shape via `httpx.MockTransport`.
 
 ### Added
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch

@@ -5,6 +5,7 @@ The live end-to-end behaviour (real Drive folders + OAuth) is out of CI scope an
 manual QA against a connected account - see the PR note.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -45,7 +46,13 @@ async def test_upload_file_resolves_folder_then_uploads() -> None:
         folder = _folder_lookup(request)
         if folder is not None:
             return folder
-        if request.url.path == "/upload/drive/v3/files":
+        if request.method == "POST" and request.url.path == "/drive/v3/files":
+            body = json.loads(request.content)
+            assert body == {"name": "chat.txt", "parents": ["watch123"]}
+            return httpx.Response(200, json={"id": "file1", "name": "chat.txt"})
+        if request.method == "PATCH" and request.url.path == "/upload/drive/v3/files/file1":
+            assert request.url.params.get("uploadType") == "media"
+            assert request.content == b"hello"
             return httpx.Response(200, json={"id": "file1", "name": "chat.txt"})
         raise AssertionError(f"unexpected request {request.method} {request.url}")
 
