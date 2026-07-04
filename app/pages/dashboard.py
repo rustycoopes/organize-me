@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.events import PAGE_SIZE, list_user_events, to_event_read
 from app.auth.users import current_active_user_optional
+from app.core.onboarding import build_onboarding_steps, onboarding_complete
 from app.core.templating import templates
 from app.db.session import get_db
 from app.models.user import User
@@ -47,5 +48,7 @@ async def dashboard_page(
             "page": page,
             "total_pages": total_pages,
             "total": total,
+            "onboarding_steps": build_onboarding_steps(user),
+            "onboarding_complete": onboarding_complete(user),
         },
     )
