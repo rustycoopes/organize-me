@@ -115,8 +115,11 @@ async def list_user_events(
         like = f"%{escaped}%"
         conditions.append(
             or_(
+                Event.type.ilike(like, escape="\\"),
                 Event.description.ilike(like, escape="\\"),
                 Event.raw_date_text.ilike(like, escape="\\"),
+                # agreed_by is a JSONB array; cast to ::text for PostgreSQL substring matching.
+                func.cast(Event.agreed_by, func.Text).ilike(like, escape="\\"),
             )
         )
 
