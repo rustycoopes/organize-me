@@ -12,7 +12,7 @@ from datetime import date as date_
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user
@@ -118,8 +118,8 @@ async def list_user_events(
                 Event.type.ilike(like, escape="\\"),
                 Event.description.ilike(like, escape="\\"),
                 Event.raw_date_text.ilike(like, escape="\\"),
-                # agreed_by is a JSONB array of strings; cast to text for substring matching.
-                cast(Event.agreed_by, String).ilike(like, escape="\\"),
+                # agreed_by is a JSONB array; cast to ::text for PostgreSQL substring matching.
+                func.cast(Event.agreed_by, func.Text).ilike(like, escape="\\"),
             )
         )
 
