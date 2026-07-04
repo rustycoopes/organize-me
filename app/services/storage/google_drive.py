@@ -17,8 +17,6 @@ provider, so it refreshes at most once per run; persisting the rotated access to
 is a possible later optimisation, not required for correctness (the refresh token is long-lived).
 """
 
-import io
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -167,17 +165,26 @@ class GoogleDriveStorageProvider(StorageProvider):
     # -- StorageProvider contract -----------------------------------------------------------
 
     async def upload_file(self, name: str, content: bytes) -> RemoteFile:
+        """Create the file then upload its bytes as two requests.
+
+        Deliberately not a single ``uploadType=multipart`` request: httpx's ``files=`` produces a
+        ``multipart/form-data`` body, but Drive's multipart upload expects ``multipart/related``
+        (RFC 2387) - sending the former is silently misinterpreted by Drive. The two-request
+        approach (metadata-only create, then a plain ``uploadType=media`` body) sidesteps that
+        encoding mismatch entirely and needs no hand-rolled multipart body.
+        """
         watch_id = await self._watch_folder()
-        # Drive multipart upload: a JSON metadata part + the raw bytes part.
         metadata = {"name": name, "parents": [watch_id]}
-        files = {
-            "metadata": (None, json.dumps(metadata), "application/json"),
-            "file": (name, io.BytesIO(content), "application/octet-stream"),
-        }
-        response = await self._request(
-            "POST", DRIVE_UPLOAD_URL, params={"uploadType": "multipart"}, files=files
+        create_response = await self._request("POST", f"{DRIVE_API}/files", json=metadata)
+        file_id = str(create_response.json()["id"])
+        upload_response = await self._request(
+            "PATCH",
+            f"{DRIVE_UPLOAD_URL}/{file_id}",
+            params={"uploadType": "media"},
+            content=content,
+            headers={"Content-Type": "application/octet-stream"},
         )
-        body = response.json()
+        body = upload_response.json()
         return RemoteFile(id=str(body["id"]), name=str(body.get("name", name)))
 
     async def list_new_files(self) -> list[RemoteFile]:

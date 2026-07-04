@@ -79,6 +79,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
@@ -89,6 +90,7 @@ jobs:
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
           E2E_TEST_MODE: "true"
           ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+          GEMINI_API_KEY: "${GEMINI_API_KEY}"
           EOF
 
       - name: Build image
@@ -110,6 +112,7 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
+            --no-cpu-throttling \
             --quiet
 
   e2e-qa:
