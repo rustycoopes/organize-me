@@ -18,6 +18,7 @@ from app.pages.app_shell import router as app_shell_pages_router
 from app.pages.auth import router as auth_pages_router
 from app.pages.dashboard import router as dashboard_pages_router
 from app.pages.landing import router as landing_pages_router
+from app.pages.logs import router as logs_pages_router
 from app.pages.processing import router as processing_pages_router
 from app.pages.profile import router as profile_pages_router
 from app.pages.prompt import router as prompt_pages_router
@@ -58,6 +59,7 @@ app.include_router(settings_pages_router)
 app.include_router(upload_pages_router)
 app.include_router(dashboard_pages_router)
 app.include_router(processing_pages_router)
+app.include_router(logs_pages_router)
 app.include_router(app_shell_pages_router)
 app.include_router(landing_pages_router)
 

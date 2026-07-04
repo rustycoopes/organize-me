@@ -2,7 +2,39 @@
 
 {% block title %}Dashboard — OrganizeMe{% endblock %}
 
+{% block head %}
+{# HTMX powers the filter/search/sort/pagination interactions below - narrowing the table swaps
+   #dashboard-body in place instead of a full page reload (Slice 5.2, #55). #}
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+{% endblock %}
+
 {% block page %}
+{# Getting Started onboarding checklist (#56). Shown above the events table until all three
+   onboarding steps are done, then hidden entirely. Steps and their done-state come from the
+   server-rendered onboarding_steps view-model (app/core/onboarding.py) - no live update needed;
+   the state simply reflects on the next page load. #}
+{% if not onboarding_complete %}
+<div class="card bg-base-100 shadow-xl mb-4" id="onboarding-checklist">
+  <div class="card-body">
+    <h2 class="card-title">Getting Started</h2>
+    <p class="text-sm opacity-70">Finish setting up OrganizeMe:</p>
+    <ul class="steps steps-vertical mt-2">
+      {% for step in onboarding_steps %}
+      <li class="step {% if step.done %}step-primary{% endif %}">
+        {% if step.done %}
+        {# sr-only state text: done/to-do is otherwise conveyed only visually (strike-through +
+           colour), which a screen reader can't perceive. #}
+        <span class="line-through opacity-70">{{ step.label }}<span class="sr-only"> (done)</span></span>
+        {% else %}
+        <a href="{{ step.url }}" class="link link-primary">{{ step.label }}<span class="sr-only"> (to do)</span></a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
 <div class="card bg-base-100 shadow-xl">
   <div class="card-body">
     {# The heading must read exactly "Dashboard" (not "Events") - the sidebar e2e spec
@@ -10,130 +42,10 @@
        clicking the nav link, matching the same nav-label-as-heading contract every other
        authenticated page follows (e.g. Settings' <h1>Settings</h1>). #}
     <h1 class="card-title">Dashboard</h1>
-    {% if total %}
-    <p class="text-sm opacity-70">{{ total }} event{{ "s" if total != 1 else "" }} total</p>
-    {% endif %}
 
-    {% if events %}
-    {#
-      event.id is a server-generated UUID (hex digits + hyphens only), so embedding it directly in
-      a single-quoted JS string inside a double-quoted HTML attribute is safe - no user-controlled
-      text (like the description) is ever inlined into an onclick-style attribute here, avoiding
-      the quote-escaping class of bug the register.html fix (#23) guards against elsewhere.
-    #}
-    <div
-      class="overflow-x-auto mt-2"
-      x-data='{
-        deleting: false,
-        error: "",
-        pendingId: null,
-        openConfirm(id) {
-          this.pendingId = id;
-          this.$refs.confirmModal.showModal();
-        },
-        async confirmDelete() {
-          this.deleting = true;
-          this.error = "";
-          try {
-            const response = await fetch("/api/v1/events/" + this.pendingId, { method: "DELETE" });
-            if (!response.ok) throw new Error("delete failed");
-            window.location.reload();
-          } catch (e) {
-            this.error = "Could not delete this event. Please try again.";
-            this.deleting = false;
-          }
-        },
-      }'
-    >
-      <div role="alert" class="alert alert-error mb-2" x-show="error" x-cloak>
-        <span x-text="error"></span>
-      </div>
-
-      <table class="table" id="events-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Resolved date</th>
-            <th>Raw date text</th>
-            <th>Agreed by</th>
-            <th>Calendar</th>
-            <th>Tasks</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for event in events %}
-          <tr>
-            <td>{{ event.type }}</td>
-            <td>{{ event.description }}</td>
-            <td>{{ event.resolved_date }}</td>
-            <td>{{ event.raw_date_text }}</td>
-            <td>
-              {% for name in event.agreed_by %}
-              <span class="badge badge-ghost mr-1">{{ name }}</span>
-              {% endfor %}
-            </td>
-            <td>
-              {% if event.calendar_url %}
-              <a href="{{ event.calendar_url }}" target="_blank" rel="noopener" class="link link-primary">Add</a>
-              {% else %}
-              <span class="opacity-50 text-sm">No date</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if event.tasks_url %}
-              <a href="{{ event.tasks_url }}" target="_blank" rel="noopener" class="link link-primary">Add</a>
-              {% else %}
-              <span class="opacity-50 text-sm">No date</span>
-              {% endif %}
-            </td>
-            <td>
-              <button
-                type="button"
-                class="btn btn-sm btn-outline btn-error"
-                @click="openConfirm('{{ event.id }}')"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      <dialog class="modal" x-ref="confirmModal">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">Delete this event?</h3>
-          <p class="py-2">This cannot be undone.</p>
-          <div class="modal-action">
-            <form method="dialog" class="flex gap-2">
-              <button class="btn" :disabled="deleting">Cancel</button>
-              <button type="button" class="btn btn-error" :disabled="deleting" @click="confirmDelete">
-                <span x-show="!deleting">Delete</span>
-                <span x-show="deleting" x-cloak>Deleting...</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      </dialog>
+    <div id="dashboard-body">
+      {% include "partials/dashboard_body.html" %}
     </div>
-
-    {% if total_pages > 1 %}
-    <div class="flex justify-center items-center gap-2 mt-4">
-      {% if page > 1 %}
-      <a href="/dashboard?page={{ page - 1 }}" class="btn btn-sm">Previous</a>
-      {% endif %}
-      <span class="btn btn-sm btn-ghost no-animation">Page {{ page }} of {{ total_pages }}</span>
-      {% if page < total_pages %}
-      <a href="/dashboard?page={{ page + 1 }}" class="btn btn-sm">Next</a>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {% else %}
-    <p class="opacity-70 mt-2">No events yet. Upload a conversation to get started.</p>
-    {% endif %}
   </div>
 </div>
 {% endblock %}

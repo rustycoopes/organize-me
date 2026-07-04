@@ -141,7 +141,7 @@ async def test_google_callback_links_to_existing_email_password_account(
     register_me = await client.post(
         "/api/v1/auth/login", data={"email": email, "password": "correct-horse-battery"}
     )
-    assert register_me.status_code in (200, 204)
+    assert register_me.status_code == 302  # success redirect to /profile (issue #43)
     password_account_id = (await client.get("/api/v1/users/me")).json()["id"]
     await client.post("/api/v1/auth/logout")
 

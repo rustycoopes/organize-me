@@ -241,3 +241,217 @@ async def test_delete_another_users_event_returns_404_and_does_not_delete(
     assert response.status_code == 404
     still_there = await db_session.scalar(select(Event).where(Event.id == other_event_id))
     assert still_there is not None
+
+
+# --- Filters, sort, search (Slice 5.2, #55) ---------------------------------------------------
+
+
+async def test_get_events_filters_by_type(client: AsyncClient, db_session: AsyncSession) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, type="Medical", description="Dentist", resolved_date="1 Jan"))
+    db_session.add(_event(user_id, run.id, type="School", description="Parents evening", resolved_date="2 Jan"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"type": "School"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Parents evening"]
+
+
+async def test_get_events_filters_by_date_range(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="Too early",
+            resolved_date_earliest=date(2026, 1, 1), resolved_date="1 Jan",
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id, description="In range",
+            resolved_date_earliest=date(2026, 6, 15), resolved_date="15 June",
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id, description="Too late",
+            resolved_date_earliest=date(2026, 12, 31), resolved_date="31 Dec",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get(
+        "/api/v1/events", params={"date_from": "2026-06-01", "date_to": "2026-06-30"}
+    )
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["In range"]
+
+
+async def test_get_events_free_text_search_matches_description(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="Dentist appointment", resolved_date="1 Jan"))
+    db_session.add(_event(user_id, run.id, description="School trip", resolved_date="2 Jan"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"q": "dentist"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Dentist appointment"]
+
+
+async def test_get_events_free_text_search_matches_raw_date_text(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(user_id, run.id, description="Dentist", resolved_date="1 Jan", raw_date_text="Saturday morning")
+    )
+    db_session.add(
+        _event(user_id, run.id, description="School trip", resolved_date="2 Jan", raw_date_text="next Tuesday")
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"q": "Saturday"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Dentist"]
+
+
+async def test_get_events_sort_asc_returns_oldest_first(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="Earlier",
+            resolved_date_earliest=date(2026, 6, 1), resolved_date="1 June",
+        )
+    )
+    db_session.add(
+        _event(
+            user_id, run.id, description="Later",
+            resolved_date_earliest=date(2026, 6, 20), resolved_date="20 June",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"sort": "asc"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions.index("Earlier") < descriptions.index("Later")
+
+
+async def test_get_events_sort_asc_still_sorts_unresolved_dates_last(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(
+            user_id, run.id, description="Has date",
+            resolved_date_earliest=date(2026, 6, 1), resolved_date="1 June",
+        )
+    )
+    db_session.add(
+        _event(user_id, run.id, description="TBC", resolved_date_earliest=None, resolved_date="TBC")
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"sort": "asc"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions[-1] == "TBC"
+
+
+async def test_get_events_filters_compose_with_pagination(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(60):
+        db_session.add(
+            _event(
+                user_id, run.id,
+                type="Medical",
+                description=f"Medical event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1) + timedelta(days=i),
+            )
+        )
+    for i in range(5):
+        db_session.add(
+            _event(
+                user_id, run.id,
+                type="School",
+                description=f"School event {i}",
+                resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2027, 1, 1) + timedelta(days=i),
+            )
+        )
+    await db_session.flush()
+
+    first_page = await client.get("/api/v1/events", params={"type": "Medical"})
+    second_page = await client.get("/api/v1/events", params={"type": "Medical", "page": 2})
+
+    body1 = first_page.json()
+    assert body1["total"] == 60
+    assert len(body1["events"]) == 50
+    assert all(e["type"] == "Medical" for e in body1["events"])
+
+    body2 = second_page.json()
+    assert len(body2["events"]) == 10
+    assert all(e["type"] == "Medical" for e in body2["events"])
+
+
+async def test_get_events_accepts_empty_date_filter_params(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """An untouched date picker submits "" (not an omitted param) via the HTMX-serialized filter
+    form - the endpoint must treat that the same as no filter, not reject it with a 422."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="Mine", resolved_date="1 Jan"))
+    await db_session.flush()
+
+    response = await client.get(
+        "/api/v1/events", params={"date_from": "", "date_to": "", "type": "", "q": ""}
+    )
+
+    assert response.status_code == 200
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert "Mine" in descriptions
+
+
+async def test_get_events_rejects_malformed_date_param_with_422(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/api/v1/events", params={"date_from": "not-a-date"})
+
+    assert response.status_code == 422
+
+
+async def test_get_events_search_escapes_like_wildcards(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """A literal "%" or "_" in the search box must be matched literally, not treated as a SQL
+    LIKE wildcard - otherwise "%" would silently match every event regardless of description."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="50% off tickets", resolved_date="1 Jan"))
+    db_session.add(_event(user_id, run.id, description="Unrelated event", resolved_date="2 Jan"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"q": "50%"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["50% off tickets"]

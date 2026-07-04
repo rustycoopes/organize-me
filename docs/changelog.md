@@ -9,7 +9,86 @@
 
 ## [Unreleased]
 
+### Changed
+- **Issue #31** — Extracted a shared `card_page` Jinja macro (`app/templates/macros/ui.html`) that
+  renders the centred DaisyUI card shell (centering wrapper + `card`/`card-body`/`card-title` +
+  optional subtitle). All five auth/profile templates (`login`, `register`, `forgot_password`,
+  `reset_password`, `profile`) now import and call the macro instead of repeating the wrapper
+  markup. Alpine.js `x-data` is placed on an ancestor `<div>` outside the macro call so directives
+  inside the card body still resolve against the reactive scope. Regression tests added in
+  `tests/test_card_macro.py`.
+
+- **Issue #72 (partial)** — wired `GEMINI_API_KEY` into the QA/prod Cloud Run env-vars files in
+  `.github/workflows/ci.yml` and `deploy.yml`, and added `--no-cpu-throttling` to both
+  `gcloud run deploy` commands so the in-process pipeline background task (#52) isn't frozen by
+  Cloud Run's default CPU throttling once the HTTP response returns. This only wires the plumbing —
+  the `GEMINI_API_KEY` GitHub Actions secret still needs to be created manually, and item 3 (live
+  Google Drive QA) remains a manual step; see the issue for the full checklist.
+- **Issue #72 improvement pass** — `GoogleDriveStorageProvider.upload_file` (#52) switched from a
+  single `uploadType=multipart` request built with httpx's `files=` (which encodes
+  `multipart/form-data`, not the `multipart/related` Drive's multipart upload expects — the exact
+  risk #72 flagged as untested) to a two-request approach: a metadata-only `POST /drive/v3/files`
+  create, then a `PATCH .../upload/drive/v3/files/{id}?uploadType=media` body upload. Avoids the
+  encoding mismatch entirely without hand-rolling a `multipart/related` body. Unit test updated to
+  assert both requests' shape via `httpx.MockTransport`.
+
+### Fixed
+- **Issue #78** — Live Google Drive connect crashed with a raw "Internal Error" page. Root cause:
+  the `ENCRYPTION_KEY` GitHub secret (flagged as an outstanding human-setup step since #45/#61) had
+  never actually been created, so `get_credential_cipher()`'s `RuntimeError` went unhandled inside
+  `GET /callback`. Fixed on branch `fix/issue-78-encryption-key-callback`: generated a `Fernet` key
+  and set the `ENCRYPTION_KEY` repo secret (shared by `ci.yml`/QA and `deploy.yml`/prod — resolves
+  that part of #61 too), and the callback now catches the missing-cipher case and redirects to
+  `/settings?error=storage_not_configured` with a clear banner instead of a 500. #61's remaining
+  scope (Google Cloud Console redirect URI + `drive` scope registration) is still an open manual
+  task.
+
 ### Added
+- **Issue #56 implemented** — Slice 5.3 Getting Started onboarding checklist on the dashboard
+  (branch `claude/admiring-carson-v5qr9b`). A 3-step checklist (Connect Storage → `/settings`,
+  Set Notification Preferences → `/profile`, Upload First File → `/upload`) renders above the
+  events table, its per-step done/incomplete state read from the `onboarding_storage_done` /
+  `onboarding_notifications_done` / `onboarding_first_upload_done` booleans on the user record, and
+  the whole block is hidden once all three are true. Server-rendered (state reflects on next page
+  load); done steps show struck-through with an sr-only "(done)" marker for screen readers,
+  incomplete steps link to their page. New pure `app/core/onboarding.py` view-model
+  (`build_onboarding_steps` / `onboarding_complete`) with a unit test, plus dashboard page tests
+  for the show / mixed / hidden states. `onboarding_notifications_done` stays unchecked until
+  Slice 7 wires notifications — no blocker. Deferred e2e coverage filed as #91.
+
+- **Issue #55 implemented** — Slice 5.2 events dashboard filters, sort & search (branch
+  `feature/slice-5.2-events-filters`, isolated worktree). `GET /api/v1/events` gains `type`,
+  `date_from`/`date_to`, `q` (free-text over `description`/`raw_date_text`, case-insensitive), and
+  `sort` (`asc`/`desc`, default unchanged) query params, all composing with each other and with
+  pagination (`app.api.v1.events.list_user_events`); a new `list_user_event_types` backs the type
+  dropdown with the user's full distinct type list, unaffected by the currently-applied filters.
+  The dashboard's filter bar (type dropdown, two date pickers, search box, sort toggle) is
+  HTMX-driven: the form and every pagination/sort link target `#dashboard-body` and
+  `app.pages.dashboard` returns just that fragment (`partials/dashboard_body.html`) for
+  `HX-Request` requests, so narrowing the table never triggers a full page reload. The filter form
+  and events table were deliberately kept as **one** HTMX swap unit (not table-only) after manual
+  browser QA caught a real bug: the sort-toggle link and a hidden `sort` field live in the form, so
+  swapping only the table left them stale after a filter change, silently dropping the active sort
+  (or vice versa) on the next click. Manual QA also caught FastAPI rejecting `date_from=`/`date_to=`
+  (empty string, submitted by an untouched HTML date input) with a 422 before business logic ever
+  ran; both routes now take these as `str | None` and parse via `app.api.v1.events.parse_date_param`
+  (empty → `None`). Improvement pass: distinguishing "no events at all" from "no events match these
+  filters" in the empty state, and the `list_user_event_types` dropdown. A multi-agent code review
+  (correctness + cleanup + altitude/conventions angles) surfaced two further real bugs, both fixed
+  before merge: `parse_date_param` let a malformed (non-empty, non-ISO) date crash with an unhandled
+  500 instead of a clean 422, and the free-text search built its `ILIKE` pattern from the raw
+  user input, so a literal `%`/`_` in the search box acted as a SQL LIKE wildcard instead of a
+  literal character (both now escaped). Also applied: `_dashboard_url`'s four call sites
+  (prev/next/sort-toggle/redirect) bound their shared filter kwargs once via `functools.partial`
+  rather than repeating all four on every call, removing the risk of a future filter param being
+  added to three call sites and missed on the fourth. Three lower-priority suggestions from the
+  same review (shared query-param model between the two routes, further DB round-trip reduction,
+  minor filter-bar UX polish) were filed as issues #96/#97/#98 (`modelsuggested`, `slice5`) rather
+  than built now. `mypy --strict` and the full suite (286 tests) are green; manually verified live
+  against a seeded dashboard (type filter, date range, search, sort toggle, and pagination all
+  composing correctly, HTMX swaps confirmed via the network panel — no full-page navigation on any
+  filter/sort/page interaction).
+
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
   indicators and streams each step's status transition live via the HTMX SSE extension — no manual
@@ -36,6 +115,14 @@
   SSE connection (already a #52 human-setup item).
 
 ### Fixed
+- **Issue #43** — `POST /api/v1/auth/login` returned fastapi-users' bare `204 No Content`, so a
+  plain full-page form POST (JS disabled / any non-fetch caller) was stranded on `/login` with no
+  navigation — it only appeared to work because `login.html`'s client-side JS did the redirect
+  (the same class of bug as #27, masked by JS). Now the endpoint itself `302`s to `/profile`,
+  carrying the auth cookie across from the backend login response, so it's correct without relying
+  on client JS. The Set-Cookie-carrying redirect used by both this flow and the Google callback
+  (#27) was extracted into a shared `_redirect_with_login_cookie` helper. Branch
+  `fix/auth-login-302-redirect`.
 - **Issue #27** — Google sign-in hung on Google's consent page and never returned to the app
   (branch `fix/google-oauth-callback-redirect`). The `/api/v1/auth/google/callback` success path
   returned fastapi-users' default cookie login response — a bare `204 No Content` — so the
@@ -320,3 +407,4 @@
 - `docs/changelog.md` — this file
 - `examples/example.whatsapp.txt` — canonical WhatsApp export sample (630 lines)
 - `examples/example.lmmoutput.txt` — canonical LLM output sample (22 extracted events, JSON)
+

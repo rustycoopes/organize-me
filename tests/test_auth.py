@@ -85,10 +85,43 @@ async def test_login_with_correct_credentials_sets_httponly_cookie(client: Async
 
     response = await client.post("/api/v1/auth/login", data={"email": email, "password": password})
 
-    assert response.status_code in (200, 204)
+    # 302 to /profile (issue #43) rather than a bare 204 - the endpoint navigates the browser
+    # itself instead of relying on client-side JS - and still sets the auth cookie.
+    assert response.status_code == 302
     set_cookie_headers = response.headers.get_list("set-cookie")
     assert len(set_cookie_headers) == 1
     assert "httponly" in set_cookie_headers[0].lower()
+
+
+async def test_login_with_correct_credentials_redirects_to_profile(client: AsyncClient) -> None:
+    # Regression guard for issue #43: a successful login must 302-redirect to /profile so a
+    # plain full-page form POST (JS disabled / non-fetch caller) lands on a page instead of a
+    # bare 204 No Content. Mirrors the Google-callback fix (#27).
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+
+    response = await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/profile"
+    # The redirect must itself carry the auth cookie, otherwise the browser follows it to
+    # /profile with no session and gets bounced back to /login.
+    assert response.headers.get_list("set-cookie"), "302 redirect did not set the auth cookie"
+
+
+async def test_login_redirect_lands_on_an_authenticated_session(client: AsyncClient) -> None:
+    # Following the login redirect must reach a protected resource - proves the cookie carried
+    # on the 302 actually authenticates the session end-to-end (issue #43).
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    me = await client.get("/api/v1/users/me")
+    assert me.status_code == 200
+    assert me.json()["email"] == email
 
 
 async def test_login_cookie_expiry_is_seven_days(client: AsyncClient) -> None:
@@ -356,7 +389,7 @@ async def test_reset_password_with_valid_token_updates_password_and_token_is_sin
     new_password_login = await client.post(
         "/api/v1/auth/login", data={"email": email, "password": new_password}
     )
-    assert new_password_login.status_code in (200, 204)
+    assert new_password_login.status_code == 302  # success redirect to /profile (issue #43)
 
     reused_token_response = await client.post(
         "/api/v1/auth/reset-password",

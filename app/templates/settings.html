@@ -38,6 +38,8 @@
               this.error = "Google Drive connection failed. Please try again.";
             } else if (params.get("error") === "save_folder_first") {
               this.error = "Save your folder path first, then connect Google Drive.";
+            } else if (params.get("error") === "storage_not_configured") {
+              this.error = "Google Drive connection is not configured yet. Please try again later or contact support.";
             }
             if (params.has("connected") || params.has("error")) {
               window.history.replaceState({}, "", window.location.pathname);
@@ -81,9 +83,13 @@
               });
               const data = await response.json().catch(() => ({}));
               if (!response.ok || !data.authorization_url) {
-                this.error = response.status === 409
-                  ? "Save your folder path first, then connect Google Drive."
-                  : "Could not start the Google Drive connection. Please try again.";
+                if (response.status === 409) {
+                  this.error = "Save your folder path first, then connect Google Drive.";
+                } else if (response.status === 503) {
+                  this.error = "Google Drive connection is not configured yet. Please try again later or contact support.";
+                } else {
+                  this.error = "Could not start the Google Drive connection. Please try again.";
+                }
                 this.connecting = false;
                 return;
               }

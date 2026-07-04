@@ -14,7 +14,7 @@
 
       {#
         Single-quoted x-data so the double-quoted JS strings inside don't terminate the attribute
-        (the register.html bug from #23). drive_connected seeds whether Drive is set up.
+        (the register.html bug from #23). drive_connected and using_ephemeral seed the storage status.
       #}
       <div
         class="mt-4"
@@ -23,12 +23,9 @@
           error: "",
           dragover: false,
           driveConnected: {{ drive_connected | tojson }},
+          usingEphemeral: {{ using_ephemeral | tojson }},
           async submitFile(fileList) {
             if (!fileList || !fileList.length) return;
-            if (!this.driveConnected) {
-              this.error = "Connect Google Drive in Settings before uploading.";
-              return;
-            }
             this.error = "";
             this.uploading = true;
             try {
@@ -59,12 +56,13 @@
           },
         }'
       >
-        {# Not connected: steer the user to Settings; the dropzone below stays disabled. #}
-        <div role="alert" class="alert alert-warning" x-show="!driveConnected" x-cloak>
+        {# Google Drive not connected: show a warning (issue #79). Uploads proceed with ephemeral storage. #}
+        <div role="alert" class="alert alert-info" x-show="usingEphemeral" x-cloak>
           <span>
-            Connect Google Drive in
+            Google Drive is not connected. Files uploaded here will be processed but not permanently
+            stored. Connect Google Drive in
             <a href="/settings" class="link">Settings</a>
-            before uploading.
+            to enable automatic storage.
           </span>
         </div>
 
@@ -73,10 +71,11 @@
         </div>
 
         {# Drag-and-drop zone. Clicking it opens the hidden file picker; dropping a file uploads it. #}
+        {# Always enabled; falls back to ephemeral storage if Drive not connected (issue #79). #}
         <div
           id="upload-dropzone"
           class="mt-4 flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-base-300 p-8 text-center transition-colors"
-          :class="{ 'border-primary bg-base-200': dragover, 'opacity-50 pointer-events-none': !driveConnected }"
+          :class="{ 'border-primary bg-base-200': dragover }"
           @dragover.prevent="dragover = true"
           @dragleave.prevent="dragover = false"
           @drop.prevent="dragover = false; submitFile($event.dataTransfer.files)"

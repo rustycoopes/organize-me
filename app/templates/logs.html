@@ -1,0 +1,66 @@
+{% extends "authenticated_base.html" %}
+
+{% block title %}Logs — OrganizeMe{% endblock %}
+
+{% block page %}
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+    <h1 class="card-title">Logs</h1>
+
+    {% if not runs %}
+    <p class="text-center opacity-70 py-8">No processing runs yet</p>
+    {% else %}
+    <div class="overflow-x-auto mt-2">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Filename</th>
+            <th>Status</th>
+            <th>Events</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in runs %}
+          <tr class="hover">
+            <td>
+              <a href="/processing-runs/{{ run.id }}" class="link link-primary">
+                {{ run.created_at }}
+              </a>
+            </td>
+            <td>{{ run.filename }}</td>
+            <td>
+              <span class="badge {% if run.status == 'success' %}badge-success{% elif run.status == 'failed' %}badge-error{% elif run.status == 'in_progress' %}badge-warning{% else %}badge-info{% endif %}">
+                {{ run.status }}
+              </span>
+            </td>
+            <td>{{ run.events_extracted_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="join justify-center mt-4">
+      {% if page > 1 %}
+      <a href="/logs?page=1" class="join-item btn btn-sm">First</a>
+      <a href="/logs?page={{ page - 1 }}" class="join-item btn btn-sm">Previous</a>
+      {% endif %}
+
+      <button class="join-item btn btn-sm btn-disabled">
+        Page {{ page }} of {{ total_pages }}
+      </button>
+
+      {% if page < total_pages %}
+      <a href="/logs?page={{ page + 1 }}" class="join-item btn btn-sm">Next</a>
+      <a href="/logs?page={{ total_pages }}" class="join-item btn btn-sm">Last</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <p class="text-sm opacity-70 mt-4">{{ total }} total processing run{{ "s" if total != 1 else "" }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

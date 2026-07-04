@@ -1,10 +1,10 @@
 {% extends "authenticated_base.html" %}
+{% from "macros/ui.html" import card_page %}
 
 {% block title %}Your profile — OrganizeMe{% endblock %}
 
 {% block page %}
 <div
-  class="flex justify-center"
   x-data='{
     ...{{ profile_data | tojson }},
     saving: false,
@@ -65,9 +65,7 @@
     },
   }'
 >
-  <div class="card w-full max-w-lg bg-base-100 shadow-xl">
-    <div class="card-body">
-      <h1 class="card-title">Your profile</h1>
+{% call card_page("Your profile", max_width="max-w-lg", outer_classes="flex justify-center") %}
 
       <div role="alert" class="alert alert-success mt-2" x-show="success" x-cloak>
         <span>Changes saved.</span>
@@ -145,8 +143,8 @@
           Delete account
         </button>
       </div>
-    </div>
-  </div>
+
+{% endcall %}
 
   <dialog class="modal" x-ref="deleteModal">
     <div class="modal-box">
