@@ -11,6 +11,7 @@ Per the Slice 4 spec the call is **fatal on failure**: any error (or an empty re
 """
 
 import asyncio
+import json
 from typing import Protocol
 
 from google import genai
@@ -19,6 +20,29 @@ from app.core.config import get_settings
 
 # Fast, low-cost model suited to structured extraction. Overridable per-client for later tuning.
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
+# Canned extraction payload used only under E2E_TEST_MODE, where the Playwright suite (#53) drives
+# upload -> pipeline -> SSE without a real Gemini key. A small, self-contained, schema-valid array
+# (the real examples/example.lmmoutput.txt is excluded from the deployed image by .dockerignore, so
+# it can't be read at runtime). Dates use formats app.core.date_parser.parse_earliest_date handles.
+E2E_FAKE_EXTRACTION_PAYLOAD = json.dumps(
+    [
+        {
+            "type": "School",
+            "description": "E2E test — pick up from school.",
+            "resolved_date": "Monday 15 June 2026 at 3:45 PM",
+            "raw_date_text": "Monday 345",
+            "agreed_by": ["Test Parent A", "Test Parent B"],
+        },
+        {
+            "type": "Activity",
+            "description": "E2E test — swim meet.",
+            "resolved_date": "Saturday 20 June 2026",
+            "raw_date_text": "Saturday",
+            "agreed_by": ["Test Parent A"],
+        },
+    ]
+)
 
 
 class GeminiError(RuntimeError):
@@ -85,6 +109,13 @@ class FakeGeminiClient:
 
 
 def get_gemini_client() -> GeminiClient:
-    """Return the production Gemini client. Overridable via ``dependency_overrides`` in tests
-    (like ``get_email_sender``) so request handlers never hit the live API."""
+    """Return the Gemini client for a run. Overridable via ``dependency_overrides`` in tests
+    (like ``get_email_sender``) so request handlers never hit the live API.
+
+    Under ``E2E_TEST_MODE`` (QA only) it returns a ``FakeGeminiClient`` with a canned payload so the
+    Playwright suite (#53) can run the full upload -> pipeline -> SSE flow to a *successful* terminal
+    state without a real ``GEMINI_API_KEY`` — mirroring how the storage provider resolves to the
+    in-memory fake in the same mode (see app.services.storage.factory)."""
+    if get_settings().e2e_test_mode:
+        return FakeGeminiClient(E2E_FAKE_EXTRACTION_PAYLOAD)
     return GoogleGeminiClient()

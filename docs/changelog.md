@@ -9,6 +9,32 @@
 
 ## [Unreleased]
 
+### Added
+- **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
+  `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
+  indicators and streams each step's status transition live via the HTMX SSE extension — no manual
+  refresh — backed by `GET /api/v1/processing-runs/{id}/sse` (sse-starlette). Per #53's resolved
+  decision the stream **polls the `processing_steps` rows** on a ~0.75s interval (no Redis pub/sub;
+  the #52 pipeline runs in-process and writes those rows as it advances), emits a `step-N` event
+  only when a step's status changes plus a `run-status` event on run-status change, and closes with
+  a `done` event once the run reaches a terminal state. A successful run shows all 7 steps
+  completing (Extract shows *skipped* for a `.txt`/`.csv`); a failed run highlights the failing step
+  with a link toward the logs. The endpoint only exposes runs owned by the requesting user (404
+  otherwise); the page falls back to the user's latest run when opened without `?run=`, and renders
+  an already-finished run statically (no wasted SSE connection). Progress logic
+  (`app/services/pipeline/progress.py`) is split from the router and the step badge is a shared
+  Jinja partial used by both the first paint and the SSE fragments, so the two never drift.
+  `PIPELINE_STEPS` in `app/services/pipeline/runner.py` is now the single source of truth for the 7
+  steps. To exercise the flow in CI, `get_gemini_client` returns a canned `FakeGeminiClient` under
+  `E2E_TEST_MODE` (the real `examples/` fixture is excluded from the deployed image) and the Upload
+  page enables its dropzone in that mode. Tests: unit tests for `build_step_views`, the SSE
+  generator (terminal success/failure) + endpoint auth/ownership, the page (empty state, live wiring,
+  terminal-static render, cross-user isolation), and a Playwright `processing.spec.ts` that drives an
+  upload and asserts the 7 steps advance live to a successful terminal state (in the `e2e-qa` suite).
+  Added the `sse-starlette` dependency. **Human setup for reliable live progress:** Cloud Run "CPU
+  always allocated" so the in-process pipeline task keeps running between the upload response and the
+  SSE connection (already a #52 human-setup item).
+
 ### Fixed
 - **Issue #27** — Google sign-in hung on Google's consent page and never returned to the app
   (branch `fix/google-oauth-callback-redirect`). The `/api/v1/auth/google/callback` success path

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.storage_config import get_user_storage_config
 from app.auth.users import current_active_user_optional
+from app.core.config import Settings, get_settings
 from app.core.templating import templates
 from app.db.session import get_db
 from app.models.user import User
@@ -27,11 +28,17 @@ async def upload_page(
     request: Request,
     user: User | None = Depends(current_active_user_optional),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> HTMLResponse | RedirectResponse:
     if user is None:
         return RedirectResponse("/login", status_code=302)
     config = await get_user_storage_config(db, user.id)
-    drive_connected = config is not None and config.oauth_access_token is not None
+    # Under E2E_TEST_MODE the upload endpoint uses the fake storage provider and accepts uploads
+    # without a real Drive connection (see app.api.v1.upload / app.services.storage.factory), so the
+    # page must enable the dropzone too — otherwise the Playwright suite (#53) couldn't upload.
+    drive_connected = settings.e2e_test_mode or (
+        config is not None and config.oauth_access_token is not None
+    )
     return templates.TemplateResponse(
         request,
         "upload.html",

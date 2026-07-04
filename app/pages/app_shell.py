@@ -2,9 +2,9 @@
 
 Each nav route renders the shared authenticated layout with a generic placeholder body;
 real content lands in later slices. Profile (app.pages.profile), Settings (app.pages.settings),
-Prompt (app.pages.prompt), and Upload (app.pages.upload) are served separately as they already
-have real content. All routes redirect anonymous visitors to /login, matching the profile page's
-gating.
+Prompt (app.pages.prompt), Upload (app.pages.upload), and Processing (app.pages.processing) are
+served separately as they already have real content. All routes redirect anonymous visitors to
+/login, matching the profile page's gating.
 """
 
 from fastapi import APIRouter, Depends, Request
@@ -20,7 +20,7 @@ router = APIRouter(tags=["pages"])
 # Placeholder pages are every nav destination except the ones with their own router and real
 # content (/profile, /settings, /prompt). Derived from NAV_ITEMS so paths/labels have a single
 # source of truth.
-PAGES_WITH_OWN_ROUTER = {"/profile", "/settings", "/prompt", "/upload"}
+PAGES_WITH_OWN_ROUTER = {"/profile", "/settings", "/prompt", "/upload", "/processing"}
 PLACEHOLDER_PAGES: list[tuple[str, str]] = [
     (item.path, item.label) for item in NAV_ITEMS if item.path not in PAGES_WITH_OWN_ROUTER
 ]
