@@ -47,7 +47,7 @@ async def test_user_notifications_disabled(db_session: AsyncSession) -> User:
     return user
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def fake_email_sender() -> FakeEmailSender:
     return FakeEmailSender()
 
