@@ -1,0 +1,92 @@
+{#
+  The events table fragment (Slice 5.1, #54). Rendered server-side into the dashboard's
+  #events-panel on first load, and returned on its own by GET /api/v1/events for HTMX pagination
+  (and, from #55, filter/sort/search). Expects an `events_page` (app.api.v1.events.EventsPage) in
+  context; the per-row delete button calls the `confirmDelete` Alpine handler defined on the
+  surrounding dashboard scope.
+#}
+{% if events_page.total == 0 %}
+<div class="flex flex-col items-center gap-3 rounded-lg border border-dashed border-base-300 p-8 text-center">
+  <p class="font-medium">No events yet.</p>
+  <p class="text-sm opacity-70">Upload a conversation and the events we extract will show up here.</p>
+  <a href="/upload" class="btn btn-primary btn-sm">Upload a file</a>
+</div>
+{% else %}
+<div class="overflow-x-auto rounded-lg border border-base-300">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Date</th>
+        <th>Raw date</th>
+        <th>Agreed by</th>
+        <th class="text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ev in events_page.events %}
+      <tr id="event-{{ ev.id }}">
+        <td><span class="badge badge-outline">{{ ev.type }}</span></td>
+        <td class="font-medium">{{ ev.description }}</td>
+        <td class="whitespace-nowrap">{{ ev.resolved_date }}</td>
+        <td class="text-sm opacity-70">{{ ev.raw_date_text }}</td>
+        <td>
+          <div class="flex flex-wrap gap-1">
+            {% for name in ev.agreed_by %}
+            <span class="badge badge-ghost" title="{{ name }}">{{ name | initials }}</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td class="text-right whitespace-nowrap">
+          <a
+            href="{{ ev.calendar_url }}"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-ghost btn-xs"
+          >Calendar</a>
+          <a
+            href="{{ ev.tasks_url }}"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-ghost btn-xs"
+          >Task</a>
+          {# Single-quoted attribute on purpose: Jinja's `tojson` escapes <, >, &, and ' (→ ')
+             but NOT ", so the description's own double quotes must sit inside a single-quoted
+             attribute or they'd break out of it. #}
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs text-error"
+            @click='confirmDelete("{{ ev.id }}", {{ ev.description | tojson }})'
+          >Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if events_page.total_pages > 1 %}
+<div class="mt-4 flex items-center justify-between">
+  <span class="text-sm opacity-70">
+    Page {{ events_page.page }} of {{ events_page.total_pages }} · {{ events_page.total }} events
+  </span>
+  <div class="join">
+    <button
+      class="join-item btn btn-sm"
+      {% if not events_page.has_prev %}disabled{% endif %}
+      hx-get="/api/v1/events?page={{ events_page.prev_page }}"
+      hx-target="#events-panel"
+      hx-swap="innerHTML"
+    >Prev</button>
+    <button
+      class="join-item btn btn-sm"
+      {% if not events_page.has_next %}disabled{% endif %}
+      hx-get="/api/v1/events?page={{ events_page.next_page }}"
+      hx-target="#events-panel"
+      hx-swap="innerHTML"
+    >Next</button>
+  </div>
+</div>
+{% endif %}
+{% endif %}

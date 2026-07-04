@@ -10,6 +10,25 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #54 implemented** — Slice 5.1 events dashboard table + calendar/tasks links + delete
+  (branch `claude/admiring-carson-lmxlh1`). The `/dashboard` page (`app/pages/dashboard.py` +
+  `dashboard.html`), previously an app_shell placeholder, now renders the user's extracted events:
+  a table of type, description, resolved date, raw date text, and `agreed_by` as initials chips
+  (full name on hover), with a per-row **Add to Google Calendar** / **Add to Google Task** link and
+  a **Delete** action. `GET /api/v1/events` (`app/api/v1/events.py`) returns the table as an HTML
+  fragment — user-scoped, 50 per page, sorted newest `resolved_date_earliest` first (undated events
+  last, `created_at` desc as tiebreak) — which the page paints server-side on first load and HTMX
+  swaps in place for pagination (the same endpoint #55 will extend with filter/sort/search).
+  `DELETE /api/v1/events/{id}` removes a single event, owner-gated (404 otherwise); the UI gates it
+  behind a DaisyUI confirmation modal (Alpine), then drops the row. Out-of-range `?page=` requests
+  clamp to the last page. New `app/core/calendar_url.py` builds the pre-filled URLs: Google
+  Calendar via the documented `/calendar/render?action=TEMPLATE` endpoint (all-day event from
+  `resolved_date_earliest`, raw date text + `agreed_by` in the description); Google Tasks is a
+  best-effort `title + due` URL, since Tasks has no public pre-fill scheme — flagged for follow-up
+  (#75). Tests: unit tests for both URL builders, API tests (auth, ownership isolation, pagination,
+  sort, delete, page-clamp), and dashboard page tests (empty state, columns/chips/links/modal,
+  pagination); `mypy --strict` clean. Deferred model-suggested items filed as #74 (refresh panel
+  after delete) and #75 (verify the Tasks pre-fill scheme).
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
   indicators and streams each step's status transition live via the HTMX SSE extension — no manual

@@ -2,6 +2,29 @@
 
 Decisions taken by the model during autonomous implementation runs, recorded for later review.
 
+## 2026-07-04 — Issue selection for autonomous run (picked #54)
+
+### Board Status still not directly readable — reconstructed again
+Same constraint as the earlier #53 run: `gh` is absent and the agent proxy serves only a pinned set
+of PR-review REST ops, blocking the Projects v2 GraphQL endpoint entirely. The board Status column
+(`backlog / Todo / In Progress / Done`) can be neither **read** nor **written** programmatically
+this session, so the `next-issue` helper (`todo_issues.py`) cannot run and later "move to In
+Progress / Done" board mutations are impossible. Selection was reconstructed from labels + open
+PR/branch signals; board-column transitions in this run are recorded via issue comments instead of
+real board moves, and this limitation is noted on the issue.
+
+### Pick: #54 (Slice 5.1 — Events dashboard table + calendar/tasks links + delete)
+- Slice 4's last planned enhancement (#53) is now merged (PR #53/commit 6d1dff9), so Slice 5 is the
+  earliest slice with actionable planned work. Its `enhancement` issues are #54, #55, #56.
+- #54 is the unblocker: #55 and #56 are both "Blocked by #54"; #54's own blocker #52 is merged. It
+  is the foundational, first-user-visible piece of the slice.
+- No branch and no PR touches #54–#56 → not In Progress. The only open PR (#70) targets #43 →
+  treated as owned/In Progress → skipped.
+- Slice 1 (#29–#43) and the Slice 4 `intake`/`modelsuggested` items (#64, #65, #68) are deferred
+  backlog (lowest tier), not competing Todo work — consistent with the earlier entry below.
+- Autonomous run: no user available within the 60s window, so recording the choice here per the
+  `next-issue` no-response rule.
+
 ## 2026-07-04 — Issue selection for autonomous run (picked #53)
 
 ### Board Status was not directly readable — reconstructed it

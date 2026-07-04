@@ -1,0 +1,69 @@
+{% extends "authenticated_base.html" %}
+
+{% block title %}Dashboard — OrganizeMe{% endblock %}
+
+{% block head %}
+{# HTMX powers in-place pagination (and, from #55, filter/sort/search) of the events table.
+   Pinned to the same htmx 1.9.x the processing page uses. #}
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+{% endblock %}
+
+{% block page %}
+<div
+  x-data='{
+    pendingId: null,
+    pendingLabel: "",
+    deleting: false,
+    error: "",
+    confirmDelete(id, label) {
+      this.pendingId = id;
+      this.pendingLabel = label;
+      this.error = "";
+      this.$refs.deleteModal.showModal();
+    },
+    async deleteEvent() {
+      this.deleting = true;
+      this.error = "";
+      try {
+        const response = await fetch(`/api/v1/events/${this.pendingId}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("delete failed");
+        const row = document.getElementById(`event-${this.pendingId}`);
+        if (row) row.remove();
+        this.$refs.deleteModal.close();
+      } catch (e) {
+        this.error = "Could not delete the event. Please try again.";
+      } finally {
+        this.deleting = false;
+      }
+    },
+  }'
+>
+  <h1 class="text-2xl font-bold">Dashboard</h1>
+  <p class="mt-1 text-sm opacity-70">Events extracted from your conversations.</p>
+
+  {# Server-rendered first page; HTMX pagination swaps this panel's contents in place. #}
+  <div id="events-panel" class="mt-6">
+    {% include "partials/events_table.html" %}
+  </div>
+
+  <dialog class="modal" x-ref="deleteModal">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">Delete this event?</h3>
+      <p class="py-4">
+        This will permanently delete “<span class="font-medium" x-text="pendingLabel"></span>”.
+        This action cannot be undone.
+      </p>
+      <div role="alert" class="alert alert-error" x-show="error" x-cloak>
+        <span x-text="error"></span>
+      </div>
+      <div class="modal-action">
+        <button type="button" class="btn" @click="$refs.deleteModal.close()">Cancel</button>
+        <button type="button" class="btn btn-error" :disabled="deleting" @click="deleteEvent">
+          <span x-show="!deleting">Delete</span>
+          <span x-show="deleting" x-cloak>Deleting...</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+</div>
+{% endblock %}
