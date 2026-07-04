@@ -55,6 +55,40 @@
   (`build_onboarding_steps` / `onboarding_complete`) with a unit test, plus dashboard page tests
   for the show / mixed / hidden states. `onboarding_notifications_done` stays unchecked until
   Slice 7 wires notifications — no blocker. Deferred e2e coverage filed as #91.
+
+- **Issue #55 implemented** — Slice 5.2 events dashboard filters, sort & search (branch
+  `feature/slice-5.2-events-filters`, isolated worktree). `GET /api/v1/events` gains `type`,
+  `date_from`/`date_to`, `q` (free-text over `description`/`raw_date_text`, case-insensitive), and
+  `sort` (`asc`/`desc`, default unchanged) query params, all composing with each other and with
+  pagination (`app.api.v1.events.list_user_events`); a new `list_user_event_types` backs the type
+  dropdown with the user's full distinct type list, unaffected by the currently-applied filters.
+  The dashboard's filter bar (type dropdown, two date pickers, search box, sort toggle) is
+  HTMX-driven: the form and every pagination/sort link target `#dashboard-body` and
+  `app.pages.dashboard` returns just that fragment (`partials/dashboard_body.html`) for
+  `HX-Request` requests, so narrowing the table never triggers a full page reload. The filter form
+  and events table were deliberately kept as **one** HTMX swap unit (not table-only) after manual
+  browser QA caught a real bug: the sort-toggle link and a hidden `sort` field live in the form, so
+  swapping only the table left them stale after a filter change, silently dropping the active sort
+  (or vice versa) on the next click. Manual QA also caught FastAPI rejecting `date_from=`/`date_to=`
+  (empty string, submitted by an untouched HTML date input) with a 422 before business logic ever
+  ran; both routes now take these as `str | None` and parse via `app.api.v1.events.parse_date_param`
+  (empty → `None`). Improvement pass: distinguishing "no events at all" from "no events match these
+  filters" in the empty state, and the `list_user_event_types` dropdown. A multi-agent code review
+  (correctness + cleanup + altitude/conventions angles) surfaced two further real bugs, both fixed
+  before merge: `parse_date_param` let a malformed (non-empty, non-ISO) date crash with an unhandled
+  500 instead of a clean 422, and the free-text search built its `ILIKE` pattern from the raw
+  user input, so a literal `%`/`_` in the search box acted as a SQL LIKE wildcard instead of a
+  literal character (both now escaped). Also applied: `_dashboard_url`'s four call sites
+  (prev/next/sort-toggle/redirect) bound their shared filter kwargs once via `functools.partial`
+  rather than repeating all four on every call, removing the risk of a future filter param being
+  added to three call sites and missed on the fourth. Three lower-priority suggestions from the
+  same review (shared query-param model between the two routes, further DB round-trip reduction,
+  minor filter-bar UX polish) were filed as issues #96/#97/#98 (`modelsuggested`, `slice5`) rather
+  than built now. `mypy --strict` and the full suite (286 tests) are green; manually verified live
+  against a seeded dashboard (type filter, date range, search, sort toggle, and pagination all
+  composing correctly, HTMX swaps confirmed via the network panel — no full-page navigation on any
+  filter/sort/page interaction).
+
 - **Issue #53 implemented** — Slice 4.2 live SSE pipeline progress page (branch
   `claude/admiring-carson-bzzfow`). A `/processing` progress page renders the 7 pipeline-step
   indicators and streams each step's status transition live via the HTMX SSE extension — no manual

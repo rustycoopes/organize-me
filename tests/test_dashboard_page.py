@@ -310,3 +310,182 @@ async def test_dashboard_delete_button_gated_behind_confirm_modal(
     assert 'class="modal"' in body
     assert "openConfirm(" in body
     assert "confirmDelete" in body
+
+
+# --- Filters, sort, search (Slice 5.2, #55) ---------------------------------------------------
+
+
+async def test_dashboard_renders_filter_controls_and_event_type_options(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="School", description="Trip",
+            resolved_date="2 Jan", resolved_date_earliest=date(2026, 1, 2),
+            raw_date_text="2 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert 'id="event-filters"' in body
+    assert 'name="type"' in body
+    assert 'name="date_from"' in body
+    assert 'name="date_to"' in body
+    assert 'name="q"' in body
+    assert '<option value="Medical"' in body
+    assert '<option value="School"' in body
+
+
+async def test_dashboard_filters_table_by_type(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist appointment",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="School", description="Parents evening",
+            resolved_date="2 Jan", resolved_date_earliest=date(2026, 1, 2),
+            raw_date_text="2 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard", params={"type": "School"})
+
+    body = response.text
+    assert "Parents evening" in body
+    assert "Dentist appointment" not in body
+
+
+async def test_dashboard_htmx_request_returns_the_dashboard_body_fragment(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist appointment",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard", headers={"HX-Request": "true"})
+
+    body = response.text
+    assert "Dentist appointment" in body
+    # The fragment includes the filter form (its sort toggle/hidden sort field must stay in sync
+    # with whatever filter/page was just requested) but excludes the surrounding page chrome.
+    assert 'id="event-filters"' in body
+    assert "<html" not in body
+    assert "Dashboard — OrganizeMe" not in body
+
+
+async def test_dashboard_shows_no_match_message_when_filters_exclude_everything(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard", params={"q": "no-such-event"})
+
+    body = response.text
+    assert "No events match these filters." in body
+    assert "No events yet" not in body
+
+
+async def test_dashboard_accepts_empty_date_filter_params(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """The filter form's date inputs submit "" (not an omitted param) when left untouched -
+    HTMX serializes the form as-is - so the route must treat that the same as no filter."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get(
+        "/dashboard", params={"date_from": "", "date_to": "", "type": "", "q": ""}
+    )
+
+    assert response.status_code == 200
+    assert "Dentist" in response.text
+
+
+async def test_dashboard_pagination_preserves_active_filters(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    for i in range(55):
+        db_session.add(
+            Event(
+                user_id=user_id, run_id=run.id, type="Medical",
+                description=f"Medical event {i}", resolved_date=f"Date {i}",
+                resolved_date_earliest=date(2026, 1, 1), raw_date_text="x", agreed_by=[],
+            )
+        )
+    await db_session.flush()
+
+    response = await client.get("/dashboard", params={"type": "Medical"})
+
+    body = response.text
+    assert "type=Medical&amp;page=2" in body or "type=Medical&page=2" in body
+
+
+async def test_dashboard_sort_toggle_link_preserves_active_type_filter(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Regression: the sort toggle link/hidden field live in the filter form, which must swap
+    together with the table on every HTMX request - otherwise a filter applied after a sort
+    toggle (or a sort toggle applied after a filter) would submit from a stale, unswapped form
+    and silently drop the other setting."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Dentist",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard", params={"type": "Medical"})
+
+    body = response.text
+    assert "type=Medical&amp;sort=asc" in body or "type=Medical&sort=asc" in body
