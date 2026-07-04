@@ -153,10 +153,18 @@ async def _drive_connect(
 
 
 async def test_auth_returns_google_consent_url_with_correct_params(client: AsyncClient) -> None:
+    from app.main import app
+
     await _register_login_with_config(client)
 
     # Uses the real GoogleOAuth2 client - get_authorization_url only builds a URL, never calls out.
-    response = await client.post("/api/v1/storage-config/google-drive/auth")
+    # The cipher factory is overridden with a throwaway key so this test doesn't depend on a
+    # configured ENCRYPTION_KEY (see the /auth fail-fast check added for issue #78).
+    app.dependency_overrides[get_cipher_factory] = lambda: (lambda: _CIPHER)
+    try:
+        response = await client.post("/api/v1/storage-config/google-drive/auth")
+    finally:
+        app.dependency_overrides.pop(get_cipher_factory, None)
 
     assert response.status_code == 200
     url = response.json()["authorization_url"]
@@ -190,6 +198,26 @@ async def test_auth_requires_a_saved_config_first(client: AsyncClient) -> None:
 async def test_auth_requires_authentication(client: AsyncClient) -> None:
     response = await client.post("/api/v1/storage-config/google-drive/auth")
     assert response.status_code == 401
+
+
+async def test_auth_fails_fast_when_encryption_key_missing(client: AsyncClient) -> None:
+    """Regression test for issue #78: a missing ENCRYPTION_KEY should be caught in /auth, before
+    sending the user through the whole Google consent flow."""
+    from app.main import app
+
+    await _register_login_with_config(client)
+
+    def _raise_missing_key() -> CredentialCipher:
+        raise RuntimeError("ENCRYPTION_KEY is not set")
+
+    app.dependency_overrides[get_cipher_factory] = lambda: _raise_missing_key
+    try:
+        response = await client.post("/api/v1/storage-config/google-drive/auth")
+    finally:
+        app.dependency_overrides.pop(get_cipher_factory, None)
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "storage_not_configured"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -304,6 +332,37 @@ async def test_callback_handles_token_exchange_failure(client: AsyncClient) -> N
 
     assert response.status_code == 302
     assert response.headers["location"] == "/settings?error=google_drive_auth_failed"
+
+
+async def test_callback_handles_missing_encryption_key(
+    client: AsyncClient, fake_drive_client: FakeDriveOAuth2
+) -> None:
+    """Regression test for issue #78: an unconfigured ENCRYPTION_KEY must redirect with a clear
+    banner, not bubble up as an unhandled 500."""
+    from app.main import app
+
+    await _register_login_with_config(client)
+    _override(fake_drive_client)
+
+    def _raise_missing_key() -> CredentialCipher:
+        raise RuntimeError("ENCRYPTION_KEY is not set")
+
+    try:
+        # /auth itself needs a working cipher (the fail-fast check added for #78), so start the
+        # flow before swapping in the raising override - only the callback should see it missing.
+        auth = await client.post("/api/v1/storage-config/google-drive/auth")
+        state = parse_qs(urlparse(auth.json()["authorization_url"]).query)["state"][0]
+        app.dependency_overrides[get_cipher_factory] = lambda: _raise_missing_key
+        response = await client.get(
+            "/api/v1/storage-config/google-drive/callback",
+            params={"code": "fake-code", "state": state},
+            follow_redirects=False,
+        )
+    finally:
+        _clear_overrides()
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/settings?error=storage_not_configured"
 
 
 async def test_callback_without_auth_cookie_redirects_to_login(client: AsyncClient) -> None:

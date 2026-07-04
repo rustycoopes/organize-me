@@ -104,6 +104,7 @@ async def google_drive_authorize(
     user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_db),
     oauth_client: GoogleOAuth2 = Depends(get_google_oauth_client),
+    cipher_factory: Callable[[], CredentialCipher] = Depends(get_cipher_factory),
 ) -> dict[str, str]:
     """Start the Drive OAuth flow: return Google's consent URL (the tab navigates to it) and set
     the CSRF cookie. Requires a saved storage config first, since the tokens attach to that row."""
@@ -111,6 +112,16 @@ async def google_drive_authorize(
     if config is None:
         # No row to hang the tokens on yet - the tab surfaces this as "save a folder path first".
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="save_folder_first")
+
+    # Fail fast if ENCRYPTION_KEY isn't configured (issue #78), rather than sending the user
+    # through the whole Google consent flow only to hit the same error in the callback.
+    try:
+        cipher_factory()
+    except RuntimeError as exc:
+        logger.exception("Cannot start Google Drive connect: credential cipher unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="storage_not_configured"
+        ) from exc
 
     settings = get_settings()
     csrf_token = secrets.token_urlsafe(32)
@@ -200,8 +211,13 @@ async def google_drive_callback(
         return failure_redirect()
 
     # Construct the cipher only now that everything has validated - this is the first point that
-    # actually needs ENCRYPTION_KEY.
-    cipher = cipher_factory()
+    # actually needs ENCRYPTION_KEY. A misconfigured deployment (issue #78: ENCRYPTION_KEY unset)
+    # must not surface as an unhandled 500 - redirect to Settings with a clear banner instead.
+    try:
+        cipher = cipher_factory()
+    except RuntimeError:
+        logger.exception("Cannot construct credential cipher for Google Drive callback")
+        return failure_redirect("storage_not_configured")
     config.oauth_access_token = cipher.encrypt(token["access_token"])
     refresh_token = token.get("refresh_token")
     if refresh_token:
