@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+### Added
+- **Issue #86 implemented** — Slice 7.1 Branded email notifications (branch `feature/slice-7.1-email-notifications`). Real `NotificationSender` implementation sends branded HTML emails on processing-run completion (success, zero-event, failure). New `RealNotificationSender` in `app/services/notifications/sender.py` fetches the user's email and notification preference, renders Jinja2 templates with inline CSS, and respects the `user.notification_email` flag. Two email templates: `success.html.j2` (event summary table + dashboard link) and `failure.html.j2` (error details + log page link). Updated `get_pipeline_notifier()` factory to return the real sender instead of the logging stub. New configuration: `BASE_URL` (defaults to `https://organize-me.app`, overrideable for local dev). Comprehensive test coverage: 7 new tests verify success, zero-event, failure emails, the off-flag behavior, and link correctness. Template environment cached at class level for performance.
+
+- **Issue #84 implemented** — Slice 6.2 Run detail page with logs (branch `feature/slice-6.2-run-detail`, PR #107). New endpoints: `GET /api/v1/processing-runs/{id}` (run detail with steps), `GET /api/v1/processing-runs/{id}/logs` (paginated logs JSON), `GET /api/html/processing-runs/{id}/logs` (HTMX HTML partial). New page `/processing-runs/{id}` displays run metadata, 7 pipeline steps with status indicators, and expandable per-step logs (searchable, paginated via HTMX, 50 lines per page). Reuses step status rendering and progress service from `/processing` page. User scoping matches other resources (404 for non-owners). Comprehensive test coverage: 14 new tests, all 39 processing tests pass.
+
 ### Changed
 - **Issue #31** — Extracted a shared `card_page` Jinja macro (`app/templates/macros/ui.html`) that
   renders the centred DaisyUI card shell (centering wrapper + `card`/`card-body`/`card-title` +
