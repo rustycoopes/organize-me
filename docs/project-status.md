@@ -60,14 +60,19 @@ Also filed #128 (`modelsuggested`): both Settings tabs hand-roll the same card/t
 of the shared `card_page` macro — a structural cleanup deferred to avoid scope creep into the
 already-shipped Storage tab. New Playwright `e2e/tests/notifications.spec.ts` covers the
 disabled→enabled SMS toggle transition (set phone in Profile, return to Settings) and an
-email-toggle save/reload round-trip. 20+ new/updated backend tests (schema, API incl. onboarding-
-flag idempotency and the new toggle-requires-contact-info validation, page render/disabled-state/
-round-trip); full suite + `mypy --strict` green. A code-review pass then caught and fixed four
-real issues: a stale onboarding-checklist link (`/profile` → `/settings`), a missing server-side
-guard letting a direct API call enable a channel with no contact info on file, a redundant second
-DB commit for the onboarding flag (folded into the existing one), and a tab-bar accessibility
-regression (static `aria-selected`/`tab-active` restored for pre-hydration clients). With #88,
-Slice 7 has only #128 (tab/card-shell refactor) outstanding as a `modelsuggested` follow-up.
+email-toggle save/reload round-trip. 17 new/updated backend tests (schema, API incl. onboarding-
+flag idempotency, page render/disabled-state/round-trip); full suite + `mypy --strict` green.
+A code-review pass caught and fixed three real issues: a stale onboarding-checklist link
+(`/profile` → `/settings`), a redundant second DB commit for the onboarding flag (folded into the
+existing one), and a tab-bar accessibility regression (static `aria-selected`/`tab-active`
+restored for pre-hydration clients). A fourth candidate fix from that pass - rejecting a channel
+toggle turned on with no matching contact info - was tried and reverted after breaking `e2e-qa`:
+it contradicted Slice 7.2's already-shipped design (silent-skip on a missing phone number, not an
+error; `notification_sms` defaults `True` regardless of phone). Also fixed two Playwright locator
+collisions in `storage.spec.ts`/`notifications.spec.ts` - both Settings tab panels stay in the DOM
+(only `x-show`-hidden), so an unscoped `form button[type="submit"]` matched two buttons; scoped to
+new `#storage-tab-panel`/`#notifications-tab-panel` ids. With #88, Slice 7 has only #128
+(tab/card-shell refactor) outstanding as a `modelsuggested` follow-up.
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set

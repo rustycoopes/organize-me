@@ -27,16 +27,21 @@
   both Settings tabs hand-roll card/tab markup instead of the shared `card_page` macro, deferred
   to avoid scope creep into the already-shipped Storage tab. 20+ new/updated backend tests; full
   suite + `mypy --strict` clean.
-  A code-review pass then caught and fixed four real issues: the onboarding checklist's
+  A code-review pass then caught and fixed three real issues: the onboarding checklist's
   "Set Notification Preferences" step still linked to `/profile` (no notification UI there) instead
-  of `/settings`; toggles could be enabled via a direct `PATCH /api/v1/users/me` call with no
-  matching contact info on file, bypassing the UI's disabled-checkbox gating (server now rejects
-  turning a channel on without an email/phone, in the same request or already on file); the
-  onboarding-flag write did a second `db.commit()`/`refresh()` after `user_manager.update()` had
-  already committed (folded into the same transaction by setting the flag on `user` before that
-  call); and the tab bar's active/`aria-selected` state existed only in Alpine bindings, so a
-  screen reader or pre-hydration fetch saw neither tab marked active (restored static
-  `tab-active`/`aria-selected="true"` on Storage matching Alpine's initial state).
+  of `/settings`; the onboarding-flag write did a second `db.commit()`/`refresh()` after
+  `user_manager.update()` had already committed (folded into the same transaction by setting the
+  flag on `user` before that call); and the tab bar's active/`aria-selected` state existed only in
+  Alpine bindings, so a screen reader or pre-hydration fetch saw neither tab marked active
+  (restored static `tab-active`/`aria-selected="true"` on Storage matching Alpine's initial state).
+  A fourth candidate fix - rejecting a channel toggle turned on with no matching contact info on
+  file - was tried and reverted: it contradicted Slice 7.2's already-shipped design, where
+  `RealNotificationSender` silently skips an SMS send with no phone number rather than treating it
+  as an error, and `notification_sms` defaults `True` for every user regardless of whether a phone
+  number is on file. The reverted validation broke `e2e-qa` (a user saving the email toggle alone
+  still resends the default-`True` `notification_sms`, which would have 422'd with no phone set) -
+  caught by the deployed Playwright suite, not by local pytest, since the local suite's fixtures
+  happened to always set a phone number first.
 
 - **Issue #87 implemented** — Slice 7.2 SMS notifications via Twilio (branch `feature/slice-7.2-sms-notifications`). New `app/services/notifications/sms.py`: `SmsSender` Protocol, real `TwilioSmsSender`, `FakeSmsSender` test double — mirrors the `EmailSender` pattern. `RealNotificationSender` now sends SMS alongside email, independently gated on `user.notification_sms` and a non-empty `user.phone_number` (silently skipped, info-logged, if the toggle is on but no phone number is on file — never raises or blocks the run). Success SMS: event count + dashboard link. Failure SMS: error summary + log page link. New config: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (empty defaults). New `twilio` dependency + mypy override (no bundled type stubs). Proactively wired `TWILIO_*` secrets into `ci.yml`/`deploy.yml`. Improvement pass: `TwilioSmsSender` now raises a clear error if credentials are unset instead of a confusing SDK error, and caches its `twilio.rest.Client` at class level instead of rebuilding it (and its connection pool) on every send. 9 new tests; full suite (353+ tests) + `mypy --strict` green. Deferred (`modelsuggested`): E.164 phone-number validation on the Profile page (#120), generalizing email/SMS dispatch in `RealNotificationSender` (#124), concurrent email+SMS sends (#125).
 

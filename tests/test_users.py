@@ -207,7 +207,10 @@ async def test_patch_notification_field_on_second_save_keeps_flag_and_updates_to
     assert user.notification_sms is True
 
 
-async def test_patch_rejects_enabling_sms_without_a_phone_number(client: AsyncClient) -> None:
+async def test_patch_allows_enabling_sms_without_a_phone_number(client: AsyncClient) -> None:
+    # No server-side guard here by design (#87): RealNotificationSender silently skips the SMS
+    # send when the toggle is on but no phone number is on file, rather than treating it as an
+    # error - so the PATCH endpoint doesn't reject this combination either.
     email = unique_email()
     password = "correct-horse-battery"
     await client.post("/api/v1/auth/register", data={"email": email, "password": password})
@@ -215,51 +218,8 @@ async def test_patch_rejects_enabling_sms_without_a_phone_number(client: AsyncCl
 
     response = await client.patch("/api/v1/users/me", json={"notification_sms": True})
 
-    assert response.status_code == 422
-
-
-async def test_patch_allows_enabling_sms_when_phone_number_set_in_same_request(
-    client: AsyncClient,
-) -> None:
-    email = unique_email()
-    password = "correct-horse-battery"
-    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
-    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
-
-    response = await client.patch(
-        "/api/v1/users/me",
-        json={"phone_number": "+15551234567", "notification_sms": True},
-    )
-
     assert response.status_code == 200
     assert response.json()["notification_sms"] is True
-
-
-async def test_patch_allows_enabling_sms_when_phone_number_already_on_file(
-    client: AsyncClient,
-) -> None:
-    email = unique_email()
-    password = "correct-horse-battery"
-    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
-    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
-    await client.patch("/api/v1/users/me", json={"phone_number": "+15551234567"})
-
-    response = await client.patch("/api/v1/users/me", json={"notification_sms": True})
-
-    assert response.status_code == 200
-    assert response.json()["notification_sms"] is True
-
-
-async def test_patch_allows_disabling_sms_without_a_phone_number(client: AsyncClient) -> None:
-    email = unique_email()
-    password = "correct-horse-battery"
-    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
-    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
-
-    response = await client.patch("/api/v1/users/me", json={"notification_sms": False})
-
-    assert response.status_code == 200
-    assert response.json()["notification_sms"] is False
 
 
 async def test_patch_with_case_different_duplicate_email_returns_4xx(
