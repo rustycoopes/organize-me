@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Base URL for the app, used in notification emails (Slice 7).
     # Defaults to https://organize-me.app for production; override to http://localhost:3000 in dev.
     base_url: str = "https://organize-me.app"
+    # Twilio credentials for SMS notifications (Slice 7.2). Empty defaults (like
+    # RESEND_API_KEY/GEMINI_API_KEY) so deploys/CI that don't set them yet don't fail Settings
+    # construction - TwilioSmsSender raises a clear error if it's actually used while unset.
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
 
 
 @lru_cache

@@ -1,4 +1,4 @@
-"""Real implementation of NotificationSender for Slice 7 (email notifications)."""
+"""Real implementation of NotificationSender for Slice 7 (email + SMS notifications)."""
 
 import logging
 from pathlib import Path
@@ -11,22 +11,29 @@ from app.db.session import get_db
 from app.models.user import User
 from app.services.notifications.email import EmailSender, ResendEmailSender
 from app.services.notifications.pipeline import NotificationOutcome, PipelineNotification
+from app.services.notifications.sms import SmsSender, TwilioSmsSender
 
 logger = logging.getLogger(__name__)
 
 
 class RealNotificationSender:
-    """Sends branded HTML email notifications after processing runs.
+    """Sends branded HTML email + SMS notifications after processing runs.
 
     Implements the NotificationSender protocol to deliver success/zero-event/failure
-    notifications via email, respecting the user's notification_email preference.
-    Uses Jinja2 templates for rendering branded HTML emails with inline CSS.
+    notifications via email and SMS, respecting each user's notification_email /
+    notification_sms preferences independently. Uses Jinja2 templates for rendering
+    branded HTML emails with inline CSS.
     """
 
     _jinja_env: Environment | None = None
 
-    def __init__(self, email_sender: EmailSender | None = None) -> None:
+    def __init__(
+        self,
+        email_sender: EmailSender | None = None,
+        sms_sender: SmsSender | None = None,
+    ) -> None:
         self.email_sender = email_sender or ResendEmailSender()
+        self.sms_sender = sms_sender or TwilioSmsSender()
         # Lazy-initialize the Jinja2 environment once per class (cached)
         if RealNotificationSender._jinja_env is None:
             template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
@@ -37,10 +44,11 @@ class RealNotificationSender:
         self.jinja_env = RealNotificationSender._jinja_env
 
     async def send(self, notification: PipelineNotification) -> None:
-        """Send an email notification for a processing run.
+        """Send email + SMS notifications for a processing run.
 
-        Fetches the user's email and notification_email preference, renders the
-        appropriate template, and sends via email_sender if notifications are enabled.
+        Fetches the user's contact info and notification preferences, renders the
+        appropriate content, and sends via email_sender/sms_sender for each channel
+        the user has enabled.
         """
         # Get a database session to fetch the user
         async for session in get_db():
@@ -56,24 +64,44 @@ class RealNotificationSender:
             logger.warning("User not found for notification: %s", notification.user_id)
             return
 
-        # Respect user preference
-        if not user.notification_email:
+        if user.notification_email:
+            try:
+                if notification.outcome == NotificationOutcome.FAILED:
+                    await self._send_failure_email(user.email, notification)
+                else:
+                    # SUCCESS and NO_NEW_EVENTS both use the success template
+                    await self._send_success_email(user.email, notification)
+            except Exception:
+                logger.exception(
+                    "Failed to send notification email to user %s", notification.user_id
+                )
+        else:
             logger.debug(
                 "Skipping email notification: user %s has notification_email=False",
                 notification.user_id,
             )
-            return
 
-        # Render and send the appropriate template
-        try:
-            if notification.outcome == NotificationOutcome.FAILED:
-                await self._send_failure_email(user.email, notification)
+        if user.notification_sms:
+            if not user.phone_number:
+                logger.info(
+                    "Skipping SMS notification: user %s has notification_sms=True but no "
+                    "phone_number on file",
+                    notification.user_id,
+                )
             else:
-                # SUCCESS and NO_NEW_EVENTS both use the success template
-                await self._send_success_email(user.email, notification)
-        except Exception:
-            logger.exception(
-                "Failed to send notification email to user %s", notification.user_id
+                try:
+                    if notification.outcome == NotificationOutcome.FAILED:
+                        await self._send_failure_sms(user.phone_number, notification)
+                    else:
+                        await self._send_success_sms(user.phone_number, notification)
+                except Exception:
+                    logger.exception(
+                        "Failed to send notification SMS to user %s", notification.user_id
+                    )
+        else:
+            logger.debug(
+                "Skipping SMS notification: user %s has notification_sms=False",
+                notification.user_id,
             )
 
     async def _send_success_email(
@@ -119,3 +147,30 @@ class RealNotificationSender:
         logger.info(
             "Sent failure email to %s for run %s", to_email, notification.run_id
         )
+
+    async def _send_success_sms(
+        self, to_phone: str, notification: PipelineNotification
+    ) -> None:
+        """Render and send a success or zero-event notification SMS."""
+        settings = get_settings()
+        body = (
+            f"OrganizeMe: {notification.filename} processed, "
+            f"{notification.new_event_count} new event(s). "
+            f"{settings.base_url}/dashboard"
+        )
+
+        await self.sms_sender.send(to=to_phone, body=body)
+        logger.info("Sent success SMS to %s for run %s", to_phone, notification.run_id)
+
+    async def _send_failure_sms(
+        self, to_phone: str, notification: PipelineNotification
+    ) -> None:
+        """Render and send a failure notification SMS."""
+        settings = get_settings()
+        body = (
+            f"OrganizeMe: {notification.filename} processing failed - "
+            f"{notification.message} {settings.base_url}/runs/{notification.run_id}"
+        )
+
+        await self.sms_sender.send(to=to_phone, body=body)
+        logger.info("Sent failure SMS to %s for run %s", to_phone, notification.run_id)
