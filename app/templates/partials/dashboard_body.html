@@ -51,6 +51,16 @@
     />
   </div>
 
+  <div class="form-control">
+    <label class="label cursor-pointer gap-2" for="filter-show-reviewed">
+      <span class="label-text text-xs">Show reviewed</span>
+      <input
+        id="filter-show-reviewed" type="checkbox" name="show_reviewed" value="true"
+        class="checkbox checkbox-sm" {% if filters.show_reviewed %}checked{% endif %}
+      />
+    </label>
+  </div>
+
   <a
     href="{{ sort_toggle_url }}"
     hx-get="{{ sort_toggle_url }}"

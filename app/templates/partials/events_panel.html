@@ -5,7 +5,7 @@
   and stay in sync with the page that was just navigated to.
 #}
 {% if total %}
-<p class="text-sm opacity-70">{{ total }} event{{ "s" if total != 1 else "" }} total</p>
+<p id="events-total-count" class="text-sm opacity-70" data-total="{{ total }}">{{ total }} event{{ "s" if total != 1 else "" }} total</p>
 {% endif %}
 
 {% if events %}
@@ -37,6 +37,29 @@
         this.deleting = false;
       }
     },
+    async toggleReviewed(id, checked, checkbox) {
+      this.error = "";
+      try {
+        const response = await fetch("/api/v1/events/" + id, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviewed: checked }),
+        });
+        if (!response.ok) throw new Error("update failed");
+        // Re-render #dashboard-body from the server instead of patching the DOM by hand: with
+        // "Show reviewed" off (the default) a just-reviewed row must disappear, which also shifts
+        // the count, pagination, and (if this was the last visible row) the empty-state message -
+        // all of which the existing HTMX swap (used by every other filter/sort/page control on
+        // this page) already gets right in one place. AJAX, not a full page reload.
+        htmx.ajax("GET", window.location.pathname + window.location.search, {
+          target: "#dashboard-body",
+          swap: "innerHTML",
+        });
+      } catch (e) {
+        checkbox.checked = !checked;
+        this.error = "Could not update this event. Please try again.";
+      }
+    },
   }'
 >
   <div role="alert" class="alert alert-error mb-2" x-show="error" x-cloak>
@@ -53,6 +76,7 @@
         <th>Agreed by</th>
         <th>Calendar</th>
         <th>Tasks</th>
+        <th>Reviewed</th>
         <th></th>
       </tr>
     </thead>
@@ -81,6 +105,15 @@
           {% else %}
           <span class="opacity-50 text-sm">No date</span>
           {% endif %}
+        </td>
+        <td>
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm"
+            aria-label="Reviewed"
+            {% if event.reviewed %}checked{% endif %}
+            @change="toggleReviewed('{{ event.id }}', $event.target.checked, $event.target)"
+          />
         </td>
         <td>
           <button

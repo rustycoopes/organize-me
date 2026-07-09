@@ -467,6 +467,111 @@ async def test_dashboard_pagination_preserves_active_filters(
     assert "type=Medical&amp;page=2" in body or "type=Medical&page=2" in body
 
 
+# --- Reviewed flag + filter (#113) --------------------------------------------------------------
+
+
+async def test_dashboard_renders_reviewed_checkbox_per_row(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    event = Event(
+        user_id=user_id, run_id=run.id, type="Medical", description="Dentist",
+        resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+        raw_date_text="1 Jan", agreed_by=[],
+    )
+    db_session.add(event)
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert 'name="show_reviewed"' in body
+    assert f"toggleReviewed('{event.id}'" in body
+
+
+async def test_dashboard_hides_reviewed_events_by_default(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Reviewed event",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[], reviewed=True,
+        )
+    )
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Unreviewed event",
+            resolved_date="2 Jan", resolved_date_earliest=date(2026, 1, 2),
+            raw_date_text="2 Jan", agreed_by=[],
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert "Unreviewed event" in body
+    assert "Reviewed event" not in body
+
+
+async def test_dashboard_show_reviewed_filter_composes_with_type_filter(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Reviewed medical",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[], reviewed=True,
+        )
+    )
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="School", description="Reviewed school",
+            resolved_date="2 Jan", resolved_date_earliest=date(2026, 1, 2),
+            raw_date_text="2 Jan", agreed_by=[], reviewed=True,
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get(
+        "/dashboard", params={"type": "Medical", "show_reviewed": "true"}
+    )
+
+    body = response.text
+    assert "Reviewed medical" in body
+    assert "Reviewed school" not in body
+
+
+async def test_dashboard_shows_no_match_message_when_all_events_are_reviewed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Regression: a returning user whose events are all reviewed (and hidden by the default
+    show_reviewed=False) must see "No events match these filters", not the first-time-user "No
+    events yet" message - they aren't a new user, their events are just hidden."""
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        Event(
+            user_id=user_id, run_id=run.id, type="Medical", description="Old dentist visit",
+            resolved_date="1 Jan", resolved_date_earliest=date(2026, 1, 1),
+            raw_date_text="1 Jan", agreed_by=[], reviewed=True,
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    body = response.text
+    assert "No events match these filters." in body
+    assert "No events yet" not in body
+
+
 async def test_dashboard_sort_toggle_link_preserves_active_type_filter(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
