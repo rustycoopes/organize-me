@@ -24,6 +24,30 @@ async def update_current_user(
     user: User = Depends(current_active_user),
     user_manager: UserManager = Depends(get_user_manager),
 ) -> UserRead:
+    fields_set = update.model_fields_set
+    # A channel toggle can only be turned on if the matching contact info is (or is being, in this
+    # same request) on file - enforced here, not just via the Settings > Notifications tab's
+    # disabled checkbox, so a direct API call can't opt a user into a channel with no destination.
+    effective_phone = update.phone_number if "phone_number" in fields_set else user.phone_number
+    effective_email = update.email if "email" in fields_set else user.email
+    if "notification_sms" in fields_set and update.notification_sms and not effective_phone:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Cannot enable SMS notifications without a phone number on file.",
+        )
+    if "notification_email" in fields_set and update.notification_email and not effective_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Cannot enable email notifications without an email on file.",
+        )
+    # Saving notification prefs (issue #88) flips the onboarding flag the first time - and every
+    # time after, harmlessly, since there's no un-toggling this step once it's done. Set directly
+    # on `user` (not the object user_manager.update() returns) so it rides along in that call's own
+    # commit instead of triggering a second round-trip.
+    if not user.onboarding_notifications_done and (
+        fields_set & {"notification_email", "notification_sms"}
+    ):
+        user.onboarding_notifications_done = True
     try:
         # UserUpdate deliberately doesn't inherit schemas.BaseUserUpdate (see its docstring), so
         # it doesn't satisfy BaseUserManager.update()'s UU TypeVar bound under mypy - it still

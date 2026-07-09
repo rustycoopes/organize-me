@@ -10,6 +10,33 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #88 implemented** — Slice 7.3 Settings > Notifications tab (branch
+  `feature/slice-7.3-notifications-tab`). New Notifications tab on `/settings` alongside Storage
+  (Alpine `activeTab` state switches between them client-side, no reload), with independent
+  email/SMS toggles backed by the existing `PATCH /api/v1/users/me` — `UserRead`/`UserUpdate`
+  gained `notification_email`/`notification_sms` (same NOT-NULL/explicit-null-rejection pattern
+  as `dark_mode`). Email toggle disabled unless `user.email` is set; SMS toggle disabled unless
+  `user.phone_number` is set; either way, hint text plus a read-only display of the current
+  email/phone linking to `/profile`. Saving sets `onboarding_notifications_done = True` the first
+  time either toggle is part of a PATCH payload (idempotent thereafter). New Playwright
+  `e2e/tests/notifications.spec.ts` (SMS toggle disabled → enabled after setting a phone number in
+  Profile; email toggle save/reload round-trip). 19 new/updated backend tests; full suite +
+  `mypy --strict` clean. The "toggle off stops that channel sending" criterion is already covered
+  for email by Slice 7.1's existing test; the SMS equivalent is blocked on Slice 7.2 (#87) merging
+  to `main` (no SMS sender module here yet) — filed as `modelsuggested` issue #129. Also filed
+  #128 (`modelsuggested`): both Settings tabs hand-roll card/tab markup instead of the shared
+  `card_page` macro, deferred to avoid scope creep into the already-shipped Storage tab.
+  A code-review pass then caught and fixed four real issues: the onboarding checklist's
+  "Set Notification Preferences" step still linked to `/profile` (no notification UI there) instead
+  of `/settings`; toggles could be enabled via a direct `PATCH /api/v1/users/me` call with no
+  matching contact info on file, bypassing the UI's disabled-checkbox gating (server now rejects
+  turning a channel on without an email/phone, in the same request or already on file); the
+  onboarding-flag write did a second `db.commit()`/`refresh()` after `user_manager.update()` had
+  already committed (folded into the same transaction by setting the flag on `user` before that
+  call); and the tab bar's active/`aria-selected` state existed only in Alpine bindings, so a
+  screen reader or pre-hydration fetch saw neither tab marked active (restored static
+  `tab-active`/`aria-selected="true"` on Storage matching Alpine's initial state).
+
 - **Issue #111 implemented** — Redesigned `/logs` as an HTMX-driven spreadsheet grid (branch
   `feature/logs-grid-redesign`). `GET /api/v1/processing-runs` gains `status`/`date_from`/
   `date_to`/`sort_by`/`sort_dir` query params (`sort_by` one of `date`/`filename`/`status`), all

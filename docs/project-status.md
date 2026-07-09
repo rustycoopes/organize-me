@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #111 — logs page redesigned as a filterable/sortable grid)
+**Last updated:** 2026-07-09 (issue #88 — Settings > Notifications tab)
 
 ---
 
@@ -40,6 +40,27 @@ row is a full, keyboard-operable click target to `/processing-runs/{id}`. 27 tes
 keyboard accessibility for row navigation, `aria-sort`, and the FAILED-with-no-failed-step
 detail-summary fallback. Deferred ideas (human-friendly date formatting, free-text search, a
 step-breakdown alternative for Details) filed as `modelsuggested` issues rather than built now.
+**Issue #88 (Slice 7.3 — Settings > Notifications tab) implemented** on branch
+`feature/slice-7.3-notifications-tab`, in an isolated worktree. A new Notifications tab sits
+alongside Storage on `/settings` (Alpine-driven client-side tab switching within one card), with
+independent email/SMS toggles backed by the existing `PATCH /api/v1/users/me` (no new endpoint) —
+`UserRead`/`UserUpdate` gained `notification_email`/`notification_sms` (mirroring the
+`dark_mode` NOT-NULL/explicit-null-rejection pattern). Email toggle is disabled unless
+`user.email` is set (always true in practice today, kept per the acceptance criteria for
+defensiveness); SMS toggle is disabled unless `user.phone_number` is set, with hint text either
+way and a read-only display of the current email/phone linking to `/profile`. Saving flips
+`onboarding_notifications_done = True` the first time either toggle is included in a PATCH
+payload (idempotent on repeat saves). The "toggle off ⇒ channel doesn't send" criterion is
+already covered on the email side by Slice 7.1's existing disabled-user test; the SMS side is
+still blocked on Slice 7.2 (#87) merging to `main` (its sender module doesn't exist here yet) —
+filed as `modelsuggested` issue #129 rather than re-blocking this issue on someone else's branch.
+Also filed #128 (`modelsuggested`): both Settings tabs hand-roll the same card/tab markup instead
+of the shared `card_page` macro — a structural cleanup deferred to avoid scope creep into the
+already-shipped Storage tab. New Playwright `e2e/tests/notifications.spec.ts` covers the
+disabled→enabled SMS toggle transition (set phone in Profile, return to Settings) and an
+email-toggle save/reload round-trip. 19 new/updated backend tests (schema, API incl. onboarding-
+flag idempotency, page render/disabled-state/round-trip); full suite (394 tests) + `mypy --strict`
+green. With #88, Slice 7 has only the SMS-dependent follow-ups (#128/#129) outstanding.
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set
