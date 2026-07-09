@@ -20,12 +20,13 @@
   email/phone linking to `/profile`. Saving sets `onboarding_notifications_done = True` the first
   time either toggle is part of a PATCH payload (idempotent thereafter). New Playwright
   `e2e/tests/notifications.spec.ts` (SMS toggle disabled → enabled after setting a phone number in
-  Profile; email toggle save/reload round-trip). 19 new/updated backend tests; full suite +
-  `mypy --strict` clean. The "toggle off stops that channel sending" criterion is already covered
-  for email by Slice 7.1's existing test; the SMS equivalent is blocked on Slice 7.2 (#87) merging
-  to `main` (no SMS sender module here yet) — filed as `modelsuggested` issue #129. Also filed
-  #128 (`modelsuggested`): both Settings tabs hand-roll card/tab markup instead of the shared
-  `card_page` macro, deferred to avoid scope creep into the already-shipped Storage tab.
+  Profile; email toggle save/reload round-trip). The "toggle off stops that channel sending"
+  criterion is covered for both channels: email by Slice 7.1's existing test, and SMS by a new
+  test added here once Slice 7.2 (#87, merged to `main` the same day) landed the SMS sender —
+  closing the gap `modelsuggested` issue #129 had flagged. Also filed #128 (`modelsuggested`):
+  both Settings tabs hand-roll card/tab markup instead of the shared `card_page` macro, deferred
+  to avoid scope creep into the already-shipped Storage tab. 20+ new/updated backend tests; full
+  suite + `mypy --strict` clean.
   A code-review pass then caught and fixed four real issues: the onboarding checklist's
   "Set Notification Preferences" step still linked to `/profile` (no notification UI there) instead
   of `/settings`; toggles could be enabled via a direct `PATCH /api/v1/users/me` call with no
@@ -36,6 +37,8 @@
   call); and the tab bar's active/`aria-selected` state existed only in Alpine bindings, so a
   screen reader or pre-hydration fetch saw neither tab marked active (restored static
   `tab-active`/`aria-selected="true"` on Storage matching Alpine's initial state).
+
+- **Issue #87 implemented** — Slice 7.2 SMS notifications via Twilio (branch `feature/slice-7.2-sms-notifications`). New `app/services/notifications/sms.py`: `SmsSender` Protocol, real `TwilioSmsSender`, `FakeSmsSender` test double — mirrors the `EmailSender` pattern. `RealNotificationSender` now sends SMS alongside email, independently gated on `user.notification_sms` and a non-empty `user.phone_number` (silently skipped, info-logged, if the toggle is on but no phone number is on file — never raises or blocks the run). Success SMS: event count + dashboard link. Failure SMS: error summary + log page link. New config: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (empty defaults). New `twilio` dependency + mypy override (no bundled type stubs). Proactively wired `TWILIO_*` secrets into `ci.yml`/`deploy.yml`. Improvement pass: `TwilioSmsSender` now raises a clear error if credentials are unset instead of a confusing SDK error, and caches its `twilio.rest.Client` at class level instead of rebuilding it (and its connection pool) on every send. 9 new tests; full suite (353+ tests) + `mypy --strict` green. Deferred (`modelsuggested`): E.164 phone-number validation on the Profile page (#120), generalizing email/SMS dispatch in `RealNotificationSender` (#124), concurrent email+SMS sends (#125).
 
 - **Issue #111 implemented** — Redesigned `/logs` as an HTMX-driven spreadsheet grid (branch
   `feature/logs-grid-redesign`). `GET /api/v1/processing-runs` gains `status`/`date_from`/
