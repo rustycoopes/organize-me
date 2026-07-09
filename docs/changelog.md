@@ -120,6 +120,15 @@
 - **Issue #84 implemented** — Slice 6.2 Run detail page with logs (branch `feature/slice-6.2-run-detail`, PR #107). New endpoints: `GET /api/v1/processing-runs/{id}` (run detail with steps), `GET /api/v1/processing-runs/{id}/logs` (paginated logs JSON), `GET /api/html/processing-runs/{id}/logs` (HTMX HTML partial). New page `/processing-runs/{id}` displays run metadata, 7 pipeline steps with status indicators, and expandable per-step logs (searchable, paginated via HTMX, 50 lines per page). Reuses step status rendering and progress service from `/processing` page. User scoping matches other resources (404 for non-owners). Comprehensive test coverage: 14 new tests, all 39 processing tests pass.
 
 ### Changed
+- **Issue #100** — Dashboard "Agreed by" chips now show initials (e.g. "Russ Cooper" → "RC")
+  instead of the full name, with the full name available via a `title` tooltip. New pure helper
+  `app/core/initials.py::to_initials()` (first letter of first word + first letter of last word,
+  uppercased; single-word names fall back to first letter; empty input returns empty string),
+  registered as a Jinja filter (`app/core/templating.py`) and used in
+  `partials/events_panel.html`. Improvement pass: made the chip focusable (`tabindex="0"`) so the
+  tooltip is reachable via keyboard, not just mouse hover. Filed #137 (Intake) — `title` tooltips
+  don't appear on touch devices at all, needs a product decision on a touch-friendly pattern — and
+  #138 (Intake) — two people sharing initials render identical, undistinguishable chips.
 - **Issue #31** — Extracted a shared `card_page` Jinja macro (`app/templates/macros/ui.html`) that
   renders the centred DaisyUI card shell (centering wrapper + `card`/`card-body`/`card-title` +
   optional subtitle). All five auth/profile templates (`login`, `register`, `forgot_password`,

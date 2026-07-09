@@ -65,7 +65,7 @@
         <td>{{ event.raw_date_text }}</td>
         <td>
           {% for name in event.agreed_by %}
-          <span class="badge badge-ghost mr-1">{{ name }}</span>
+          <span class="badge badge-ghost mr-1" title="{{ name }}" tabindex="0">{{ name | to_initials }}</span>
           {% endfor %}
         </td>
         <td>

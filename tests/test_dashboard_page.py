@@ -87,11 +87,12 @@ async def test_dashboard_renders_event_row_with_all_columns(
     assert "Dentist appointment" in body
     assert "Saturday 6 June 2026" in body
     assert "Saturday" in body
-    assert "Russ Cooper" in body
-    assert "Christine Cooper" in body
     assert "calendar.google.com" in body
     assert "tasks.google.com" in body
     assert f"openConfirm('{event.id}')" in body
+    # Agreed-by chips show initials only, with the full name available via tooltip.
+    assert '<span class="badge badge-ghost mr-1" title="Russ Cooper" tabindex="0">RC</span>' in body
+    assert '<span class="badge badge-ghost mr-1" title="Christine Cooper" tabindex="0">CC</span>' in body
 
 
 async def test_dashboard_shows_no_date_placeholder_for_unresolved_events(
