@@ -3,6 +3,9 @@
 > Part of the OrganizeMe build plan. Shared context in
 > [`../implementation-plan.md`](../implementation-plan.md).
 
+**Status:** 7.1 (email, #86) and 7.2 (SMS, #87) implemented. 7.3 (Settings > Notifications tab,
+#88) next.
+
 **Delivers:** Users receive branded email and SMS after processing runs (success and failure).
 
 ## Includes
