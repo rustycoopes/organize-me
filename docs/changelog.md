@@ -10,6 +10,36 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #111 implemented** — Redesigned `/logs` as an HTMX-driven spreadsheet grid (branch
+  `feature/logs-grid-redesign`). `GET /api/v1/processing-runs` gains `status`/`date_from`/
+  `date_to`/`sort_by`/`sort_dir` query params (`sort_by` one of `date`/`filename`/`status`), all
+  composing with each other and with pagination — same filter-composition pattern as the
+  dashboard's events endpoint (#55). New `ProcessingRunRead.detail_summary` field: the first
+  error log line for a `failed` run (falling back to any captured log line, then a fixed
+  placeholder, if no step itself was marked failed) or an `"N log lines"` count otherwise,
+  computed by `build_run_detail_summaries()` from the page's already-fetched steps (avoids
+  per-row queries). The `/logs` page's filter form (Status dropdown + date-range pickers) and
+  three sortable column headers (Date/Filename/Status, with `aria-sort` + a ▲/▼ indicator) swap
+  `#logs-body` in place via `partials/logs_body.html`/`partials/logs_grid.html`, mirroring
+  `partials/dashboard_body.html`. Each row is a full click target (keyboard-operable via
+  `tabindex`/Enter, not just mouse) linking to `/processing-runs/{id}`. Pagination keeps the
+  original page's First/Last jump links alongside Previous/Next. 30 tests (filter/sort/pagination
+  composition, detail-summary fallback + deterministic-ordering cases, HTMX partial response);
+  `mypy --strict` clean. Improvement pass: keyboard accessibility for row-click navigation,
+  `aria-sort` on active sort headers, and the detail-summary fallback chain for a FAILED run with
+  no step-level FAILED status. A multi-agent `/code-review` pass then caught a real correctness
+  bug: the steps query backing `detail_summary` had no `ORDER BY step_number`, so for a run with
+  multiple FAILED steps the "first error line" shown wasn't guaranteed to be the chronologically
+  earliest one — fixed by ordering both the API endpoint's and the page's steps query, locked in
+  with a test using deliberately out-of-order inserts. Same review pass also restored the
+  First/Last pagination links (present in the original table, silently dropped by the initial
+  grid) and simplified `sort_url_for` to reuse the existing `url_for` partial. Two lower-priority
+  duplication findings (`parse_date_param` duplicated from `app/api/v1/events.py`; the
+  runs+steps+summary fetch duplicated between the JSON endpoint and the HTML page) deferred rather
+  than bundled into this PR. Deferred model-suggested ideas filed as `modelsuggested`-labelled
+  issues (human-friendly date formatting, free-text search on the grid, a step-breakdown
+  alternative for the details column).
+
 - **Issue #86 implemented** — Slice 7.1 Branded email notifications (branch `feature/slice-7.1-email-notifications`). Real `NotificationSender` implementation sends branded HTML emails on processing-run completion (success, zero-event, failure). New `RealNotificationSender` in `app/services/notifications/sender.py` fetches the user's email and notification preference, renders Jinja2 templates with inline CSS, and respects the `user.notification_email` flag. Two email templates: `success.html.j2` (event summary table + dashboard link) and `failure.html.j2` (error details + log page link). Updated `get_pipeline_notifier()` factory to return the real sender instead of the logging stub. New configuration: `BASE_URL` (defaults to `https://organize-me.app`, overrideable for local dev). Comprehensive test coverage: 7 new tests verify success, zero-event, failure emails, the off-flag behavior, and link correctness. Template environment cached at class level for performance.
 
 - **Issue #84 implemented** — Slice 6.2 Run detail page with logs (branch `feature/slice-6.2-run-detail`, PR #107). New endpoints: `GET /api/v1/processing-runs/{id}` (run detail with steps), `GET /api/v1/processing-runs/{id}/logs` (paginated logs JSON), `GET /api/html/processing-runs/{id}/logs` (HTMX HTML partial). New page `/processing-runs/{id}` displays run metadata, 7 pipeline steps with status indicators, and expandable per-step logs (searchable, paginated via HTMX, 50 lines per page). Reuses step status rendering and progress service from `/processing` page. User scoping matches other resources (404 for non-owners). Comprehensive test coverage: 14 new tests, all 39 processing tests pass.
