@@ -228,7 +228,7 @@ async def test_dashboard_shows_onboarding_checklist_for_a_new_user(
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
     assert (
-        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<a href="/settings" class="link link-primary">Set Notification Preferences'
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
     assert (
@@ -264,9 +264,9 @@ async def test_dashboard_onboarding_checklist_marks_done_steps_and_keeps_incompl
         '<span class="sr-only"> (done)</span></span>'
     ) in body
     # The one incomplete step still renders as a link to its page (checklist-specific anchor, so
-    # the sidebar nav's own /profile link can't be what satisfies this).
+    # the sidebar nav's own /settings link can't be what satisfies this).
     assert (
-        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<a href="/settings" class="link link-primary">Set Notification Preferences'
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
 
