@@ -87,6 +87,22 @@ class PipelineScheduler(Protocol):
         """Start the pipeline for a created run (in the background, not awaited to completion)."""
         ...
 
+    async def schedule_batch(
+        self,
+        *,
+        runs: list[tuple[uuid.UUID, RemoteFile]],
+        user_id: uuid.UUID,
+        storage: StorageProvider,
+        gemini: GeminiClient,
+        notifier: NotificationSender,
+        prompt_text: str,
+    ) -> None:
+        """Start a batch of runs, processed one after another (not concurrently) in a single
+        background task - used by the import-pending-files endpoint (#110), where files must be
+        processed sequentially rather than the fire-and-forget-per-file pattern ``schedule`` uses
+        for a single manual upload."""
+        ...
+
 
 class BackgroundPipelineScheduler:
     """Runs the pipeline as a detached asyncio task with its **own** DB session.
@@ -151,6 +167,70 @@ class BackgroundPipelineScheduler:
             logger.exception("pipeline background task failed for run %s", run_id)
         finally:
             # Release the provider's HTTP client (a fresh one is built per upload).
+            await storage.aclose()
+
+    async def schedule_batch(
+        self,
+        *,
+        runs: list[tuple[uuid.UUID, RemoteFile]],
+        user_id: uuid.UUID,
+        storage: StorageProvider,
+        gemini: GeminiClient,
+        notifier: NotificationSender,
+        prompt_text: str,
+    ) -> None:
+        asyncio.create_task(
+            self._run_batch(
+                runs=runs,
+                user_id=user_id,
+                storage=storage,
+                gemini=gemini,
+                notifier=notifier,
+                prompt_text=prompt_text,
+            )
+        )
+
+    async def _run_batch(
+        self,
+        *,
+        runs: list[tuple[uuid.UUID, RemoteFile]],
+        user_id: uuid.UUID,
+        storage: StorageProvider,
+        gemini: GeminiClient,
+        notifier: NotificationSender,
+        prompt_text: str,
+    ) -> None:
+        """Runs each file's pipeline in turn, awaiting one before starting the next - per #110's
+        resolved "sequential, not parallel" decision. One shared session for the whole batch (all
+        writes are sequential, so there's no concurrent-access risk); one file's unexpected failure
+        doesn't stop the rest of the batch."""
+        session_maker = async_sessionmaker(get_engine(), expire_on_commit=False)
+        try:
+            async with session_maker() as session:
+                for run_id, remote_file in runs:
+                    run = await session.get(ProcessingRun, run_id)
+                    if run is None:  # pragma: no cover - the row was just committed
+                        logger.error("pipeline scheduler: run %s vanished", run_id)
+                        continue
+                    try:
+                        await run_pipeline(
+                            session,
+                            run=run,
+                            user_id=user_id,
+                            remote_file=remote_file,
+                            storage=storage,
+                            gemini=gemini,
+                            notifier=notifier,
+                            prompt_text=prompt_text,
+                        )
+                    except Exception:  # pragma: no cover - one file must not sink the whole batch
+                        logger.exception("pipeline background task failed for run %s", run_id)
+                        # An unhandled failure mid-pipeline can leave the shared session's
+                        # transaction unusable (SQLAlchemy raises on any further use of a session
+                        # after a failed flush/commit) - roll back so the next file in the batch
+                        # gets a clean session instead of silently failing too.
+                        await session.rollback()
+        finally:
             await storage.aclose()
 
 

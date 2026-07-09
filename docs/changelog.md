@@ -10,6 +10,33 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #110 implemented** — Import pending files button (branch
+  `feature/slice-7-import-pending-files`). New `POST /api/v1/import-pending-files` scans the
+  connected storage watch folder via `StorageProvider.list_new_files()`, creates one
+  `processing_runs` row per pending file, and processes them **sequentially** in a single
+  background task (new `PipelineScheduler.schedule_batch()`, resolved via a clarifying question
+  before building — differs from the manual upload path's fire-and-forget-per-file `schedule()`).
+  Returns the first file's `run_id`; the client follows it to `/processing` like a manual upload,
+  with the rest of the batch visible afterward via `/logs`. New shared `is_drive_connected()`
+  helper (`app/api/v1/storage_config.py`) and `partials/import_pending_button.html` back the
+  button on both `/upload` and `/dashboard` without duplicating the Alpine fetch/redirect logic.
+  New Playwright `e2e/tests/import-pending-files.spec.ts` covers what's deterministic under
+  `E2E_TEST_MODE` (button enabled, "no pending files" on click); genuinely populating pending
+  files needs a real connected Drive account, out of e2e scope per the standing #23 decision.
+  Improvement pass: importing now also flips `onboarding_first_upload_done`, matching manual
+  upload. A code-review pass then caught and fixed three real issues confirmed independently by
+  multiple review angles: `_run_batch` never rolled back its shared session after an unhandled
+  per-file failure, which would silently poison every remaining file in the batch; `get_import_storage`
+  duplicated the "is Drive connected" check instead of reusing the `is_drive_connected()` helper
+  this same diff introduced; and a dead `db.refresh()` loop issued one wasted SELECT per pending
+  file despite `expire_on_commit=False` making it a no-op. Also fixed a minor storage-client leak
+  on the no-pending-files path and updated README.md. Two lower-priority findings deferred as
+  `modelsuggested`: auto-advancing `/processing` across a whole batch instead of only the first
+  file (#132), and guarding against a double-click/multi-tab race enqueuing duplicate batches —
+  same class of gap the existing single-file upload endpoint already has, backstopped by the
+  `events` table's dedup constraint (#133). 9 new/updated backend tests; full suite +
+  `mypy --strict` green.
+
 - **Issue #115 verified** — onboarding checklist hide-on-completion (branch
   `feature/slice-5.3-onboarding-hide-verify`). No code changes were needed: the mechanism
   (`onboarding_complete()` + the dashboard's conditional render) was already correct, and #88's

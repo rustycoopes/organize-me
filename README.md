@@ -48,6 +48,13 @@ Anyone who coordinates logistics, agreements, or commitments over chat — co-pa
 - Upload a `.txt`, `.zip`, or `.csv` file directly from the app
 - Goes through the identical processing pipeline as auto-detected files
 
+### Import Pending Files
+- "Import pending files" button on the Upload and Dashboard pages scans your connected storage's
+  watch folder for files not yet processed
+- Processes them one after another through the same 7-step pipeline as a manual upload
+- Follows the first file's progress to the live `/processing` page; the rest of the batch finishes
+  in the background and shows up afterward in the processing history (`/logs`)
+
 ### Processing Pipeline
 - 7 visible steps: File Received → Extract → Filter by Date → Call Gemini LLM → Parse Response → Deduplicate & Save → Notify
 - Real-time step progress with success/failure state per step — a live progress page (`/processing`)
