@@ -6,9 +6,13 @@ from datetime import date
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.upload import get_pipeline_scheduler, get_upload_storage
+from app.main import app
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.user import User
+from app.services.storage.fake import FakeStorageProvider
+from tests.test_storage_google_drive import FakeDriveOAuth2, _drive_connect
 
 
 def unique_email() -> str:
@@ -276,6 +280,48 @@ async def test_dashboard_hides_onboarding_checklist_once_all_steps_done(
 ) -> None:
     user_id = await _register_and_login(client)
     await _complete_onboarding(db_session, user_id)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'id="onboarding-checklist"' not in response.text
+    assert "Getting Started" not in response.text
+
+
+async def test_dashboard_hides_onboarding_checklist_after_completing_flow_through_real_endpoints(
+    client: AsyncClient,
+) -> None:
+    """Regression test for #115: walks all three onboarding steps through their actual API
+    endpoints (Drive OAuth connect, notification-prefs PATCH, file upload) rather than flipping
+    the User flags directly, so a regression in any endpoint's flag-setting logic - not just in
+    the dashboard's read of those flags - would be caught here."""
+    await _register_and_login(client)
+
+    # Step 1: Connect Storage, via the real Google Drive OAuth connect flow.
+    await client.put(
+        "/api/v1/storage-config", json={"provider": "google_drive", "folder_path": "/OrganizeMe"}
+    )
+    await _drive_connect(client, FakeDriveOAuth2())
+
+    # Step 2: Set Notification Preferences, via the real profile PATCH endpoint.
+    await client.patch("/api/v1/users/me", json={"notification_email": True})
+
+    # Step 3: Upload First File, via the real upload endpoint (storage/scheduler faked).
+    app.dependency_overrides[get_upload_storage] = lambda: FakeStorageProvider()
+
+    class _RecordingScheduler:
+        async def schedule(self, **kwargs: object) -> None:
+            pass
+
+    app.dependency_overrides[get_pipeline_scheduler] = lambda: _RecordingScheduler()
+    try:
+        await client.post(
+            "/api/v1/upload",
+            files={"file": ("chat.txt", b"5/30/26, 10:00 - Russ: hi", "text/plain")},
+        )
+    finally:
+        app.dependency_overrides.pop(get_upload_storage, None)
+        app.dependency_overrides.pop(get_pipeline_scheduler, None)
 
     response = await client.get("/dashboard")
 

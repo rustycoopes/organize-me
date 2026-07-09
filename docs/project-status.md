@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #88 — Settings > Notifications tab)
+**Last updated:** 2026-07-09 (issue #115 — verify onboarding checklist hides on completion)
 
 ---
 
@@ -73,6 +73,28 @@ collisions in `storage.spec.ts`/`notifications.spec.ts` - both Settings tab pane
 (only `x-show`-hidden), so an unscoped `form button[type="submit"]` matched two buttons; scoped to
 new `#storage-tab-panel`/`#notifications-tab-panel` ids. With #88, Slice 7 has only #128
 (tab/card-shell refactor) outstanding as a `modelsuggested` follow-up.
+
+**Issue #115 (verify onboarding checklist hides once all steps complete) verified.** #115 was a
+verification task blocked on #88 (Notifications tab) — now shipped — which was the only piece
+missing to flip `onboarding_notifications_done` outside a test. Traced the mechanism end to end:
+`app/core/onboarding.py::onboarding_complete()` (all three `onboarding_*_done` booleans true) and
+the dashboard template's `{% if not onboarding_complete %}` were already correct, and #88's own
+review pass had already fixed the stale `/profile` link on the notifications step — so there was
+no code to fix, only verification to add. Existing coverage (`test_onboarding_checklist.py`'s
+`onboarding_complete()` unit tests, `test_dashboard_page.py`'s show/mixed/hidden page tests) already
+exercised the flag logic directly, but by *setting the User booleans on the DB row*, not by driving
+the endpoints that are supposed to set them — so a regression in, say, the upload endpoint's
+onboarding-flip logic wouldn't have been caught by the "hides" test. Added
+`test_dashboard_hides_onboarding_checklist_after_completing_flow_through_real_endpoints` to
+`tests/test_dashboard_page.py`: walks a fresh user through all three real endpoints (Google Drive
+OAuth connect via the existing fake-client pattern from `test_storage_google_drive.py`, the
+notification-prefs `PATCH /api/v1/users/me`, and `POST /api/v1/upload` with a faked storage
+provider/scheduler) and asserts the checklist is gone from the next `/dashboard` load. A true
+Playwright e2e version of the full flow remains out of scope, per the standing #23 decision to keep
+real Google OAuth out of the e2e suite (also noted in #91, the already-tracked and still-open
+`modelsuggested` issue for onboarding e2e coverage) — the new pytest integration test is the
+strongest regression coverage achievable without relitigating that decision. No code changes; full
+suite + `mypy --strict` green.
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set

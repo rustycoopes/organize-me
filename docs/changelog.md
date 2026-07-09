@@ -10,6 +10,17 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #115 verified** — onboarding checklist hide-on-completion (branch
+  `feature/slice-5.3-onboarding-hide-verify`). No code changes were needed: the mechanism
+  (`onboarding_complete()` + the dashboard's conditional render) was already correct, and #88's
+  review pass had already fixed the one real bug (stale `/profile` link) blocking this from working.
+  Added a regression test that drives all three onboarding steps through their real endpoints
+  (Drive OAuth connect, notification-prefs PATCH, file upload) rather than setting the User flags
+  directly, so a regression in any endpoint's flag-flipping logic would be caught, not just in the
+  dashboard's read of those flags. Full Playwright e2e coverage of the flow stays out of scope per
+  the standing #23 decision to keep real Google OAuth out of e2e (tracked separately in the
+  already-open #91).
+
 - **Issue #88 implemented** — Slice 7.3 Settings > Notifications tab (branch
   `feature/slice-7.3-notifications-tab`). New Notifications tab on `/settings` alongside Storage
   (Alpine `activeTab` state switches between them client-side, no reload), with independent
