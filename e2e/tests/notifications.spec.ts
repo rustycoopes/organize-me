@@ -25,7 +25,7 @@ test.describe('Settings > Notifications', () => {
     await expect(page.locator('#notification_sms')).toBeEnabled();
 
     await page.locator('#notification_sms').uncheck();
-    await page.locator('form button[type="submit"]').click();
+    await page.locator('#notifications-tab-panel form button[type="submit"]').click();
     await expect(page.getByText('Notification preferences saved.')).toBeVisible();
 
     // Reload from the server to prove the toggle was persisted, not just held client-side.
@@ -42,7 +42,7 @@ test.describe('Settings > Notifications', () => {
     // Both channels default on; toggling email off and saving persists across a reload.
     await expect(page.locator('#notification_email')).toBeChecked();
     await page.locator('#notification_email').uncheck();
-    await page.locator('form button[type="submit"]').click();
+    await page.locator('#notifications-tab-panel form button[type="submit"]').click();
     await expect(page.getByText('Notification preferences saved.')).toBeVisible();
 
     await page.reload();

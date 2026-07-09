@@ -39,6 +39,7 @@
         (the register.html bug from #23). storage_data seeds provider + folder_path from the server.
       #}
       <div
+        id="storage-tab-panel"
         class="mt-4"
         x-show="activeTab === 'storage'"
         x-data='{
@@ -243,6 +244,7 @@
       {# Notifications tab (issue #88): independent SMS/email toggles, each disabled until the
          matching contact info is on file in /profile. notifications_data seeds current state. #}
       <div
+        id="notifications-tab-panel"
         class="mt-4"
         x-show="activeTab === 'notifications'"
         x-cloak
