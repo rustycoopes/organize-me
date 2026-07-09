@@ -1,12 +1,14 @@
-"""Tests for the Processing History logs page and API endpoint (Slice 6.1, #83)."""
+"""Tests for the Processing History logs page and API endpoint (Slice 6.1, #83; redesigned as a
+filterable, sortable grid in #111)."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.processing_step import ProcessingStep, ProcessingStepStatus
 
 
 def unique_email() -> str:
@@ -28,17 +30,37 @@ async def _make_run(
     filename: str = "chat.txt",
     status: ProcessingRunStatus = ProcessingRunStatus.SUCCESS,
     events_count: int = 0,
+    created_at: datetime | None = None,
 ) -> ProcessingRun:
     run = ProcessingRun(
         user_id=user_id,
         filename=filename,
         status=status,
         events_extracted_count=events_count,
-        created_at=datetime.now(timezone.utc),
+        created_at=created_at or datetime.now(timezone.utc),
     )
     db.add(run)
     await db.flush()
     return run
+
+
+async def _make_step(
+    db: AsyncSession,
+    run_id: uuid.UUID,
+    step_number: int = 1,
+    status: ProcessingStepStatus = ProcessingStepStatus.SUCCESS,
+    log_lines: list[str] | None = None,
+) -> ProcessingStep:
+    step = ProcessingStep(
+        run_id=run_id,
+        step_number=step_number,
+        step_name=f"step_{step_number}",
+        status=status,
+        log_lines=log_lines or [],
+    )
+    db.add(step)
+    await db.flush()
+    return step
 
 
 async def test_logs_redirects_anonymous_visitor_to_login(client: AsyncClient) -> None:
@@ -93,6 +115,10 @@ async def test_logs_paginates_across_multiple_pages(
     assert "Next" in first_page.text
     assert "Page 2 of 2" in second_page.text
     assert "Previous" in second_page.text
+    # First/Last jump links (carried over from the pre-grid table) let a user reach either end
+    # of a large result set without repeatedly clicking Next.
+    assert "Last" in first_page.text
+    assert "First" in second_page.text
 
 
 async def test_logs_shows_total_run_count(
@@ -224,3 +250,290 @@ async def test_logs_shows_run_status_badge_with_correct_color(
     assert "badge-success" in body
     assert "badge-error" in body
     assert "badge-warning" in body
+
+
+# --- Grid redesign (#111): status/date filters, column sort, expanded-details column ---
+
+
+async def test_api_processing_runs_filters_by_status(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, filename="ok.txt", status=ProcessingRunStatus.SUCCESS)
+    await _make_run(db_session, user_id, filename="bad.txt", status=ProcessingRunStatus.FAILED)
+
+    response = await client.get("/api/v1/processing-runs", params={"status": "failed"})
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["total"] == 1
+    assert body["runs"][0]["filename"] == "bad.txt"
+
+
+async def test_api_processing_runs_filters_by_date_range(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    today = datetime.now(timezone.utc)
+    await _make_run(db_session, user_id, filename="old.txt", created_at=today - timedelta(days=10))
+    await _make_run(db_session, user_id, filename="recent.txt", created_at=today)
+
+    response = await client.get(
+        "/api/v1/processing-runs",
+        params={"date_from": (today - timedelta(days=1)).date().isoformat()},
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["total"] == 1
+    assert body["runs"][0]["filename"] == "recent.txt"
+
+
+async def test_api_processing_runs_sorts_by_filename_ascending(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, filename="charlie.txt")
+    await _make_run(db_session, user_id, filename="alpha.txt")
+    await _make_run(db_session, user_id, filename="bravo.txt")
+
+    response = await client.get(
+        "/api/v1/processing-runs", params={"sort_by": "filename", "sort_dir": "asc"}
+    )
+
+    filenames = [r["filename"] for r in response.json()["runs"]]
+    assert filenames == ["alpha.txt", "bravo.txt", "charlie.txt"]
+
+
+async def test_api_processing_runs_sorts_by_status(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, filename="a.txt", status=ProcessingRunStatus.SUCCESS)
+    await _make_run(db_session, user_id, filename="b.txt", status=ProcessingRunStatus.FAILED)
+
+    asc_response = await client.get(
+        "/api/v1/processing-runs", params={"sort_by": "status", "sort_dir": "asc"}
+    )
+    desc_response = await client.get(
+        "/api/v1/processing-runs", params={"sort_by": "status", "sort_dir": "desc"}
+    )
+
+    # Postgres sorts a native enum column by its declared member order, not alphabetically, so
+    # just assert that reversing sort_dir reverses the order rather than hard-coding that order.
+    asc_statuses = [r["status"] for r in asc_response.json()["runs"]]
+    desc_statuses = [r["status"] for r in desc_response.json()["runs"]]
+    assert asc_statuses == list(reversed(desc_statuses))
+    assert asc_statuses != desc_statuses
+
+
+async def test_api_processing_runs_filters_and_sort_compose_with_pagination(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    for i in range(3):
+        await _make_run(
+            db_session, user_id, filename=f"ok_{i}.txt", status=ProcessingRunStatus.SUCCESS
+        )
+    await _make_run(db_session, user_id, filename="bad.txt", status=ProcessingRunStatus.FAILED)
+
+    response = await client.get(
+        "/api/v1/processing-runs",
+        params={"status": "success", "sort_by": "filename", "sort_dir": "asc", "page": 1},
+    )
+
+    body = response.json()
+    assert body["total"] == 3
+    assert [r["filename"] for r in body["runs"]] == ["ok_0.txt", "ok_1.txt", "ok_2.txt"]
+
+
+async def test_api_processing_runs_detail_summary_shows_first_error_for_failed_run(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id, status=ProcessingRunStatus.FAILED)
+    await _make_step(
+        db_session,
+        run.id,
+        step_number=1,
+        status=ProcessingStepStatus.SUCCESS,
+        log_lines=["started ok"],
+    )
+    await _make_step(
+        db_session,
+        run.id,
+        step_number=2,
+        status=ProcessingStepStatus.FAILED,
+        log_lines=["boom: could not parse file"],
+    )
+
+    response = await client.get("/api/v1/processing-runs")
+
+    body = response.json()
+    assert body["runs"][0]["detail_summary"] == "boom: could not parse file"
+
+
+async def test_api_processing_runs_detail_summary_picks_earliest_failed_step_deterministically(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    # With two FAILED steps, the "first error" must be the earliest by step_number regardless of
+    # DB row-return order - the steps query must ORDER BY step_number, not rely on incidental
+    # physical/insertion order (a run's steps are created in step_number order today, but nothing
+    # guarantees Postgres returns them that way without an explicit ORDER BY).
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id, status=ProcessingRunStatus.FAILED)
+    # Insert step 5 before step 2 so insertion order and step_number order disagree.
+    await _make_step(
+        db_session,
+        run.id,
+        step_number=5,
+        status=ProcessingStepStatus.FAILED,
+        log_lines=["later failure"],
+    )
+    await _make_step(
+        db_session,
+        run.id,
+        step_number=2,
+        status=ProcessingStepStatus.FAILED,
+        log_lines=["earlier failure"],
+    )
+
+    response = await client.get("/api/v1/processing-runs")
+
+    body = response.json()
+    assert body["runs"][0]["detail_summary"] == "earlier failure"
+
+
+async def test_api_processing_runs_detail_summary_falls_back_when_no_step_marked_failed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    # A run can be FAILED without any of its steps being marked failed (e.g. the pipeline raised
+    # before updating a step's status) - the column must still surface something useful.
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id, status=ProcessingRunStatus.FAILED)
+    await _make_step(
+        db_session,
+        run.id,
+        step_number=1,
+        status=ProcessingStepStatus.SUCCESS,
+        log_lines=["last line before the crash"],
+    )
+
+    response = await client.get("/api/v1/processing-runs")
+
+    body = response.json()
+    assert body["runs"][0]["detail_summary"] == "last line before the crash"
+
+
+async def test_api_processing_runs_detail_summary_falls_back_to_placeholder_with_no_log_lines(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, status=ProcessingRunStatus.FAILED)
+
+    response = await client.get("/api/v1/processing-runs")
+
+    body = response.json()
+    assert body["runs"][0]["detail_summary"] == "No details available"
+
+
+async def test_api_processing_runs_detail_summary_shows_log_line_count_for_success(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id, status=ProcessingRunStatus.SUCCESS)
+    await _make_step(
+        db_session, run.id, step_number=1, log_lines=["line 1", "line 2", "line 3"]
+    )
+
+    response = await client.get("/api/v1/processing-runs")
+
+    body = response.json()
+    assert body["runs"][0]["detail_summary"] == "3 log lines"
+
+
+async def test_logs_page_status_filter_narrows_grid(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, filename="ok.txt", status=ProcessingRunStatus.SUCCESS)
+    await _make_run(db_session, user_id, filename="bad.txt", status=ProcessingRunStatus.FAILED)
+
+    response = await client.get("/logs", params={"status": "failed"})
+
+    body = response.text
+    assert "bad.txt" in body
+    assert "ok.txt" not in body
+
+
+async def test_logs_page_date_range_filter_narrows_grid(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    today = datetime.now(timezone.utc)
+    await _make_run(db_session, user_id, filename="old.txt", created_at=today - timedelta(days=10))
+    await _make_run(db_session, user_id, filename="recent.txt", created_at=today)
+
+    response = await client.get(
+        "/logs", params={"date_from": (today - timedelta(days=1)).date().isoformat()}
+    )
+
+    body = response.text
+    assert "recent.txt" in body
+    assert "old.txt" not in body
+
+
+async def test_logs_page_column_headers_are_sortable_links(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id)
+
+    response = await client.get("/logs")
+
+    body = response.text
+    assert "sort_by=filename" in body
+    assert "sort_by=status" in body
+
+
+async def test_logs_page_htmx_request_returns_partial_not_full_page(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, filename="chat.txt")
+
+    response = await client.get("/logs", headers={"HX-Request": "true"})
+
+    body = response.text
+    assert "chat.txt" in body
+    # The partial doesn't re-render the page shell (sidebar/nav), only the swap unit.
+    assert "<html" not in body.lower()
+
+
+async def test_logs_page_expanded_details_column_shows_first_error(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id, status=ProcessingRunStatus.FAILED)
+    await _make_step(
+        db_session,
+        run.id,
+        status=ProcessingStepStatus.FAILED,
+        log_lines=["parse error: unexpected token"],
+    )
+
+    response = await client.get("/logs")
+
+    assert "parse error: unexpected token" in response.text
+
+
+async def test_logs_page_out_of_range_page_redirect_preserves_filters(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    await _make_run(db_session, user_id, status=ProcessingRunStatus.SUCCESS)
+
+    response = await client.get("/logs", params={"status": "success", "page": 5})
+
+    assert response.status_code in (302, 303, 307)
+    assert response.headers["location"] == "/logs?status=success&page=1"

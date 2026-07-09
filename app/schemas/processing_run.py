@@ -15,6 +15,9 @@ class ProcessingRunRead(BaseModel):
     status: ProcessingRunStatus
     events_extracted_count: int
     created_at: datetime
+    # Logs-grid expanded-details column (#111): the first error line for a failed run, or a
+    # "N log lines" count otherwise. Computed from the run's steps, not stored.
+    detail_summary: str
 
 
 class ProcessingRunListRead(BaseModel):
