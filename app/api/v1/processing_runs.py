@@ -21,6 +21,7 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -34,10 +35,13 @@ from app.schemas.processing_run import (
     ProcessingLogLineRead,
     ProcessingRunDetailRead,
     ProcessingRunListRead,
+    ProcessingRunLogsDownloadRead,
     ProcessingRunRead,
+    ProcessingStepLogsRead,
     ProcessingStepRead,
 )
 from app.services.pipeline.progress import stream_run_progress
+from app.services.processing_logs import LOG_PAGE_SIZE, filter_log_lines, paginate_log_lines
 
 router = APIRouter(prefix="/api/v1", tags=["processing-runs"])
 
@@ -260,24 +264,53 @@ async def read_processing_run_logs(
     if step is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="step_not_found")
 
-    log_lines = step.log_lines or []
-    if search:
-        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        log_lines = [line for line in log_lines if escaped.lower() in line.lower()]
-
-    total = len(log_lines)
-    page_size = 50
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated = log_lines[start:end]
+    log_lines = filter_log_lines(step.log_lines or [], search)
+    paginated, total = paginate_log_lines(log_lines, page)
 
     return ProcessingLogLineRead(
         step_number=step.step_number,
         step_name=step.step_name,
         log_lines=paginated,
         page=page,
-        page_size=page_size,
+        page_size=LOG_PAGE_SIZE,
         total=total,
+    )
+
+
+@router.get("/processing-runs/{run_id}/logs/download")
+async def download_processing_run_logs(
+    run_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The run's full structured logs across all steps, as a downloadable JSON file (Slice 6.3, #85)."""
+    run = await db.get(ProcessingRun, run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run_not_found")
+
+    steps_result = await db.scalars(
+        select(ProcessingStep).where(ProcessingStep.run_id == run_id).order_by(ProcessingStep.step_number)
+    )
+    payload = ProcessingRunLogsDownloadRead(
+        run_id=run.id,
+        filename=run.filename,
+        steps=[
+            ProcessingStepLogsRead(
+                step_number=s.step_number,
+                step_name=s.step_name,
+                status=s.status,
+                log_lines=s.log_lines or [],
+            )
+            for s in steps_result.all()
+        ],
+    )
+
+    return Response(
+        content=payload.model_dump_json(),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="processing-run-{run.id}-logs.json"'
+        },
     )
 
 

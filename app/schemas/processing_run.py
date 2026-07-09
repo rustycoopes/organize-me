@@ -61,3 +61,20 @@ class ProcessingLogLineRead(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class ProcessingStepLogsRead(BaseModel):
+    """One step's full (unpaginated) log lines, for the run logs download (Slice 6.3, #85)."""
+
+    step_number: int
+    step_name: str
+    status: ProcessingStepStatus
+    log_lines: list[str]
+
+
+class ProcessingRunLogsDownloadRead(BaseModel):
+    """A run's full structured logs across all steps (Slice 6.3, #85)."""
+
+    run_id: uuid.UUID
+    filename: str
+    steps: list[ProcessingStepLogsRead]
