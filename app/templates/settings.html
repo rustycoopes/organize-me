@@ -5,12 +5,33 @@
 {% block page %}
 <div class="flex justify-center">
   <div class="card w-full max-w-lg bg-base-100 shadow-xl">
-    <div class="card-body">
+    <div class="card-body" x-data="{ activeTab: 'storage' }">
       <h1 class="card-title">Settings</h1>
 
-      {# Storage is the only tab in this slice; more land in later ones. #}
+      {# Storage | Notifications | Preferences per the implementation plan; Preferences lands in a
+         later slice. #}
       <div role="tablist" class="tabs tabs-bordered mt-2">
-        <a role="tab" class="tab tab-active" aria-selected="true">Storage</a>
+        {# Static "tab-active"/aria-selected="true" on Storage matches activeTab's initial value
+           above, so the tab bar is already correct in the raw server-rendered HTML - before
+           Alpine hydrates - for no-JS clients, screen readers, and plain HTTP fetches. Alpine's
+           :class/:aria-selected bindings take over from there for the actual click-to-switch
+           behaviour. #}
+        <a
+          role="tab"
+          class="tab tab-active"
+          :class="activeTab === 'storage' ? 'tab-active' : ''"
+          aria-selected="true"
+          :aria-selected="activeTab === 'storage'"
+          @click="activeTab = 'storage'"
+        >Storage</a>
+        <a
+          role="tab"
+          class="tab"
+          :class="activeTab === 'notifications' ? 'tab-active' : ''"
+          aria-selected="false"
+          :aria-selected="activeTab === 'notifications'"
+          @click="activeTab = 'notifications'"
+        >Notifications</a>
       </div>
 
       {#
@@ -18,7 +39,9 @@
         (the register.html bug from #23). storage_data seeds provider + folder_path from the server.
       #}
       <div
+        id="storage-tab-panel"
         class="mt-4"
+        x-show="activeTab === 'storage'"
         x-data='{
           ...{{ storage_data | tojson }},
           saving: false,
@@ -216,6 +239,108 @@
         <div class="mt-4" x-show="provider === 's3'" x-cloak>
           <p class="text-sm opacity-70">Amazon S3 support is coming soon.</p>
         </div>
+      </div>
+
+      {# Notifications tab (issue #88): independent SMS/email toggles, each disabled until the
+         matching contact info is on file in /profile. notifications_data seeds current state. #}
+      <div
+        id="notifications-tab-panel"
+        class="mt-4"
+        x-show="activeTab === 'notifications'"
+        x-cloak
+        x-data='{
+          ...{{ notifications_data | tojson }},
+          saving: false,
+          error: "",
+          success: false,
+          async save() {
+            this.saving = true;
+            this.error = "";
+            this.success = false;
+            try {
+              const response = await fetch("/api/v1/users/me", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  notification_email: this.notification_email,
+                  notification_sms: this.notification_sms,
+                }),
+              });
+              if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                this.error = data.detail || "Could not save changes. Please try again.";
+                return;
+              }
+              this.success = true;
+            } catch (e) {
+              this.error = "Could not save changes. Please try again.";
+            } finally {
+              this.saving = false;
+            }
+          },
+        }'
+      >
+        <div role="alert" class="alert alert-success mt-2" x-show="success" x-cloak>
+          <span>Notification preferences saved.</span>
+        </div>
+        <div role="alert" class="alert alert-error mt-2" x-show="error" x-cloak>
+          <span x-text="error"></span>
+        </div>
+
+        <form class="flex flex-col gap-4" @submit.prevent="save">
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text">Email</span>
+              <span class="label-text-alt">
+                {% if notifications_data.email %}{{ notifications_data.email }}{% else %}Not set{% endif %}
+                — <a href="/profile" class="link">edit in Profile</a>
+              </span>
+            </div>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3">
+            <input
+              type="checkbox"
+              id="notification_email"
+              x-model="notification_email"
+              {% if not notifications_data.email %}disabled{% endif %}
+              class="toggle toggle-primary"
+            />
+            <span class="label-text">Email notifications</span>
+          </label>
+          {% if not notifications_data.email %}
+          <p class="text-sm opacity-70 -mt-2">Set your email in Profile to enable.</p>
+          {% endif %}
+
+          <div class="divider my-0"></div>
+
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text">Phone number</span>
+              <span class="label-text-alt">
+                {% if notifications_data.phone_number %}{{ notifications_data.phone_number }}{% else %}Not set{% endif %}
+                — <a href="/profile" class="link">edit in Profile</a>
+              </span>
+            </div>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3">
+            <input
+              type="checkbox"
+              id="notification_sms"
+              x-model="notification_sms"
+              {% if not notifications_data.phone_number %}disabled{% endif %}
+              class="toggle toggle-primary"
+            />
+            <span class="label-text">SMS notifications</span>
+          </label>
+          {% if not notifications_data.phone_number %}
+          <p class="text-sm opacity-70 -mt-2">Set your phone number in Profile to enable.</p>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary mt-2" :disabled="saving">
+            <span x-show="!saving">Save changes</span>
+            <span x-show="saving" x-cloak>Saving...</span>
+          </button>
+        </form>
       </div>
     </div>
   </div>

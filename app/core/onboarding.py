@@ -23,13 +23,13 @@ def build_onboarding_steps(user: User) -> list[OnboardingStep]:
     """The three onboarding steps in their documented order, with each step's done state.
 
     Order (Connect Storage → Set Notification Preferences → Upload First File) and target pages
-    are fixed per issue #56. `onboarding_notifications_done` is flipped by Slice 7 (notifications,
-    not built yet), so that step simply stays incomplete until then — no blocker.
+    are fixed per issue #56. The notifications step links to /settings (the Notifications tab,
+    issue #88), not /profile — that's where `onboarding_notifications_done` actually gets flipped.
     """
     return [
         OnboardingStep("Connect Storage", "/settings", user.onboarding_storage_done),
         OnboardingStep(
-            "Set Notification Preferences", "/profile", user.onboarding_notifications_done
+            "Set Notification Preferences", "/settings", user.onboarding_notifications_done
         ),
         OnboardingStep("Upload First File", "/upload", user.onboarding_first_upload_done),
     ]

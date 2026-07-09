@@ -1,7 +1,8 @@
 """The authenticated Settings page (issue #46).
 
-Currently hosts a single **Storage** tab: pick a provider and set the watch-folder path, backed
-by `GET`/`PUT /api/v1/storage-config`. Served here (rather than as a generic placeholder in
+Hosts a **Storage** tab (pick a provider, set the watch-folder path, backed by
+`GET`/`PUT /api/v1/storage-config`) and a **Notifications** tab (toggle SMS/email, backed by the
+existing `PATCH /api/v1/users/me`, issue #88). Served here (rather than as a generic placeholder in
 app.pages.app_shell) because it has real content; more tabs land in later slices. Anonymous
 visitors are redirected to /login, matching the other authenticated pages.
 """
@@ -43,8 +44,19 @@ async def settings_page(
         # (the tokens attach to that row), so the button is gated on this.
         "has_config": config is not None,
     }
+    notifications_data = {
+        "notification_email": user.notification_email,
+        "notification_sms": user.notification_sms,
+        "email": user.email,
+        "phone_number": user.phone_number or "",
+    }
     return templates.TemplateResponse(
         request,
         "settings.html",
-        {"user": user, "dark_mode": user.dark_mode, "storage_data": storage_data},
+        {
+            "user": user,
+            "dark_mode": user.dark_mode,
+            "storage_data": storage_data,
+            "notifications_data": notifications_data,
+        },
     )

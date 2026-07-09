@@ -24,6 +24,15 @@ async def update_current_user(
     user: User = Depends(current_active_user),
     user_manager: UserManager = Depends(get_user_manager),
 ) -> UserRead:
+    fields_set = update.model_fields_set
+    # Saving notification prefs (issue #88) flips the onboarding flag the first time - and every
+    # time after, harmlessly, since there's no un-toggling this step once it's done. Set directly
+    # on `user` (not the object user_manager.update() returns) so it rides along in that call's own
+    # commit instead of triggering a second round-trip.
+    if not user.onboarding_notifications_done and (
+        fields_set & {"notification_email", "notification_sms"}
+    ):
+        user.onboarding_notifications_done = True
     try:
         # UserUpdate deliberately doesn't inherit schemas.BaseUserUpdate (see its docstring), so
         # it doesn't satisfy BaseUserManager.update()'s UU TypeVar bound under mypy - it still

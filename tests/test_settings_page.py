@@ -116,6 +116,66 @@ async def test_settings_page_prefills_saved_folder_path(client: AsyncClient) -> 
     assert 'value="/OrganizeMe/reports"' in response.text
 
 
+async def test_settings_page_renders_notifications_tab_with_toggles(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.text
+    assert "Notifications" in body
+    assert 'id="notification_email"' in body
+    assert 'id="notification_sms"' in body
+
+    def _input_tag(input_id: str) -> str:
+        start = body.index(f'id="{input_id}"')
+        return body[max(0, start - 200) : start + 200]
+
+    # Fresh user has an email (set at registration) but no phone number: email toggle enabled,
+    # SMS toggle disabled with hint text.
+    assert "disabled" not in _input_tag("notification_email").split("/>")[0]
+    assert "disabled" in _input_tag("notification_sms").split("/>")[0]
+    assert "Set your phone number in Profile to enable." in body
+
+
+async def test_settings_page_reflects_saved_notification_prefs(client: AsyncClient) -> None:
+    await _register_and_login(client)
+    await client.patch(
+        "/api/v1/users/me",
+        json={
+            "phone_number": "+15551234567",
+            "notification_email": False,
+            "notification_sms": True,
+        },
+    )
+
+    response = await client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.text.replace(" ", "")
+    assert '"notification_email":false' in body
+    assert '"notification_sms":true' in body
+    assert '"phone_number":"+15551234567"' in body
+
+
+async def test_settings_page_notifications_x_data_is_not_truncated_by_a_stray_quote(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client)
+    response = await client.get("/settings")
+
+    collector = _XDataCollector()
+    collector.feed(response.text)
+
+    notifications_x_data = [
+        v
+        for v in collector.x_data_values
+        if "notification_email" in v and "async save()" in v
+    ]
+    assert notifications_x_data, "settings page has no notifications x-data component"
+    assert "/api/v1/users/me" in notifications_x_data[0]
+
+
 class _XDataCollector(HTMLParser):
     """Collects every `x-data` attribute value, honouring HTML attribute-quote termination - so a
     stray quote that truncates the attribute (the register.html bug from #23) is caught here too."""
