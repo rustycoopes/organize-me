@@ -11,6 +11,11 @@
   <div class="flex items-center gap-3">
     <a href="/logs" class="btn btn-ghost btn-sm">← Back to History</a>
     <h1 class="text-2xl font-bold">Run Detail</h1>
+    <a
+      href="/api/v1/processing-runs/{{ run_id }}/logs/download"
+      download
+      class="btn btn-outline btn-sm ml-auto"
+    >Download logs</a>
   </div>
 
   {# Run metadata #}
