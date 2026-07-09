@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #115 — verify onboarding checklist hides on completion)
+**Last updated:** 2026-07-09 (issue #110 — Import pending files button)
 
 ---
 
@@ -95,6 +95,57 @@ real Google OAuth out of the e2e suite (also noted in #91, the already-tracked a
 `modelsuggested` issue for onboarding e2e coverage) — the new pytest integration test is the
 strongest regression coverage achievable without relitigating that decision. No code changes; full
 suite + `mypy --strict` green.
+
+**Issue #110 (Import pending files button) implemented** on branch
+`feature/slice-7-import-pending-files`, in an isolated worktree. New `POST
+/api/v1/import-pending-files` (`app/api/v1/import_pending_files.py`) scans the user's connected
+storage watch folder via the existing `StorageProvider.list_new_files()` (already excludes
+`processed/`/`failed/` by contract — no new dedup bookkeeping needed) and creates one
+`processing_runs` row per pending file. Resolved design decision (asked and confirmed with the
+user before building): files are processed **sequentially**, one after another in a single
+background task, not fire-and-forget-per-file like the manual upload path — added
+`PipelineScheduler.schedule_batch()`/`BackgroundPipelineScheduler._run_batch()` alongside the
+existing single-file `schedule()`/`_run()` in `app/api/v1/upload.py` for this. The endpoint returns
+only the *first* file's `run_id`, so the client follows it to `/processing` exactly like a manual
+upload; the rest of the batch keeps processing in the background and is visible afterward via the
+`/logs` history page rather than a second live SSE stream — the simplest workable v1 UX given the
+existing single-run progress page, with the alternative (auto-advancing the live view across a
+whole batch) explicitly deferred rather than built now. New `get_import_storage` dependency has no
+ephemeral-storage fallback (unlike uploads) since there's no watch folder to scan without a real
+connected provider — 400 `storage_not_connected` if none. New shared `is_drive_connected()` helper
+in `app/api/v1/storage_config.py` (extracted from `app/pages/upload.py`'s pre-existing inline
+check) backs the Import button's disabled state on both `/upload` and `/dashboard` via one new
+`partials/import_pending_button.html`, so the two pages share one Alpine fetch/redirect
+implementation instead of duplicating it. New Playwright `e2e/tests/import-pending-files.spec.ts`
+covers what's deterministic under `E2E_TEST_MODE` (the button is enabled, and clicking it
+surfaces "no pending files" — `E2E_TEST_MODE`'s per-request fake storage provider has no
+persistence across requests, so genuinely populating "pending files" needs a real connected
+Drive account, out of e2e scope per the standing #23 decision). Improvement pass (before review):
+importing also flips `onboarding_first_upload_done`, matching manual upload, so a user who only
+ever imports (never uses the Upload page directly) doesn't have that onboarding step stuck
+incomplete forever. A multi-angle code review pass then caught and fixed three real issues,
+independently confirmed by multiple review angles: (1) `_run_batch`'s per-file `except` block
+logged an unexpected failure but never rolled back the shared session, so one file's unhandled
+error would poison every remaining file in the batch (a real correctness bug contradicting the
+method's own "one failure doesn't stop the batch" docstring claim) — fixed by rolling back before
+continuing the loop; (2) `get_import_storage` re-derived "is Drive connected" inline instead of
+calling the `is_drive_connected()` helper this same diff introduced specifically to prevent that
+duplication — fixed by extracting a shared `config_is_connected()` predicate both now call; (3) a
+dead `db.refresh()` loop after `db.commit()` issued one wasted SELECT per pending file, even though
+`get_db`'s sessionmaker uses `expire_on_commit=False` (nothing is expired, so nothing needs
+refreshing) — removed. Also fixed a minor `StorageProvider` HTTP-client leak on the
+no-pending-files early-return path, and updated README.md (a repo CLAUDE.md requirement the diff
+had initially missed). One lower-priority finding (a double-click/multi-tab race that could enqueue
+duplicate batches — same class of gap the pre-existing single-file upload endpoint already has, and
+backstopped by the `events` table's existing dedup constraint) deferred as `modelsuggested` #133;
+auto-advancing `/processing` across a whole batch instead of only showing the first file live
+deferred as `modelsuggested` #132. No dedicated automated test for the session-rollback fix itself:
+`BackgroundPipelineScheduler`'s background-task methods open their own DB session via `get_engine()`
+directly (bypassing the request-scoped `get_db` override), which the test suite's SAVEPOINT-based
+isolation (each test's writes live in a rolled-back transaction on one connection) can't observe —
+the same reason no test in the codebase exercises `_run`/`schedule` directly either; the fix is the
+standard, well-understood SQLAlchemy rollback-after-failed-flush pattern. 9 new/updated backend
+tests; full suite + `mypy --strict` green.
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set

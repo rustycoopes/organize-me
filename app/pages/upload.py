@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.storage_config import get_user_storage_config
+from app.api.v1.storage_config import is_drive_connected
 from app.auth.users import current_active_user_optional
 from app.core.config import Settings, get_settings
 from app.core.templating import templates
@@ -32,11 +32,7 @@ async def upload_page(
 ) -> HTMLResponse | RedirectResponse:
     if user is None:
         return RedirectResponse("/login", status_code=302)
-    config = await get_user_storage_config(db, user.id)
-    # Check if Google Drive is actually connected (token present and decryptable)
-    drive_connected = settings.e2e_test_mode or (
-        config is not None and config.oauth_access_token is not None
-    )
+    drive_connected = await is_drive_connected(db, user.id, settings)
     # If no storage configured, uploads will fall back to ephemeral storage (issue #79)
     using_ephemeral = not settings.e2e_test_mode and not drive_connected
     return templates.TemplateResponse(

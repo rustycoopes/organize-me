@@ -10,6 +10,7 @@ from app.api.v1.upload import get_pipeline_scheduler, get_upload_storage
 from app.main import app
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.storage_config import StorageConfig, StorageProviderType
 from app.models.user import User
 from app.services.storage.fake import FakeStorageProvider
 from tests.test_storage_google_drive import FakeDriveOAuth2, _drive_connect
@@ -210,6 +211,38 @@ async def test_dashboard_does_not_redirect_when_there_are_zero_events(
 
     assert response.status_code == 200
     assert "No events yet" in response.text
+
+
+async def test_dashboard_import_pending_files_button_disabled_without_connected_storage(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'id="import-pending-files-btn"' in response.text
+    assert "driveConnected:false" in response.text.replace(" ", "")
+
+
+async def test_dashboard_import_pending_files_button_enabled_with_connected_storage(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    db_session.add(
+        StorageConfig(
+            user_id=user_id,
+            provider=StorageProviderType.GOOGLE_DRIVE,
+            folder_path="/OrganizeMe",
+            oauth_access_token="ciphertext-token",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "driveConnected:true" in response.text.replace(" ", "")
 
 
 async def test_dashboard_shows_onboarding_checklist_for_a_new_user(
