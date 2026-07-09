@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #85 — Slice 6.3 searchable log filter + log download)
+**Last updated:** 2026-07-09 (issue #111 — logs page redesigned as a filterable/sortable grid)
 
 ---
 
@@ -19,6 +19,27 @@
 **Slice 6 (processing history + logs) complete.** Slice 5 fully drained. Issue #83 (Slice 6.1 — processing history list page) is implemented on branch `feature/slice-6.1-logs-page` and merged into `main`. Issue #84 (Slice 6.2 — run detail page + logs viewer) is implemented on branch `feature/slice-6.2-run-detail` (PR #107) and merged into `main`. New endpoints: `GET /api/v1/processing-runs/{id}` (run detail with steps, JSON), `GET /api/v1/processing-runs/{id}/logs` (paginated logs JSON), `GET /api/html/processing-runs/{id}/logs` (HTMX HTML partial). New page `/processing-runs/{id}` displays run metadata, 7 pipeline steps with status indicators, and expandable per-step logs (searchable, paginated 50/page via HTMX). Reuses step rendering from `/processing` page. User scoping (404 for non-owners). Comprehensive test coverage: 14 new tests, all 39 processing tests pass, no regressions. New schemas: `ProcessingStepRead`, `ProcessingRunDetailRead`, `ProcessingLogLineRead`. With #84, Slice 6.2 is functionally complete. Issue #85 (Slice 6.3 — searchable log filter + log download) is implemented on branch `feature/slice-6.3-log-search-download`, in an isolated worktree: the live HTMX search filter already existed from #84, so the remaining scope was `GET /api/v1/processing-runs/{id}/logs/download` (a run's full structured logs across all steps as a downloadable JSON file, `Content-Disposition: attachment`) plus a "Download logs" link on the run detail page. Improvement pass: fixed a pre-existing bug where log search escaped `%`/`_` as if for a SQL `LIKE` pattern despite matching being a plain substring check, which silently broke searches containing those characters, and deduplicated the search/pagination logic (API route + HTMX partial) into a shared `app/services/processing_logs.py` helper. Lower-priority follow-up (download filename using the run's original filename) filed as #118 (Intake). With #85, Slice 6 is complete.
 
 **Slice 7.1 (email notifications) implemented.** Slice 6 fully drained. Issue #86 (Slice 7.1 — branded email notifications) is implemented on branch `feature/slice-7.1-email-notifications`: real `NotificationSender` implementation (`RealNotificationSender` in `app/services/notifications/sender.py`) replaces the logging stub behind the same protocol. Sends branded HTML emails on processing-run completion (success, zero-event, failure) using Jinja2 templates with inline CSS. Two templates (`success.html.j2`, `failure.html.j2`) render the OrganizeMe header, event summary or error details, and appropriate CTA links (dashboard for success, log page for failure). Respects the `user.notification_email` flag (stored at user registration, defaults to `True`). New config: `BASE_URL` (defaults to `https://organize-me.app`, overrideable for local dev). Updated factory `get_pipeline_notifier()` wires the real sender without touching the pipeline itself. Comprehensive test coverage: 7 tests verify success/zero-event/failure emails, the off-flag behavior, unknown-user graceful handling, and link correctness. Template environment cached at class level for performance (avoid re-reading filesystem on each send). SMS support deferred to Slice 7.2. Slice 7.1 is functionally complete.
+
+**Slice 7.3 (#88, Settings > Notifications tab) paused, picked up #111 instead.** #88 turned out
+to be blocked in practice: its acceptance criteria require an integration test proving the SMS
+toggle blocks Twilio sends, but Slice 7.2 (#87, SMS via Twilio) was `In Progress` under a
+concurrent session with no SMS sender in the codebase yet. Rather than build the toggle UI/schema
+now and leave the SMS half of the test unwritten, picked up #111 (Slice 7 `future`/enhancement
+tier, no cross-issue blocker) instead and left #88 in `Todo` for a session after #87 lands.
+**Issue #111 (redesign `/logs` as an HTMX-driven spreadsheet grid) implemented** on branch
+`feature/logs-grid-redesign`, in an isolated worktree. `GET /api/v1/processing-runs` gains
+`status`/`date_from`/`date_to`/`sort_by`/`sort_dir` query params (composing with each other and
+pagination, mirroring the dashboard's #55 filter pattern) and a new `detail_summary` field per
+run (first error line for a `failed` run, falling back through any captured log line to a fixed
+placeholder if no step itself was marked failed; an `"N log lines"` count otherwise — computed
+from the page's already-fetched steps, no per-row queries). The `/logs` page's filter form
+(Status + date range) and three sortable column headers (Date/Filename/Status, `aria-sort` +
+▲/▼) swap `#logs-body` in place via new `partials/logs_body.html`/`partials/logs_grid.html`. Each
+row is a full, keyboard-operable click target to `/processing-runs/{id}`. 27 tests; `mypy
+--strict` clean on the changed files and on the full `app`/`tests` tree. Improvement pass:
+keyboard accessibility for row navigation, `aria-sort`, and the FAILED-with-no-failed-step
+detail-summary fallback. Deferred ideas (human-friendly date formatting, free-text search, a
+step-breakdown alternative for Details) filed as `modelsuggested` issues rather than built now.
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set
