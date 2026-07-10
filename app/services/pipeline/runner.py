@@ -36,6 +36,7 @@ from app.core.message_filter import filter_messages_within_window
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.processing_step import ProcessingStep, ProcessingStepStatus
+from app.models.user import User
 from app.schemas.pipeline import ExtractedEvent
 from app.services.llm.gemini import GeminiClient, GeminiError
 from app.services.notifications.pipeline import (
@@ -177,6 +178,30 @@ async def _deduplicate_and_save(
     return new_count
 
 
+def _silent_notification_modes_warning(user: User | None) -> str | None:
+    """A single warning line naming which notification channels will silently not fire for this
+    run (issue #112), or ``None`` if every configured channel is live.
+
+    Mirrors ``RealNotificationSender``'s own gating exactly (email: ``notification_email``; SMS:
+    ``notification_sms`` **and** a non-empty ``phone_number``) so the warning never claims a
+    channel is silent when the sender would actually fire it, or vice versa. "no phone number" is
+    only reported when SMS is otherwise enabled - if SMS itself is off, the missing phone number
+    isn't why nothing was sent, so reporting both would be redundant.
+    """
+    if user is None:  # pragma: no cover - the run always has a real owning user
+        return None
+    disabled: list[str] = []
+    if not user.notification_email:
+        disabled.append("disabled email")
+    if not user.notification_sms:
+        disabled.append("disabled SMS")
+    elif not user.phone_number:
+        disabled.append("no phone number")
+    if not disabled:
+        return None
+    return f"Warning: {'; '.join(disabled)}"
+
+
 async def _notify(
     session: AsyncSession,
     run: ProcessingRun,
@@ -199,7 +224,14 @@ async def _notify(
             message=message,
         )
     )
-    await _finish_step(session, step, ProcessingStepStatus.SUCCESS, [f"Notified user: {message}"])
+    log_lines = [f"Notified user: {message}"]
+    user = await session.get(User, user_id)
+    warning = _silent_notification_modes_warning(user)
+    if warning is not None:
+        log_lines.append(warning)
+    # A disabled/unconfigured notification channel is expected user configuration, not a pipeline
+    # problem - the step still succeeds and the run's overall status is unaffected (issue #112).
+    await _finish_step(session, step, ProcessingStepStatus.SUCCESS, log_lines)
 
 
 async def _fail_run(

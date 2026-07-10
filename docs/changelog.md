@@ -10,6 +10,17 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #112 implemented** — log notification silent modes as warnings (branch
+  `feature/slice-7-notify-silent-mode-warnings`). During the pipeline's Notify step,
+  `_silent_notification_modes_warning()` adds one extra log line naming which channels won't
+  actually fire (`disabled email`, `disabled SMS`, `no phone number` — only the ones that apply,
+  omitted entirely when everything's live), mirroring `RealNotificationSender`'s own gating exactly
+  so the warning can never disagree with what actually sends. Doesn't affect step/run status; no
+  new endpoint wiring needed since `/processing-runs/{id}/logs` already surfaces arbitrary
+  `ProcessingStep.log_lines`. 6 new tests, including one true end-to-end test through the real
+  logs endpoint. No improvement-pass changes or `modelsuggested` issues — matched the acceptance
+  criteria with no gaps.
+
 - **Issue #113 implemented** — "reviewed" flag on dashboard events (branch `feature/slice-5-events-reviewed-flag`). New `reviewed` boolean column on `events` (migration `a7b8c9d0e1f2`, default `false`) plus a partial index `ix_events_user_id_unreviewed_sort` (migration `b8c9d0e1f2a3`, `WHERE reviewed = false`) covering the dashboard's now-default `reviewed = false` filter+sort, matching the precedent set by `f6a7b8c9d0e1`. `GET /api/v1/events` and `/dashboard` gain a `show_reviewed` param (default `false`) that hides reviewed events, composing with the existing type/date/search filters and pagination. New `PATCH /api/v1/events/{id}` endpoint (owner-scoped via a shared `get_owned_event` helper, same 404 semantics as `DELETE`) toggles the flag and returns the updated event. Dashboard table gets a per-row "Reviewed" checkbox (Alpine.js `fetch` PATCH, no page reload, reverts on failure) and the filter bar gets a "Show reviewed" checkbox. 15 new tests (9 API, 6 page-level) covering default-hide behaviour, the show-all toggle, filter composition, PATCH ownership/404 semantics, and the all-reviewed empty-state message; full suite green; `mypy --strict` clean.
 
   A code-review pass then caught two real bugs pre-merge: marking a row reviewed while "Show reviewed" was off used hand-written JS to remove the row and decrement a count, which desynced from the server on pagination boundaries (didn't backfill rows from the next page, didn't show the empty-state message when the last row was removed) — fixed by re-rendering `#dashboard-body` via `htmx.ajax()` after a successful PATCH instead, reusing the same swap every other filter/sort/page control on this page already uses; and `has_active_filters` didn't count the default `show_reviewed=false` hiding as a filter, so a returning user whose events were all reviewed saw the misleading first-time "No events yet" message — fixed using the already-fetched `event_types` list (unaffected by filters) as a free signal that the user has events at all. Also fixed in the same pass: a redundant `db.refresh()` after commit (the session is `expire_on_commit=False`) and duplicated owner-lookup code between `DELETE`/`PATCH` (extracted to `get_owned_event`). Two lower-priority suggestions deferred to issues #135 (type-filter dropdown includes types that only exist on reviewed events) and #136 (no e2e coverage for the reviewed checkbox/filter interaction), both `modelsuggested`.

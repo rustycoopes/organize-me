@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #93 — Dropbox StorageProvider implementation)
+**Last updated:** 2026-07-10 (issue #112 — log notification silent modes as warnings)
 
 ---
 
@@ -146,6 +146,29 @@ isolation (each test's writes live in a rolled-back transaction on one connectio
 the same reason no test in the codebase exercises `_run`/`schedule` directly either; the fix is the
 standard, well-understood SQLAlchemy rollback-after-failed-flush pattern. 9 new/updated backend
 tests; full suite + `mypy --strict` green.
+
+**Issue #112 (log notification silent modes as warnings) implemented** on branch
+`feature/slice-7-notify-silent-mode-warnings`, in an isolated worktree. New
+`_silent_notification_modes_warning()` in `app/services/pipeline/runner.py` runs during the Notify
+step (step 7, shared by both the success and failure paths via the existing `_notify()` helper) and
+adds one extra log line — `"Warning: disabled email; disabled SMS"` / `"Warning: no phone
+number"` etc., only the modes actually silent, omitted entirely when every configured channel is
+live — to the step's existing `"Notified user: ..."` log line. Deliberately mirrors
+`RealNotificationSender`'s own gating exactly (email: `notification_email`; SMS:
+`notification_sms` **and** a non-empty `phone_number`) so the warning can never disagree with what
+the real sender actually does — "no phone number" is only reported when SMS is otherwise enabled,
+since if SMS itself is off the missing phone number isn't why nothing sent. The warning never
+affects the step's or run's status (still `SUCCESS`) and needed no new endpoint wiring — the
+existing `/processing-runs/{id}/logs` machinery already surfaces arbitrary `ProcessingStep.log_lines`
+generically. 6 new tests (`test_pipeline_runner.py`: all-disabled, email-only, SMS-only, SMS-on-
+without-phone, and no-warning-when-fully-configured; `test_processing_run_detail.py`: one true
+end-to-end test driving a real pipeline run through to the actual logs endpoint, closing the loop
+on the issue's explicit "warning appears in `/processing-runs/{id}/logs`" acceptance criterion
+rather than only asserting on the ProcessingStep row directly). No improvement-pass changes needed
+and no `modelsuggested` issues filed — the implementation matched the issue's acceptance criteria
+exactly with no gaps found. `mypy --strict` clean; targeted test files green (full local suite hit
+repeated sandbox-infra kills unrelated to the change - see below - so CI's `test` job is the
+authoritative full-suite confirmation before merge).
 
 **Slice 5.3 (#56 — Getting Started onboarding checklist) implemented.** On branch
 `claude/admiring-carson-v5qr9b`: a 3-step checklist (Connect Storage → `/settings`, Set

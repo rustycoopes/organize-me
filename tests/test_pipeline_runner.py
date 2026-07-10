@@ -352,3 +352,86 @@ async def test_markdown_fenced_json_is_parsed(db_session: AsyncSession) -> None:
 
     assert run.status == ProcessingRunStatus.SUCCESS
     assert run.events_extracted_count == _EXPECTED_NEW_EVENTS
+
+
+async def _run_notify_only(db_session: AsyncSession, user: User) -> ProcessingStep:
+    """Drives a minimal zero-event run and returns its Notify (step 7) row, for asserting the
+    silent-notification-mode warning (#112) independently of event-extraction behaviour."""
+    run = await _make_run(db_session, user, "chat.txt")
+    storage = FakeStorageProvider()
+    remote_file = await storage.upload_file("chat.txt", b"data")
+
+    await run_pipeline(
+        db_session,
+        run=run,
+        user_id=user.id,
+        remote_file=remote_file,
+        storage=storage,
+        gemini=FakeGeminiClient("[]"),
+        notifier=FakeNotificationSender(),
+        prompt_text="extract events",
+    )
+
+    assert run.status == ProcessingRunStatus.SUCCESS
+    steps = await _steps(db_session, run.id)
+    notify_step = steps[-1]
+    assert notify_step.step_number == 7
+    return notify_step
+
+
+async def test_notify_step_warns_when_all_channels_disabled(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    user.notification_email = False
+    user.notification_sms = False
+    await db_session.flush()
+
+    notify_step = await _run_notify_only(db_session, user)
+
+    assert notify_step.status == ProcessingStepStatus.SUCCESS
+    assert "Warning: disabled email; disabled SMS" in notify_step.log_lines
+
+
+async def test_notify_step_warns_for_disabled_email_only(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    user.notification_email = False
+    user.phone_number = "+15551234567"
+    await db_session.flush()
+
+    notify_step = await _run_notify_only(db_session, user)
+
+    assert "Warning: disabled email" in notify_step.log_lines
+
+
+async def test_notify_step_warns_for_disabled_sms_only(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    user.notification_sms = False
+    await db_session.flush()
+
+    notify_step = await _run_notify_only(db_session, user)
+
+    assert "Warning: disabled SMS" in notify_step.log_lines
+
+
+async def test_notify_step_warns_for_sms_enabled_without_phone_number(
+    db_session: AsyncSession,
+) -> None:
+    user = await _make_user(db_session)
+    # notification_sms defaults True; phone_number defaults None - SMS is "on" but unreachable.
+    await db_session.flush()
+
+    notify_step = await _run_notify_only(db_session, user)
+
+    assert "Warning: no phone number" in notify_step.log_lines
+
+
+async def test_notify_step_has_no_warning_when_fully_configured(
+    db_session: AsyncSession,
+) -> None:
+    user = await _make_user(db_session)
+    user.phone_number = "+15551234567"
+    await db_session.flush()
+
+    notify_step = await _run_notify_only(db_session, user)
+
+    assert not any(line.startswith("Warning:") for line in notify_step.log_lines)
+    assert notify_step.status == ProcessingStepStatus.SUCCESS
