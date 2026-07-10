@@ -22,6 +22,7 @@ dependencies = [
     "google-genai>=2.10.0",
     "python-dateutil>=2.9.0.post0",
     "sse-starlette>=2.1.0",
+    "boto3>=1.35",
 ]
 
 [dependency-groups]
@@ -39,6 +40,14 @@ python_version = "3.12"
 
 [[tool.mypy.overrides]]
 module = "twilio.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "boto3.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "botocore.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

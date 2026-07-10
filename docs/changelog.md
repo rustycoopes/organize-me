@@ -10,6 +10,33 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #94 implemented** — S3 StorageProvider (Slice 8.2, branch
+  `feature/s3-storage-provider`). New `S3StorageProvider` (`app/services/storage/s3.py`) implements
+  the `StorageProvider` ABC against a user's manually-entered AWS credentials (access key, secret,
+  bucket, region — no OAuth), using the synchronous `boto3` SDK with every blocking call wrapped in
+  `asyncio.to_thread` (mirroring `ResendEmailSender`'s pattern, per the issue's specified approach,
+  rather than adding `aioboto3`). `folder_path` is treated as a key prefix within the bucket;
+  `list_new_files` lists with `Delimiter="/"` so S3's native prefix listing (which is recursive by
+  default) matches the non-recursive, direct-children-only semantics Dropbox/Google Drive already
+  have — `processed/`/`failed/` sub-prefixes (and any other nested "subfolder") are excluded by
+  construction rather than by manual filtering. S3 has no native move, so `move_file` is
+  copy-then-delete. `app/services/storage/factory.py` gains `build_s3_provider`, decrypting all
+  four stored credential columns and wiring a live `S3StorageProvider` into
+  `build_storage_provider` for `provider = s3` (previously raised `unsupported storage provider`).
+  Added `boto3` to `pyproject.toml` (+ `mypy` `ignore_missing_imports` overrides for `boto3`/
+  `botocore`, which ship no type stubs). 14 new provider tests plus 2 new factory tests, all via a
+  hand-rolled fake S3 client (no live AWS credentials touched in CI, per the issue's acceptance
+  criteria); full suite (455 tests) and `mypy --strict` clean. Improvement pass: wrapped every
+  boto3 call's `ClientError`/`BotoCoreError` in a new `S3Error` (previously defined but unused —
+  errors would have propagated as raw botocore exceptions, unlike Dropbox's `DropboxError`
+  wrapping), and added a factory test asserting the *decrypted* credential values actually reach
+  `boto3.client(...)` (previously only checked the resolved provider type, not that decryption
+  happened correctly — a mismatch would otherwise only surface as an opaque AWS auth failure at
+  runtime). Two lower-priority ideas deferred to `modelsuggested` issues #149 (retry/backoff on S3
+  throttling errors) and #150 (`boto3.client()` construction runs synchronously on the event loop —
+  fixing it properly cascades into an async refactor of `build_storage_provider` and both its
+  callers, out of proportion to this issue's scope).
+
 - **Issue #112 implemented** — log notification silent modes as warnings (branch
   `feature/slice-7-notify-silent-mode-warnings`). During the pipeline's Notify step,
   `_silent_notification_modes_warning()` adds one extra log line naming which channels won't
