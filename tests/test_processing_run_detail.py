@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.processing_step import ProcessingStep, ProcessingStepStatus
+from app.models.user import User
+from app.services.llm.gemini import FakeGeminiClient
+from app.services.notifications.pipeline import FakeNotificationSender
+from app.services.pipeline.runner import run_pipeline
+from app.services.storage.fake import FakeStorageProvider
 
 
 def unique_email() -> str:
@@ -120,6 +125,38 @@ async def test_processing_run_logs_endpoint_returns_json(
     assert data["page"] == 1
     assert data["page_size"] == 50
     assert data["total"] == 3
+
+
+async def test_processing_run_logs_endpoint_shows_silent_notification_mode_warning(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Regression test for #112: a real pipeline run for a user with no phone number on file
+    (SMS is "on" by default but unreachable) surfaces the silent-mode warning through the actual
+    logs endpoint, not just as a ProcessingStep.log_lines assertion in the pipeline unit tests."""
+    user_id = await _register_and_login(client)
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    run = ProcessingRun(user_id=user_id, filename="chat.txt", status=ProcessingRunStatus.PENDING)
+    db_session.add(run)
+    await db_session.flush()
+    storage = FakeStorageProvider()
+    remote_file = await storage.upload_file("chat.txt", b"data")
+
+    await run_pipeline(
+        db_session,
+        run=run,
+        user_id=user_id,
+        remote_file=remote_file,
+        storage=storage,
+        gemini=FakeGeminiClient("[]"),
+        notifier=FakeNotificationSender(),
+        prompt_text="extract events",
+    )
+
+    response = await client.get(f"/api/v1/processing-runs/{run.id}/logs?step_number=7")
+
+    assert response.status_code == 200
+    assert "Warning: no phone number" in response.json()["log_lines"]
 
 
 async def test_processing_run_logs_html_endpoint_returns_html_partial(

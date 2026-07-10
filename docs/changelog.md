@@ -10,6 +10,17 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #112 implemented** — log notification silent modes as warnings (branch
+  `feature/slice-7-notify-silent-mode-warnings`). During the pipeline's Notify step,
+  `_silent_notification_modes_warning()` adds one extra log line naming which channels won't
+  actually fire (`disabled email`, `disabled SMS`, `no phone number` — only the ones that apply,
+  omitted entirely when everything's live), mirroring `RealNotificationSender`'s own gating exactly
+  so the warning can never disagree with what actually sends. Doesn't affect step/run status; no
+  new endpoint wiring needed since `/processing-runs/{id}/logs` already surfaces arbitrary
+  `ProcessingStep.log_lines`. 6 new tests, including one true end-to-end test through the real
+  logs endpoint. No improvement-pass changes or `modelsuggested` issues — matched the acceptance
+  criteria with no gaps.
+
 - **Issue #110 implemented** — Import pending files button (branch
   `feature/slice-7-import-pending-files`). New `POST /api/v1/import-pending-files` scans the
   connected storage watch folder via `StorageProvider.list_new_files()`, creates one
