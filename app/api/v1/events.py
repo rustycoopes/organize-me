@@ -20,7 +20,7 @@ from app.core.calendar_url import build_google_calendar_url, build_google_tasks_
 from app.db.session import get_db
 from app.models.event import Event
 from app.models.user import User
-from app.schemas.event import EventListRead, EventRead
+from app.schemas.event import EventListRead, EventRead, EventUpdate
 
 SortOrder = Literal["asc", "desc"]
 
@@ -65,6 +65,7 @@ def to_event_read(event: Event) -> EventRead:
         raw_date_text=event.raw_date_text,
         agreed_by=event.agreed_by,
         created_at=event.created_at,
+        reviewed=event.reviewed,
         calendar_url=build_google_calendar_url(
             title=event.description,
             event_date=event.resolved_date_earliest,
@@ -87,6 +88,7 @@ async def list_user_events(
     date_to: date_ | None = None,
     search: str | None = None,
     sort: SortOrder = "desc",
+    show_reviewed: bool = False,
 ) -> tuple[list[Event], int]:
     """The user's events for one page, newest ``resolved_date_earliest`` first by default, plus
     the total count (for pagination). Shared by the JSON endpoint and the dashboard page's
@@ -96,11 +98,17 @@ async def list_user_events(
     AND); ``sort`` flips the default newest-first ordering to oldest-first. All compose with
     ``page``: the count and the page window are both taken over the filtered set.
 
+    ``show_reviewed=False`` (the default, #113) hides events the user has marked reviewed, so old,
+    already-addressed entries don't clutter the table; pass ``True`` to show every event regardless
+    of reviewed state.
+
     ``.nullslast()`` is required regardless of ``sort`` direction: Postgres treats NULL as larger
     than any value by default, so unresolved ("TBC") dates should always sort to the bottom, not
     flip to the top when ``sort="asc"``.
     """
     conditions = [Event.user_id == user_id]
+    if not show_reviewed:
+        conditions.append(Event.reviewed.is_(False))
     if event_type:
         conditions.append(Event.type == event_type)
     if date_from is not None:
@@ -138,6 +146,14 @@ async def list_user_events(
     return list(result.all()), total or 0
 
 
+async def get_owned_event(db: AsyncSession, event_id: uuid.UUID, user_id: uuid.UUID) -> Event | None:
+    """The event if it exists and belongs to ``user_id``, else ``None`` - shared by ``DELETE`` and
+    ``PATCH`` so both give the same 404 whether the id doesn't exist at all or belongs to another
+    user, never confirming another user's event exists."""
+    event = await db.scalar(select(Event).where(Event.id == event_id, Event.user_id == user_id))
+    return event
+
+
 async def list_user_event_types(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
     """Distinct event types the user has, for the dashboard's type filter dropdown.
 
@@ -158,6 +174,7 @@ async def read_events(
     date_to: str | None = Query(default=None),
     q: str | None = Query(default=None),
     sort: SortOrder = Query(default="desc"),
+    show_reviewed: bool = Query(default=False),
     user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> EventListRead:
@@ -170,6 +187,7 @@ async def read_events(
         date_to=parse_date_param(date_to),
         search=q,
         sort=sort,
+        show_reviewed=show_reviewed,
     )
     return EventListRead(
         events=[to_event_read(e) for e in events], page=page, page_size=PAGE_SIZE, total=total
@@ -182,10 +200,26 @@ async def delete_event(
     user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    event = await db.scalar(select(Event).where(Event.id == event_id, Event.user_id == user.id))
+    event = await get_owned_event(db, event_id, user.id)
     if event is None:
-        # Same 404 whether the id doesn't exist at all or belongs to another user - never confirm
-        # another user's event exists.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await db.delete(event)
     await db.commit()
+
+
+@router.patch("/events/{event_id}", response_model=EventRead)
+async def update_event(
+    event_id: uuid.UUID,
+    update: EventUpdate,
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> EventRead:
+    """Toggle an event's reviewed flag (#113), scoped to the requesting user like ``DELETE``."""
+    event = await get_owned_event(db, event_id, user.id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    event.reviewed = update.reviewed
+    await db.commit()
+    # No db.refresh() needed: the session is expire_on_commit=False (app/db/session.py), so `event`
+    # still holds the value just assigned - refreshing would just be a wasted round-trip.
+    return to_event_read(event)

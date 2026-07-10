@@ -503,6 +503,143 @@ async def test_get_events_free_text_search_matches_agreed_by(
     assert descriptions == ["Meeting with Alice"]
 
 
+# --- Reviewed flag + filter (#113) ------------------------------------------------------------
+
+
+async def test_new_events_default_to_unreviewed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    assert response.json()["events"][0]["reviewed"] is False
+
+
+async def test_get_events_hides_reviewed_events_by_default(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="Unreviewed", resolved_date="1 Jan"))
+    db_session.add(
+        _event(user_id, run.id, description="Reviewed", resolved_date="2 Jan", reviewed=True)
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events")
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Unreviewed"]
+
+
+async def test_get_events_show_reviewed_true_returns_all(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(_event(user_id, run.id, description="Unreviewed", resolved_date="1 Jan"))
+    db_session.add(
+        _event(user_id, run.id, description="Reviewed", resolved_date="2 Jan", reviewed=True)
+    )
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"show_reviewed": "true"})
+
+    descriptions = {e["description"] for e in response.json()["events"]}
+    assert descriptions == {"Unreviewed", "Reviewed"}
+
+
+async def test_get_events_reviewed_filter_composes_with_type_filter(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    db_session.add(
+        _event(user_id, run.id, type="Medical", description="Reviewed medical", reviewed=True)
+    )
+    db_session.add(_event(user_id, run.id, type="Medical", description="Unreviewed medical"))
+    db_session.add(_event(user_id, run.id, type="School", description="Unreviewed school"))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/events", params={"type": "Medical"})
+
+    descriptions = [e["description"] for e in response.json()["events"]]
+    assert descriptions == ["Unreviewed medical"]
+
+
+async def test_patch_event_marks_it_reviewed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    event = _event(user_id, run.id)
+    db_session.add(event)
+    await db_session.flush()
+    event_id = event.id
+
+    response = await client.patch(f"/api/v1/events/{event_id}", json={"reviewed": True})
+
+    assert response.status_code == 200
+    assert response.json()["reviewed"] is True
+    await db_session.refresh(event)
+    assert event.reviewed is True
+
+
+async def test_patch_event_can_unmark_reviewed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = await _make_run(db_session, user_id)
+    event = _event(user_id, run.id, reviewed=True)
+    db_session.add(event)
+    await db_session.flush()
+    event_id = event.id
+
+    response = await client.patch(f"/api/v1/events/{event_id}", json={"reviewed": False})
+
+    assert response.status_code == 200
+    assert response.json()["reviewed"] is False
+
+
+async def test_patch_event_requires_authentication(client: AsyncClient) -> None:
+    response = await client.patch(f"/api/v1/events/{uuid.uuid4()}", json={"reviewed": True})
+
+    assert response.status_code == 401
+
+
+async def test_patch_nonexistent_event_returns_404(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.patch(f"/api/v1/events/{uuid.uuid4()}", json={"reviewed": True})
+
+    assert response.status_code == 404
+
+
+async def test_patch_another_users_event_returns_404_and_does_not_update(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _register_and_login(client)
+
+    other_user = User(email=unique_email(), hashed_password="x")
+    db_session.add(other_user)
+    await db_session.flush()
+    other_run = await _make_run(db_session, other_user.id)
+    other_event = _event(other_user.id, other_run.id)
+    db_session.add(other_event)
+    await db_session.flush()
+    other_event_id = other_event.id
+
+    response = await client.patch(f"/api/v1/events/{other_event_id}", json={"reviewed": True})
+
+    assert response.status_code == 404
+    await db_session.refresh(other_event)
+    assert other_event.reviewed is False
+
+
 async def test_get_events_multiple_filters_compose_with_and_logic(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:

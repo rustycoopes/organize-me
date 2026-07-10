@@ -47,6 +47,7 @@ def _dashboard_url(
     date_to: date_ | None,
     q: str | None,
     sort: SortOrder,
+    show_reviewed: bool = False,
 ) -> str:
     """Build a /dashboard URL carrying only the non-default filters, so a plain unfiltered link
     stays as short as ``/dashboard?page=2`` (existing pagination tests assert this exact form)."""
@@ -61,6 +62,8 @@ def _dashboard_url(
         params["q"] = q
     if sort != "desc":
         params["sort"] = sort
+    if show_reviewed:
+        params["show_reviewed"] = "true"
     params["page"] = str(page)
     return f"/dashboard?{urlencode(params)}"
 
@@ -74,6 +77,7 @@ async def dashboard_page(
     date_to: str | None = Query(default=None),
     q: str | None = Query(default=None),
     sort: SortOrder = Query(default="desc"),
+    show_reviewed: bool = Query(default=False),
     user: User | None = Depends(current_active_user_optional),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -93,13 +97,19 @@ async def dashboard_page(
         date_to=parsed_date_to,
         search=q,
         sort=sort,
+        show_reviewed=show_reviewed,
     )
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     # Bound to the current filters so every call site below only has to vary page/sort - keeping
     # a filter param out of sync across prev/next/sort/redirect (four call sites) isn't possible
     # since there's only one place they're threaded through.
     url_for = partial(
-        _dashboard_url, type=type, date_from=parsed_date_from, date_to=parsed_date_to, q=q
+        _dashboard_url,
+        type=type,
+        date_from=parsed_date_from,
+        date_to=parsed_date_to,
+        q=q,
+        show_reviewed=show_reviewed,
     )
     # A page beyond the last valid one (e.g. a stale bookmark, or the last event on that page was
     # just deleted) would otherwise render the empty-state message even though the user has
@@ -110,7 +120,14 @@ async def dashboard_page(
         return RedirectResponse(url_for(page=total_pages, sort=sort), status_code=302)
 
     event_types = await list_user_event_types(db, user.id)
-    has_active_filters = bool(type or parsed_date_from or parsed_date_to or q)
+    # list_user_event_types is unaffected by any filter (see its docstring), so a non-empty result
+    # here means the user has events somewhere even if none are showing - e.g. every event is
+    # reviewed and "Show reviewed" is off. Without this, a returning user whose events are all
+    # reviewed would see the misleading first-time "No events yet" message instead of "No events
+    # match these filters" (#113).
+    has_active_filters = bool(
+        type or parsed_date_from or parsed_date_to or q or show_reviewed or event_types
+    )
     is_htmx_request = request.headers.get("hx-request") == "true"
     # Only the full-page template renders the Import pending files button - skip the extra query
     # on every HTMX filter/sort/pagination request, which never re-renders it.
@@ -130,6 +147,7 @@ async def dashboard_page(
             "date_to": parsed_date_to.isoformat() if parsed_date_to else "",
             "q": q or "",
             "sort": sort,
+            "show_reviewed": show_reviewed,
         },
         "prev_url": url_for(page=page - 1, sort=sort) if page > 1 else None,
         "next_url": url_for(page=page + 1, sort=sort) if page < total_pages else None,
