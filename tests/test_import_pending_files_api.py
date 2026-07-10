@@ -19,6 +19,16 @@ from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.user import User
 from app.services.storage.base import RemoteFile
 from app.services.storage.fake import FakeStorageProvider
+from app.services.storage.google_drive import GoogleDriveError
+
+
+class _FailingStorageProvider(FakeStorageProvider):
+    """A storage provider whose file listing blows up, mirroring a real Drive/Dropbox API
+    failure (expired token, unreachable folder, etc.) so the endpoint's error handling can be
+    exercised without a live provider."""
+
+    async def list_new_files(self) -> list[RemoteFile]:
+        raise GoogleDriveError("Drive API GET https://www.googleapis.com/drive/v3/files failed (401)")
 
 
 def unique_email() -> str:
@@ -82,6 +92,26 @@ async def test_import_pending_files_returns_400_when_nothing_is_pending(
 
     assert response.status_code == 400
     assert response.json()["detail"] == "no_pending_files"
+
+
+async def test_import_pending_files_returns_502_with_detail_when_storage_listing_fails(
+    client: AsyncClient,
+) -> None:
+    """Regression test for #143: a Drive/Dropbox API failure while listing pending files used to
+    propagate as an unhandled 500 with no ``detail`` body, so the client fell back to the generic
+    "Import failed. Please try again." message with no indication of what actually went wrong.
+    It should instead surface a specific, mappable detail code (and the run-creating/scheduling
+    steps must never be reached, since there's no file list to act on)."""
+    await _register_and_login(client)
+    _override_storage(_FailingStorageProvider())
+    scheduler = _RecordingBatchScheduler()
+    _override_scheduler(scheduler)
+
+    response = await client.post("/api/v1/import-pending-files")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "storage_error"
+    assert scheduler.calls == []
 
 
 async def test_import_pending_files_creates_one_run_per_file_and_schedules_batch(

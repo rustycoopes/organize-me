@@ -14,7 +14,16 @@ chosen v1 UX - a fully "watch every file complete live" UI was considered and de
 
 Requires a connected storage provider - no ephemeral fallback like ``app.api.v1.upload``'s
 ``get_upload_storage``, since there's no watch folder to scan without one.
+
+Fix (#143): a Drive/Dropbox API failure while listing pending files (expired token, unreachable
+watch folder, etc.) used to propagate out of this endpoint as an unhandled exception - FastAPI's
+default handler turns that into a bare 500 with no ``detail`` body, so the client fell back to a
+generic "Import failed. Please try again." with no indication of what went wrong. ``list_new_files``
+is now wrapped so the failure is logged (with the user id, for support/log correlation) and returned
+as a distinguishable ``storage_error`` detail the client maps to an actionable message.
 """
+
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +39,11 @@ from app.models.user import User
 from app.services.llm.gemini import GeminiClient, get_gemini_client
 from app.services.notifications.pipeline import NotificationSender, get_pipeline_notifier
 from app.services.storage.base import StorageProvider
+from app.services.storage.dropbox import DropboxError
 from app.services.storage.factory import build_storage_provider
+from app.services.storage.google_drive import GoogleDriveError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["import-pending-files"])
 
@@ -64,7 +77,14 @@ async def import_pending_files(
     notifier: NotificationSender = Depends(get_pipeline_notifier),
     scheduler: PipelineScheduler = Depends(get_pipeline_scheduler),
 ) -> dict[str, str]:
-    pending_files = await storage.list_new_files()
+    try:
+        pending_files = await storage.list_new_files()
+    except (GoogleDriveError, DropboxError):
+        logger.exception("import-pending-files: listing failed for user %s", user.id)
+        await storage.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="storage_error"
+        ) from None
     if not pending_files:
         # No batch to hand off to the scheduler, so this endpoint owns closing the provider itself
         # (schedule_batch's background task closes it for us on every other path).

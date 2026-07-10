@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-10 (issue #94 — S3 StorageProvider implementation)
+**Last updated:** 2026-07-10 (issue #143 — import-pending-files error detail fix)
 
 ---
 
@@ -230,6 +230,26 @@ error-wrapping convention, and added a factory test asserting decrypted credenti
 `boto3.client(...)`. Two lower-priority ideas deferred to `modelsuggested` issues #149
 (retry/backoff on S3 throttling) and #150 (`boto3.client()` construction blocking the event loop).
 With #94, Slice 8 has only #95 (Settings > Storage tab UI for all three providers) outstanding.
+
+**Bug #143 fixed (import-pending-files failed in prod with no error detail).** Root cause: a
+Drive/Dropbox API failure while listing pending files (`POST /api/v1/import-pending-files`) or
+writing an uploaded file (`POST /api/v1/upload`) propagated as an unhandled exception — FastAPI's
+default handler turns that into a bare 500 with no `detail` body, so the client's `messageFor()`
+map had nothing to key off and always showed the generic "Import/Upload failed. Please try again.",
+exactly the reported symptom (files visibly waiting in Drive, the button fails anyway with no
+explanation). Fixed on branch `fix/import-pending-files-error-detail`, in an isolated worktree: both
+endpoints now catch `GoogleDriveError`/`DropboxError` around the storage call, `logger.exception` it
+(with the user id, for support/log correlation), close the provider, and return `502` with detail
+`storage_error`, mapped by `import_pending_button.html`/`upload.html` to "Could not reach your storage
+provider. Try reconnecting it in Settings, or try again in a moment." 2 new regression tests; full
+suite green; `mypy --strict` clean. The first draft wrote "Couldn't" - a literal apostrophe inside
+the single-quoted `x-data='...'` Alpine attribute, terminating it early and breaking Alpine init for
+the whole button (the same bug class #23's `register.html` fix already warned about in this file).
+`e2e-qa` caught it live against deployed QA (`import-pending-files.spec.ts`/`processing.spec.ts`
+failing even though the backend was independently verified correct via direct API calls); reworded
+to "Could not" to sidestep the apostrophe. Two lower-priority improvements deferred to
+`modelsuggested` issues #146 (distinguish auth-failure from transient errors with a dedicated
+`storage_reauth_required` detail) and #147 (e2e coverage for the `storage_error` path).
 
 ## Completed Milestones
 

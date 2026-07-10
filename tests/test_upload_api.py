@@ -17,6 +17,7 @@ from app.models.processing_run import ProcessingRun
 from app.models.user import User
 from app.services.storage.base import RemoteFile, StorageProvider
 from app.services.storage.fake import FakeStorageProvider
+from app.services.storage.google_drive import GoogleDriveError
 
 
 def unique_email() -> str:
@@ -122,6 +123,32 @@ async def test_upload_rejects_empty_file(client: AsyncClient) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "empty_file"
+
+
+async def test_upload_returns_502_with_detail_when_storage_write_fails(
+    client: AsyncClient,
+) -> None:
+    """Regression test for #143 (same fix applied to the manual-upload path that shares the
+    unhandled-storage-exception gap): a Drive/Dropbox write failure while writing the uploaded
+    file into the watch folder must surface as a mappable ``storage_error`` detail rather than a
+    bare 500, and must not create/schedule a run."""
+
+    class _FailingStorageProvider(FakeStorageProvider):
+        async def upload_file(self, name: str, content: bytes) -> RemoteFile:
+            raise GoogleDriveError("Drive API POST https://www.googleapis.com/drive/v3/files failed (401)")
+
+    await _register_and_login(client)
+    _override_storage(_FailingStorageProvider())
+    scheduler = _RecordingScheduler()
+    _override_scheduler(scheduler)
+
+    response = await client.post(
+        "/api/v1/upload", files={"file": ("chat.txt", b"hi", "text/plain")}
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "storage_error"
+    assert scheduler.calls == []
 
 
 async def test_successful_upload_creates_run_flips_onboarding_and_schedules(
