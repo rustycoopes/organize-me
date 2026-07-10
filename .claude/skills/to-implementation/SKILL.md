@@ -8,9 +8,9 @@ description: Implement the new feature onto a branch. Ensure there is a loop to 
 Implement the work described by the issues.
 When starting the issue, move the status to inprogress.
 
-Read only the relevant per-slice spec for this issue — `docs/slices/slice-N.md` (each embeds
+Read only the relevant per-slice spec for this issue — `docs/platform-restructure/WBS/slice-R<N>.md` (each embeds
 the schema, endpoints, and utilities that slice needs). Don't load the full
-`docs/implementation-plan.md`, PRD, or technical-approach unless a specific question requires it.
+`docs/platform-restructure/platform-restructure-prd.md`, PRD, or technical-approach unless a specific question requires it.
 
 Use /tdd where possible, at pre-agreed seams.
 
@@ -21,18 +21,12 @@ Treat this chnage as a major feature and follow the steps defined in claude.md t
 
 Assume mulitple agents are running so use a seperate directory / worktree for this work
 
-Implement this feature as efficiently as possible.
+Implement this feature as efficiently as possible, use sub-agents where appropriate.
 
-Once the implementation is working, do a SINGLE improvement pass: compare the work against the
-original issue (and the slice spec) and list up to 3 concrete improvements that would improve the
-code or align better with what is required. 
-implement the improvements you recommend for addressing now. 
+Once the implementation is working, do a compare the work against the to ensure all item are accounted for
+Once done, perform a through code review the work.  use the code-review-master and code-quality-guardian agents to find improvements.
+If chnages are recommended, implement them now. 
 For all other suggested improvements Create a GitHub issue with the status of intake. And a label with the slice name. Also add a label  "modelsuggested". 
-
-
-Once done, use /review to review the work.
-
-After the implementation, ensure all changes are commited to local git using a meaningful message. 
 
 Commit all outstanding changes to GitHub with a meaningful message. Push the changes to remote. Then raise a PR to merge this all into main. Make sure that the Git Hub build completes correctly and any deployment is successful.
 
