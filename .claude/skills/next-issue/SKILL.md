@@ -21,8 +21,9 @@ build order gives the project a solid base: finish earlier slices before later o
 broken before adding new things, land foundational pieces before the work that depends on them, and
 don't sink effort into low-priority polish while higher-value work sits waiting.
 
-**Scope: all slices, earliest first.** This skill considers `Todo` issues from every slice
-(`slice1`, `slice2`, `slice3`, …), but strongly prefers the lowest-numbered slice that still has
+**Scope: all slices, earliest first.** This skill considers `Todo` issues labeled 'framework-refactor' and 'restructure-rN'.  Each increment of label
+(`restructure-r1`, `restructure-r2`, `restructure-r3`, …) is considered a slice.
+, you should strongly prefer the lowest-numbered slice that still has
 ready work — an earlier slice is the foundation later ones build on, so it gets drained before the
 next one starts. Only once a slice has no `Todo` work does selection move to the next slice up.
 
@@ -30,6 +31,10 @@ next one starts. Only once a slice has no `Todo` work does selection move to the
 another worker (or a concurrent loop session) owns it. Never pick, resume, or hand off to an
 `In Progress` issue, even if it would otherwise be the highest-priority next thing to do. Select
 only from work that has **not been started** (`Todo`) and work identified as an "enhancement" not a "future-enhancement. 
+
+
+
+
 If the item you'd expect to pick next is
 `In Progress`, skip it and take the next-best not-started `Todo` item instead. The gathering helper
 in Step 1 already filters to `Todo`, so `In Progress` issues won't appear in the candidate list —
@@ -61,7 +66,7 @@ work. Everything in higher-numbered slices is out of contention for this run.
 Then, within that slice, priority is strict across tiers, highest first:
 
 1. **`bug`** — a broken thing undermines the base everything else builds on, so bugs come first.
-2. **`enhancement`** — the planned features for that slice.
+2. **`framework-refactor`** — the planned features for that slice.
 3. **`future-enhancement`** — deferred improvements/decisions; worth doing but lowest priority.
 
 Take the highest non-empty tier. Everything below it is out of contention — you only choose *within*
@@ -75,7 +80,8 @@ Do **not** default to the lowest issue number. Read the candidate issues in the 
 - **What unblocks the most?** An issue that other Todo issues depend on should go first. Issue
   bodies often say this outright (e.g. "Blocked by #17", "before #16/#17"). Prefer the *unblocker*
   over the *blocked*. (Example: sidebar shell #17 is a dependency of the E2E-tests issue #23, so
-  #17 goes first even though both are enhancements.)
+  #17 goes first even though both are enhancement
+  s.)
 - **What's foundational?** Shared plumbing, scaffolding, or interfaces that later work reuses beat
   leaf features.
 - **Is it actually ready?** If a candidate is blocked by something still open, or (common for
