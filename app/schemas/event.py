@@ -16,6 +16,7 @@ class EventRead(BaseModel):
     raw_date_text: str
     agreed_by: list[str]
     created_at: datetime
+    reviewed: bool
     calendar_url: str | None
     tasks_url: str | None
 
@@ -27,3 +28,9 @@ class EventListRead(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class EventUpdate(BaseModel):
+    """Body of ``PATCH /api/v1/events/{id}`` (#113) - only the reviewed flag is user-settable."""
+
+    reviewed: bool

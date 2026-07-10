@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import Date, DateTime, ForeignKey, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -49,3 +49,5 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Marked by the user on the dashboard (#113) to hide old, already-addressed events by default.
+    reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
