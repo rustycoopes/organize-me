@@ -49,8 +49,16 @@ class PipelineNotification:
 
 
 class NotificationSender(Protocol):
-    async def send(self, notification: PipelineNotification) -> None:
-        """Deliver (or, this slice, log) a processing-run notification."""
+    async def send(self, notification: PipelineNotification) -> list[str]:
+        """Deliver (or, this slice, log) a processing-run notification.
+
+        Returns a description of each enabled channel that failed to actually deliver (issue
+        #144) - empty if every channel the user has enabled either sent successfully or was
+        itself not applicable (e.g. no phone number on file, already covered by the separate
+        "silent mode" warning in ``app.services.pipeline.runner``). The caller (the pipeline's
+        Notify step) surfaces these as log lines so a real delivery failure - as opposed to
+        expected user configuration - is visible instead of only reaching server-side logs.
+        """
         ...
 
 
@@ -60,7 +68,7 @@ class LoggingNotificationSender:
     A real SMS+email sender replaces this in Slice 7 behind the same Protocol; the pipeline is
     unaffected."""
 
-    async def send(self, notification: PipelineNotification) -> None:
+    async def send(self, notification: PipelineNotification) -> list[str]:
         logger.info(
             "processing-run notification: run=%s user=%s outcome=%s new_events=%d file=%s :: %s",
             notification.run_id,
@@ -70,16 +78,22 @@ class LoggingNotificationSender:
             notification.filename,
             notification.message,
         )
+        return []
 
 
 class FakeNotificationSender:
-    """Records notifications instead of sending them. Used in tests to assert the step-7 payload."""
+    """Records notifications instead of sending them. Used in tests to assert the step-7 payload.
+
+    ``failures`` can be set by a test before calling ``send()`` to simulate a delivery failure
+    surfacing through the pipeline (issue #144) without needing a real failing channel sender."""
 
     def __init__(self) -> None:
         self.sent: list[PipelineNotification] = []
+        self.failures: list[str] = []
 
-    async def send(self, notification: PipelineNotification) -> None:
+    async def send(self, notification: PipelineNotification) -> list[str]:
         self.sent.append(notification)
+        return list(self.failures)
 
 
 def get_pipeline_notifier() -> NotificationSender:

@@ -435,3 +435,35 @@ async def test_notify_step_has_no_warning_when_fully_configured(
 
     assert not any(line.startswith("Warning:") for line in notify_step.log_lines)
     assert notify_step.status == ProcessingStepStatus.SUCCESS
+
+
+async def test_notify_step_warns_when_delivery_fails(db_session: AsyncSession) -> None:
+    """Regression test for #144: both notification channels enabled (no "silent mode" warning
+    applies) but the actual send raised - e.g. Resend's sandbox sender rejecting a recipient
+    that isn't the account's own verified address. That failure must land in the Notify step's
+    log_lines so it's visible via /processing-runs/{id}/logs, instead of vanishing into only
+    server-side logs while the step (and the user-visible run) reports plain success."""
+    user = await _make_user(db_session)
+    user.phone_number = "+15551234567"
+    await db_session.flush()
+    run = await _make_run(db_session, user, "chat.txt")
+    storage = FakeStorageProvider()
+    remote_file = await storage.upload_file("chat.txt", b"data")
+    notifier = FakeNotificationSender()
+    notifier.failures = ["email delivery failed: Resend: recipient not verified"]
+
+    await run_pipeline(
+        db_session,
+        run=run,
+        user_id=user.id,
+        remote_file=remote_file,
+        storage=storage,
+        gemini=FakeGeminiClient("[]"),
+        notifier=notifier,
+        prompt_text="extract events",
+    )
+
+    steps = await _steps(db_session, run.id)
+    notify_step = steps[-1]
+    assert notify_step.status == ProcessingStepStatus.SUCCESS
+    assert "Warning: email delivery failed: Resend: recipient not verified" in notify_step.log_lines

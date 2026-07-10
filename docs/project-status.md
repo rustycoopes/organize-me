@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-10 (issue #143 — import-pending-files error detail fix)
+**Last updated:** 2026-07-10 (issue #144 — notification delivery visibility fix)
 
 ---
 
@@ -250,6 +250,26 @@ failing even though the backend was independently verified correct via direct AP
 to "Could not" to sidestep the apostrophe. Two lower-priority improvements deferred to
 `modelsuggested` issues #146 (distinguish auth-failure from transient errors with a dedicated
 `storage_reauth_required` detail) and #147 (e2e coverage for the `storage_error` path).
+
+**Bug #144 fixed (notifications silently not delivered in prod, no error shown).** Root cause: a
+real email/SMS delivery failure inside `RealNotificationSender._send_with_session` was swallowed by
+a bare `except Exception: logger.exception(...)` per channel - the pipeline's Notify step still
+logged "Notified user: ..." and reported success regardless, so the failure was indistinguishable
+from a real send anywhere the user or support could see, exactly the reported symptom (preferences
+correctly set to notify, no error, but nothing arrived). Fixed on branch
+`fix/notification-delivery-visibility`, in an isolated worktree: `NotificationSender.send()` now
+returns `list[str]` describing each channel that raised, and `_notify()`
+(`app/services/pipeline/runner.py`) appends each as a `Warning: ...` log line on the Notify step,
+visible via `/processing-runs/{id}/logs` - the same convention #112 already established for
+silently-disabled channels, extended to genuine delivery failures. Also gave `ResendEmailSender` the
+fail-fast-on-unset-config guard `TwilioSmsSender` already had (closing issue #124's deferred
+email-side half): a missing `RESEND_API_KEY` now raises a clear error immediately instead of a
+confusing Resend SDK error. 4 new regression tests; full suite green; `mypy --strict` clean.
+Investigating surfaced the likely actual root cause: `Settings.email_from` defaults to Resend's
+shared sandbox sender (`onboarding@resend.dev`), which only delivers to the Resend account's own
+verified address - if prod hasn't verified a custom domain, this is an account/DNS-level fix outside
+the repo, filed as `modelsuggested` issue #152 (**human setup**, same class of gap as #61/#72's
+other provider-account setup steps).
 
 ## Completed Milestones
 
