@@ -168,6 +168,82 @@ async def test_read_never_leaks_stored_credentials(
     assert body["is_connected"] is True
 
 
+async def test_put_switching_provider_clears_stale_credentials(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Regression test (#93 review): switching provider must clear the old provider's credentials,
+    so a config can't end up "connected" (oauth_access_token set) while `provider` points at a
+    different backend than the one those credentials actually authenticate - which would otherwise
+    let a stale-but-still-connected config reach build_storage_provider's not-yet-implemented-S3
+    ValueError, or hand Dropbox calls a Google Drive token."""
+    await _register_and_login(client)
+    me = await client.get("/api/v1/users/me")
+    user_id = uuid.UUID(me.json()["id"])
+
+    secret = "super-secret-encrypted-token-value"
+    db_session.add(
+        StorageConfig(
+            user_id=user_id,
+            provider=StorageProviderType.GOOGLE_DRIVE,
+            folder_path="/OrganizeMe",
+            oauth_access_token=secret,
+            oauth_refresh_token=secret,
+        )
+    )
+    await db_session.flush()
+
+    response = await client.put(
+        "/api/v1/storage-config",
+        json={"provider": "dropbox", "folder_path": "/OrganizeMe"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_connected"] is False
+
+    config = (
+        await db_session.scalars(select(StorageConfig).where(StorageConfig.user_id == user_id))
+    ).one()
+    assert config.provider == StorageProviderType.DROPBOX
+    assert config.oauth_access_token is None
+    assert config.oauth_refresh_token is None
+
+
+async def test_put_same_provider_keeps_existing_credentials(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """The credential-clearing on provider switch must not fire when the provider is unchanged
+    (e.g. just editing the folder path of an already-connected config)."""
+    await _register_and_login(client)
+    me = await client.get("/api/v1/users/me")
+    user_id = uuid.UUID(me.json()["id"])
+
+    secret = "super-secret-encrypted-token-value"
+    db_session.add(
+        StorageConfig(
+            user_id=user_id,
+            provider=StorageProviderType.GOOGLE_DRIVE,
+            folder_path="/OrganizeMe",
+            oauth_access_token=secret,
+            oauth_refresh_token=secret,
+        )
+    )
+    await db_session.flush()
+
+    response = await client.put(
+        "/api/v1/storage-config",
+        json={"provider": "google_drive", "folder_path": "/OrganizeMe/new-path"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_connected"] is True
+
+    config = (
+        await db_session.scalars(select(StorageConfig).where(StorageConfig.user_id == user_id))
+    ).one()
+    assert config.folder_path == "/OrganizeMe/new-path"
+    assert config.oauth_access_token == secret
+
+
 async def test_get_requires_authentication(client: AsyncClient) -> None:
     response = await client.get("/api/v1/storage-config")
     assert response.status_code == 401

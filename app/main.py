@@ -12,6 +12,7 @@ from app.api.v1.internal_e2e import router as internal_e2e_router
 from app.api.v1.llm_prompt import router as llm_prompt_router
 from app.api.v1.processing_runs import router as processing_runs_router
 from app.api.v1.storage_config import router as storage_config_router
+from app.api.v1.storage_dropbox import router as storage_dropbox_router
 from app.api.v1.storage_google_drive import router as storage_google_drive_router
 from app.api.v1.upload import router as upload_router
 from app.api.v1.users import router as users_router
@@ -46,6 +47,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(storage_config_router)
 app.include_router(storage_google_drive_router)
+app.include_router(storage_dropbox_router)
 app.include_router(upload_router)
 app.include_router(import_pending_files_router)
 app.include_router(events_router)
