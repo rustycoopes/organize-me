@@ -212,6 +212,25 @@ permissions) and set `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET` as 
 class of gap as issue #72's other provider setup steps. Settings > Storage tab UI support for
 Dropbox (#95, blocked on this issue and #94) is next once #94 (S3) lands.
 
+**Slice 8.2 (S3 StorageProvider) implemented.** Issue #94 is implemented on branch
+`feature/s3-storage-provider`, in an isolated worktree: `S3StorageProvider`
+(`app/services/storage/s3.py`) implements the `StorageProvider` ABC against a user's manually-
+entered AWS credentials (access key, secret, bucket, region — no OAuth, the other half of the
+Slice 8 pair alongside Dropbox's OAuth flow), using `boto3` with every blocking call wrapped in
+`asyncio.to_thread` (per the issue's specified approach, mirroring `ResendEmailSender` rather than
+adding `aioboto3`). `list_new_files` lists with `Delimiter="/"` so S3's natively-recursive prefix
+listing matches the non-recursive, direct-children-only semantics Dropbox/Google Drive already
+have; `move_file` is copy-then-delete (S3 has no native move). `app/services/storage/factory.py`
+gains `build_s3_provider`, decrypting all four stored credential columns and completing
+`build_storage_provider`'s provider branching (previously raised `unsupported storage provider`
+for S3). 14 new provider tests + 2 new factory tests via a hand-rolled fake S3 client (no live AWS
+credentials touched in CI); full suite (455 tests) + `mypy --strict` clean. Improvement pass:
+wrapped boto3 errors in a (previously-defined-but-unused) `S3Error`, matching `DropboxError`'s
+error-wrapping convention, and added a factory test asserting decrypted credentials actually reach
+`boto3.client(...)`. Two lower-priority ideas deferred to `modelsuggested` issues #149
+(retry/backoff on S3 throttling) and #150 (`boto3.client()` construction blocking the event loop).
+With #94, Slice 8 has only #95 (Settings > Storage tab UI for all three providers) outstanding.
+
 **Bug #143 fixed (import-pending-files failed in prod with no error detail).** Root cause: a
 Drive/Dropbox API failure while listing pending files (`POST /api/v1/import-pending-files`) or
 writing an uploaded file (`POST /api/v1/upload`) propagated as an unhandled exception — FastAPI's
