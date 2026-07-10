@@ -43,7 +43,7 @@ class RealNotificationSender:
             )
         self.jinja_env = RealNotificationSender._jinja_env
 
-    async def send(self, notification: PipelineNotification) -> None:
+    async def send(self, notification: PipelineNotification) -> list[str]:
         """Send email + SMS notifications for a processing run.
 
         Fetches the user's contact info and notification preferences, renders the
@@ -52,17 +52,25 @@ class RealNotificationSender:
         """
         # Get a database session to fetch the user
         async for session in get_db():
-            await self._send_with_session(session, notification)
-            return
+            return await self._send_with_session(session, notification)
+        return []  # pragma: no cover - get_db always yields at least one session
 
     async def _send_with_session(
         self, session: AsyncSession, notification: PipelineNotification
-    ) -> None:
-        """Internal method that accepts a session (useful for testing)."""
+    ) -> list[str]:
+        """Internal method that accepts a session (useful for testing).
+
+        Returns a description of each enabled channel that raised while actually attempting
+        delivery (issue #144) - a real failure (bad/unset credentials, the provider rejecting the
+        recipient, a network error, ...) was previously only ever logged server-side via
+        ``logger.exception``, indistinguishable from a genuine send by the pipeline's Notify step
+        or the user."""
         user = await session.get(User, notification.user_id)
         if user is None:
             logger.warning("User not found for notification: %s", notification.user_id)
-            return
+            return []
+
+        failures: list[str] = []
 
         if user.notification_email:
             try:
@@ -71,10 +79,11 @@ class RealNotificationSender:
                 else:
                     # SUCCESS and NO_NEW_EVENTS both use the success template
                     await self._send_success_email(user.email, notification)
-            except Exception:
+            except Exception as exc:
                 logger.exception(
                     "Failed to send notification email to user %s", notification.user_id
                 )
+                failures.append(f"email delivery failed: {exc}")
         else:
             logger.debug(
                 "Skipping email notification: user %s has notification_email=False",
@@ -94,15 +103,18 @@ class RealNotificationSender:
                         await self._send_failure_sms(user.phone_number, notification)
                     else:
                         await self._send_success_sms(user.phone_number, notification)
-                except Exception:
+                except Exception as exc:
                     logger.exception(
                         "Failed to send notification SMS to user %s", notification.user_id
                     )
+                    failures.append(f"SMS delivery failed: {exc}")
         else:
             logger.debug(
                 "Skipping SMS notification: user %s has notification_sms=False",
                 notification.user_id,
             )
+
+        return failures
 
     async def _send_success_email(
         self, to_email: str, notification: PipelineNotification

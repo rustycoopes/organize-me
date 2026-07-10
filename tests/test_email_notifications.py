@@ -200,3 +200,64 @@ class TestEmailNotifications:
 
         email = fake_email_sender.sent[0]
         assert f"/runs/{run_id}" in email["html"]
+
+    async def test_send_with_session_returns_failure_when_email_delivery_raises(
+        self, test_user: User, db_session: AsyncSession
+    ) -> None:
+        """Regression test for #144: a live Resend delivery failure (e.g. the account's
+        onboarding@resend.dev sandbox sender rejecting a recipient that isn't the account's own
+        verified address - see `Settings.email_from`'s docstring) used to be swallowed by a bare
+        `except Exception: logger.exception(...)`, so the Notify step still logged "Notified
+        user: ..." and succeeded even though nothing was actually delivered - exactly the
+        reported symptom (no error, but no email). `_send_with_session` must now return a
+        description of the failure instead of swallowing it silently."""
+
+        class _FailingEmailSender:
+            async def send(self, *, to: str, subject: str, html: str) -> None:
+                raise RuntimeError("Resend: recipient not verified for sandbox sender")
+
+        sender = RealNotificationSender(email_sender=_FailingEmailSender())
+        notification = PipelineNotification(
+            user_id=test_user.id,
+            run_id=uuid.uuid4(),
+            filename="chat.txt",
+            outcome=NotificationOutcome.SUCCESS,
+            new_event_count=1,
+            message="1 new event added.",
+        )
+
+        failures = await sender._send_with_session(db_session, notification)
+
+        assert len(failures) == 1
+        assert "email" in failures[0].lower()
+        assert "recipient not verified" in failures[0]
+
+
+class TestResendEmailSender:
+    async def test_raises_clear_error_when_api_key_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ResendEmailSender.send() should fail loudly and clearly if RESEND_API_KEY is unset,
+        rather than surfacing a confusing error from the Resend SDK itself - mirrors
+        TwilioSmsSender's equivalent guard (issue #124's deferred email-side half)."""
+        import app.services.notifications.email as email_module
+        from app.core.config import Settings
+        from app.services.notifications.email import ResendEmailSender
+
+        unset_settings = Settings(
+            database_url="postgresql://unused",
+            jwt_secret="unused",
+            google_oauth_client_id="unused",
+            google_oauth_client_secret="unused",
+            google_oauth_redirect_uri="unused",
+            # Explicit empty string: pydantic-settings otherwise falls back to reading
+            # .env.local for any field not passed here, which would pick up this worktree's
+            # real Resend key and defeat the point of this test.
+            resend_api_key="",
+        )
+        monkeypatch.setattr(email_module, "get_settings", lambda: unset_settings)
+
+        sender = ResendEmailSender()
+
+        with pytest.raises(RuntimeError, match="RESEND_API_KEY"):
+            await sender.send(to="user@example.com", subject="hi", html="<p>hi</p>")

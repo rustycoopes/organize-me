@@ -193,6 +193,33 @@ class TestSmsNotifications:
 
         assert len(fake_sms_sender.sent) == 0
 
+    async def test_send_with_session_returns_failure_when_sms_delivery_raises(
+        self, test_user: User, db_session: AsyncSession
+    ) -> None:
+        """Regression test for #144, SMS side of the same fix as the email delivery-failure
+        test: a raised send must be returned as a failure description, not silently absorbed by
+        the bare except that used to leave the pipeline's Notify step none the wiser."""
+
+        class _FailingSmsSender:
+            async def send(self, *, to: str, body: str) -> None:
+                raise RuntimeError("Twilio: unverified destination number")
+
+        sender = RealNotificationSender(sms_sender=_FailingSmsSender())
+        notification = PipelineNotification(
+            user_id=test_user.id,
+            run_id=uuid.uuid4(),
+            filename="chat.txt",
+            outcome=NotificationOutcome.SUCCESS,
+            new_event_count=1,
+            message="1 new event added.",
+        )
+
+        failures = await sender._send_with_session(db_session, notification)
+
+        assert len(failures) == 1
+        assert "sms" in failures[0].lower()
+        assert "unverified destination number" in failures[0]
+
 
 class TestTwilioSmsSender:
     async def test_raises_clear_error_when_credentials_unset(

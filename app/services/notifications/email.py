@@ -19,6 +19,11 @@ class ResendEmailSender:
 
     async def send(self, *, to: str, subject: str, html: str) -> None:
         settings = get_settings()
+        if not settings.resend_api_key:
+            raise RuntimeError(
+                "ResendEmailSender used but RESEND_API_KEY is unset - wire that secret into "
+                "this environment before email notifications can send."
+            )
         resend.api_key = settings.resend_api_key
         # resend's SendClient is a blocking (requests-based) client; run it off the
         # event loop thread so a slow/hanging call to Resend can't stall the server.

@@ -10,6 +10,31 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #144 fixed** — notification delivery failures now surface with detail (branch
+  `fix/notification-delivery-visibility`). A real email/SMS delivery failure (bad/unset
+  credentials, the provider rejecting the recipient, a network error, ...) inside
+  `RealNotificationSender._send_with_session` (`app/services/notifications/sender.py`) used to be
+  swallowed by a bare `except Exception: logger.exception(...)` per channel - the pipeline's
+  Notify step still logged "Notified user: ..." and reported success regardless, so a genuine
+  delivery failure was indistinguishable from a real send anywhere the user (or support) could
+  see, exactly the reported symptom: preferences correctly set to notify, no error shown, but no
+  email/SMS ever arrived. `NotificationSender.send()` (the pipeline's boundary Protocol, `app/
+  services/notifications/pipeline.py`) now returns `list[str]` describing each enabled channel
+  that raised; `app/services/pipeline/runner.py::_notify()` appends each as a `Warning: ...` log
+  line on the Notify step (same convention #112 already established for silently-disabled
+  channels), visible via `/processing-runs/{id}/logs`. Also gave `ResendEmailSender.send()` the
+  same fail-fast-on-unset-config guard `TwilioSmsSender` already had (issue #124's deferred
+  email-side half) - a missing `RESEND_API_KEY` now raises a clear `RuntimeError` immediately
+  instead of a confusing Resend SDK error after a live network round-trip. 4 new regression tests
+  (email + SMS delivery-failure surfacing, the Notify step log line, the Resend config guard); full
+  suite green; `mypy --strict` clean. Investigating the report surfaced the likely actual root
+  cause: `Settings.email_from` defaults to Resend's shared sandbox sender
+  (`onboarding@resend.dev`), which Resend restricts to only deliver to the account's own verified
+  address - if prod hasn't verified a custom sending domain, arbitrary recipients' emails would be
+  rejected exactly like the reporter's symptom. That's an account/DNS-level fix outside this
+  repository, filed as `modelsuggested` issue #152; this fix's real, concrete value is making that
+  failure (or any other future one) visible instead of silent.
+
 - **Issue #143 fixed** — import-pending-files errors now surface with detail (branch
   `fix/import-pending-files-error-detail`). A Drive/Dropbox API failure while listing pending files
   (`POST /api/v1/import-pending-files`) or writing an uploaded file (`POST /api/v1/upload`) used to

@@ -214,7 +214,7 @@ async def _notify(
     """Run step 7: send the notification and record the step. Used by both the success and the
     failure paths so the user is always told how a run ended."""
     step = await _begin_step(session, run.id, STEP_NOTIFY)
-    await notifier.send(
+    delivery_failures = await notifier.send(
         PipelineNotification(
             user_id=user_id,
             run_id=run.id,
@@ -229,8 +229,13 @@ async def _notify(
     warning = _silent_notification_modes_warning(user)
     if warning is not None:
         log_lines.append(warning)
-    # A disabled/unconfigured notification channel is expected user configuration, not a pipeline
-    # problem - the step still succeeds and the run's overall status is unaffected (issue #112).
+    # A genuine delivery failure (bad/unset credentials, the provider rejecting the recipient, a
+    # network error, ...) is different from an expected disabled/unconfigured channel above - it's
+    # unexpected and worth the user's/support's attention, so it's called out the same way (issue
+    # #144: previously only reached server-side logs, indistinguishable from a real send).
+    log_lines.extend(f"Warning: {failure}" for failure in delivery_failures)
+    # Neither case fails the step or the run's overall status (issue #112's precedent extended to
+    # #144: a notification problem is never a reason to mark the underlying processing as failed).
     await _finish_step(session, step, ProcessingStepStatus.SUCCESS, log_lines)
 
 
