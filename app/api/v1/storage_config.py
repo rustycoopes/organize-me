@@ -88,6 +88,21 @@ async def upsert_storage_config(
         )
         db.add(config)
     else:
+        if config.provider != payload.provider:
+            # Switching providers leaves any previously-connected credentials meaningless for the
+            # new one (a Google Drive OAuth token doesn't authenticate Dropbox calls, etc.) - clear
+            # them so `is_connected`/build_storage_provider don't act on stale, wrong-provider
+            # credentials. Without this, a config that's still "connected" by an old provider's
+            # token but now points `provider` at a not-yet-implemented backend (S3, until #94
+            # lands) would reach build_storage_provider's ValueError instead of the "please
+            # connect" state a genuinely-disconnected config gets.
+            config.oauth_access_token = None
+            config.oauth_refresh_token = None
+            config.oauth_token_expires_at = None
+            config.s3_access_key = None
+            config.s3_secret_key = None
+            config.s3_bucket_name = None
+            config.s3_region = None
         config.provider = payload.provider
         config.folder_path = payload.folder_path
     # get_db doesn't auto-commit, so persist here (savepoint-safe under the test fixture's
