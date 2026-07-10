@@ -10,6 +10,22 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #143 fixed** — import-pending-files errors now surface with detail (branch
+  `fix/import-pending-files-error-detail`). A Drive/Dropbox API failure while listing pending files
+  (`POST /api/v1/import-pending-files`) or writing an uploaded file (`POST /api/v1/upload`) used to
+  propagate as an unhandled exception, which FastAPI's default handler turns into a bare 500 with no
+  `detail` body - the client's `messageFor()` map had nothing to key off, so the user always saw the
+  generic "Import/Upload failed. Please try again." with no indication of what actually went wrong
+  (the reported symptom: files visibly waiting in Drive, click fails anyway, no explanation). Both
+  endpoints now catch `GoogleDriveError`/`DropboxError` around the storage call, `logger.exception`
+  it (with the user id, for support/log correlation), close the provider, and return a `502` with
+  detail `storage_error`, which `import_pending_button.html` and `upload.html` map to "Couldn't reach
+  your storage provider. Try reconnecting it in Settings, or try again in a moment." 2 new regression
+  tests (`test_import_pending_files_api.py`, `test_upload_api.py`), each asserting the 502/detail and
+  that no run is created/scheduled on failure. Two lower-priority improvements deferred to issues
+  #146 (distinguish auth-failure from transient errors with a dedicated `storage_reauth_required`
+  detail) and #147 (e2e coverage for the `storage_error` path), both `modelsuggested`.
+
 - **Issue #112 implemented** — log notification silent modes as warnings (branch
   `feature/slice-7-notify-silent-mode-warnings`). During the pipeline's Notify step,
   `_silent_notification_modes_warning()` adds one extra log line naming which channels won't

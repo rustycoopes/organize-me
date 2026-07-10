@@ -33,7 +33,9 @@ from app.services.llm.gemini import GeminiClient, get_gemini_client
 from app.services.notifications.pipeline import NotificationSender, get_pipeline_notifier
 from app.services.pipeline.runner import run_pipeline
 from app.services.storage.base import RemoteFile, StorageProvider
+from app.services.storage.dropbox import DropboxError
 from app.services.storage.factory import build_storage_provider
+from app.services.storage.google_drive import GoogleDriveError
 from app.api.v1.storage_config import get_user_storage_config
 
 logger = logging.getLogger(__name__)
@@ -273,8 +275,17 @@ async def upload_file(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="empty_file")
 
     # Write the bytes into the watch folder, then record the run so the pipeline (and #53's progress
-    # page) have a row to drive.
-    remote_file = await storage.upload_file(filename, content)
+    # page) have a row to drive. A Drive/Dropbox API failure here (expired token, unreachable watch
+    # folder) used to propagate as an unhandled 500 with no detail (#143) - surfaced as a
+    # distinguishable storage_error instead so the client can show an actionable message.
+    try:
+        remote_file = await storage.upload_file(filename, content)
+    except (GoogleDriveError, DropboxError):
+        logger.exception("upload: writing to storage failed for user %s", user.id)
+        await storage.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="storage_error"
+        ) from None
     run = ProcessingRun(
         user_id=user.id, filename=filename, status=ProcessingRunStatus.PENDING
     )

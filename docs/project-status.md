@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-10 (issue #112 — log notification silent modes as warnings)
+**Last updated:** 2026-07-10 (issue #143 — import-pending-files error detail fix)
 
 ---
 
@@ -211,6 +211,21 @@ works live:** register a Dropbox app (scoped access, `files.content.write`/`file
 permissions) and set `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET` as repo secrets — same
 class of gap as issue #72's other provider setup steps. Settings > Storage tab UI support for
 Dropbox (#95, blocked on this issue and #94) is next once #94 (S3) lands.
+
+**Bug #143 fixed (import-pending-files failed in prod with no error detail).** Root cause: a
+Drive/Dropbox API failure while listing pending files (`POST /api/v1/import-pending-files`) or
+writing an uploaded file (`POST /api/v1/upload`) propagated as an unhandled exception — FastAPI's
+default handler turns that into a bare 500 with no `detail` body, so the client's `messageFor()`
+map had nothing to key off and always showed the generic "Import/Upload failed. Please try again.",
+exactly the reported symptom (files visibly waiting in Drive, the button fails anyway with no
+explanation). Fixed on branch `fix/import-pending-files-error-detail`, in an isolated worktree: both
+endpoints now catch `GoogleDriveError`/`DropboxError` around the storage call, `logger.exception` it
+(with the user id, for support/log correlation), close the provider, and return `502` with detail
+`storage_error`, mapped by `import_pending_button.html`/`upload.html` to "Couldn't reach your storage
+provider. Try reconnecting it in Settings, or try again in a moment." 2 new regression tests; full
+suite green; `mypy --strict` clean. Two lower-priority improvements deferred to `modelsuggested`
+issues #146 (distinguish auth-failure from transient errors with a dedicated
+`storage_reauth_required` detail) and #147 (e2e coverage for the `storage_error` path).
 
 ## Completed Milestones
 
