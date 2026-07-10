@@ -14,8 +14,10 @@ The same provider instance is used for the upload write and then handed to the b
 task, so its underlying HTTP client lives for the whole run.
 """
 
-import httpx
 import logging
+
+import boto3
+import httpx
 
 from app.core.config import Settings
 from app.core.security import CredentialCipher
@@ -25,6 +27,7 @@ from app.services.storage.dropbox import DropboxStorageProvider
 from app.services.storage.ephemeral import EphemeralStorageProvider
 from app.services.storage.fake import FakeStorageProvider
 from app.services.storage.google_drive import GoogleDriveStorageProvider
+from app.services.storage.s3 import S3StorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +78,29 @@ def build_dropbox_provider(
     )
 
 
+def build_s3_provider(config: StorageConfig, cipher: CredentialCipher) -> S3StorageProvider:
+    """Construct a live S3 provider from a connected storage config.
+
+    All four fields are decrypted (per the Slice 8 spec, every credential column on
+    ``storage_configs`` - including bucket name and region, not just the access key/secret - is
+    stored encrypted at rest) and required: a config with ``provider = s3`` is only ever created
+    once all four are populated (#95's write path).
+    """
+    access_key = cipher.decrypt(config.s3_access_key) if config.s3_access_key else None
+    secret_key = cipher.decrypt(config.s3_secret_key) if config.s3_secret_key else None
+    bucket_name = cipher.decrypt(config.s3_bucket_name) if config.s3_bucket_name else None
+    region = cipher.decrypt(config.s3_region) if config.s3_region else None
+    if not (access_key and secret_key and bucket_name and region):
+        raise ValueError("S3 storage config is missing required credentials")
+    client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name=region,
+    )
+    return S3StorageProvider(client=client, bucket_name=bucket_name, folder_path=config.folder_path)
+
+
 def build_storage_provider(
     *,
     config: StorageConfig | None,
@@ -105,5 +131,6 @@ def build_storage_provider(
         return build_dropbox_provider(config, settings, cipher)
     if config.provider == StorageProviderType.GOOGLE_DRIVE:
         return build_google_drive_provider(config, settings, cipher)
-    # S3 lands in Slice 8.2 (#94); no live provider to build yet.
+    if config.provider == StorageProviderType.S3:
+        return build_s3_provider(config, cipher)
     raise ValueError(f"unsupported storage provider: {config.provider}")
