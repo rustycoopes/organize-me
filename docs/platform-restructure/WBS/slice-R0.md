@@ -1,4 +1,4 @@
-# Slice R0 — Acquire `organize-me.app` Domain + DNS Control
+# Slice R0 — Establish DNS Control for `organizeme.russcoopersoftware.com` (Squarespace subdomain)
 
 > Part of the OrganizeMe Platform Restructure. Structural PRD:
 > [`../platform-restructure-prd.md`](../platform-restructure-prd.md) ·
@@ -6,39 +6,58 @@
 
 **Type:** Prerequisite / manual-ops task (not a code change).
 
-**Delivers:** A registered `organize-me.app` domain with DNS records the operator can edit —
-the blocking prerequisite for provisioning the shared HTTPS Load Balancer (R5).
+**Delivers:** Editable DNS for the platform subdomains on the existing, operator-owned
+`russcoopersoftware.com` domain (managed at Squarespace) — the blocking prerequisite for
+provisioning the shared HTTPS Load Balancer (R5) and its Google-managed SSL cert.
+
+The shared platform origins are:
+- **Production:** `organizeme.russcoopersoftware.com`
+- **QA:** `organizeme.qa.russcoopersoftware.com`
 
 ## What to build
 
-Confirm or establish ownership and DNS control of `organize-me.app`. Today the domain is only
-*referenced* in code (`app/core/config.py` `base_url` default, notification email links) — it
-is not confirmed as registered, and no DNS/managed-cert config exists in the repo. Live traffic
-currently runs on the raw `*.run.app` Cloud Run URLs.
+No domain purchase is required — `russcoopersoftware.com` is already registered and managed at
+Squarespace. This slice confirms the operator can add/edit **Custom DNS Records** for the two
+subdomains above, so R5 can point them at the Load Balancer IP and issue managed certs.
 
-This is an ops/setup task with no code deliverable. It exists as its own issue because the
-design doc explicitly flags domain/DNS readiness as **blocking** for Load Balancer provisioning,
-and the Google-managed SSL cert in R5 cannot validate until a DNS record points at the LB.
+Today the platform domain is only *referenced* in code (`app/core/config.py` `base_url` default,
+notification email links, previously `organize-me.app`) — no DNS/managed-cert config exists in the
+repo and live traffic runs on the raw `*.run.app` Cloud Run URLs.
+
+This is an ops/setup task with no code deliverable. It exists as its own issue because the design
+doc flags domain/DNS readiness as **blocking** for Load Balancer provisioning: the Google-managed
+SSL cert in R5 cannot validate until an A/AAAA record for the subdomain resolves to the LB.
 
 ## Includes
-- Register `organize-me.app` (or confirm existing registration) with a registrar the operator controls.
-- Verify DNS zone access — ability to add/edit A/AAAA records for the apex and any subdomains.
-- Decide apex vs. subdomain strategy for the shared platform origin (design assumes the apex `organize-me.app`).
-- Note the nameserver / DNS provider for R5 (Google Cloud DNS vs. external registrar DNS).
+- Confirm access to Squarespace's DNS panel for `russcoopersoftware.com` → **Custom Records**.
+- Verify you can add/edit **A, AAAA, and TXT** records for the `organizeme` and `organizeme.qa`
+  hosts (the LB cutover records land in R5/R11/R12; here we only prove edit access).
+- Record which DNS provider is authoritative (Squarespace-managed nameservers vs. delegating the
+  zone to Google Cloud DNS) and note it for R5.
 
 ## Design notes
-- The final A/AAAA record cutover to the Load Balancer IP happens **in R5/R11/R12**, not here —
-  R0 only guarantees the domain exists and DNS is editable so R5 isn't blocked.
+- **Use Custom DNS Records (A/AAAA), _not_ Squarespace "Domain Forwarding".** Forwarding issues an
+  HTTP 301/302 redirect (or an iframe-masked one) from Squarespace's servers — it never points at
+  the LB, so (a) the Google-managed cert can't validate, and (b) the browser never lands on the
+  shared origin, which breaks the domain-scoped SSO cookie (R4) and the LB path routing (R5). The
+  subdomain must resolve *directly* to the LB IP via an A (IPv4) / AAAA (IPv6) record.
+- A subdomain is simpler than an apex here: no apex-CNAME/flattening constraints, and it keeps the
+  auth cookie isolated from the main `russcoopersoftware.com` site (see R4 — scope to the exact
+  host, never to `.russcoopersoftware.com`).
+- The actual A/AAAA record cutover to the Load Balancer IP happens **in R5 (QA) and R11/R12
+  (prod)**, not here — R0 only guarantees DNS is editable so R5 isn't blocked.
 - Keep today's `*.run.app` URLs live throughout; nothing about this task touches production traffic.
 
 ## Blocked by
 - None — can start immediately.
 
 ## Acceptance criteria
-- [ ] `organize-me.app` is registered to an account the operator controls.
-- [ ] The operator can add/edit DNS records in its zone (verified with a throwaway TXT record).
-- [ ] DNS provider / nameservers documented for R5.
+- [ ] Operator can add/edit Custom A/AAAA/TXT records for `organizeme.russcoopersoftware.com` and
+      `organizeme.qa.russcoopersoftware.com` in Squarespace DNS (verified with a throwaway TXT record).
+- [ ] Confirmed the plan uses Custom DNS Records, not Domain Forwarding.
+- [ ] Authoritative DNS provider / nameservers documented for R5.
 - [ ] No production traffic change — existing `*.run.app` URLs still serve.
 
 ## Testing
-- Manual: add and resolve a temporary TXT record to prove edit access, then remove it.
+- Manual: add and resolve a temporary TXT record on one of the subdomains to prove edit access,
+  then remove it.
