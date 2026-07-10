@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-09 (issue #112 — log notification silent modes as warnings)
+**Last updated:** 2026-07-10 (issue #112 — log notification silent modes as warnings)
 
 ---
 
@@ -185,6 +185,32 @@ blocker. Deferred e2e coverage filed as #91. #55 (5.2 filters/sort/search) is th
 issue (In Progress on another branch).
 
 **Bug #78 fixed (live Google Drive connect crashed with "Internal Error").** Root cause: the `ENCRYPTION_KEY` GitHub secret (flagged as an outstanding human-setup step since #45/#61) had never actually been created, so `get_credential_cipher()` raised `RuntimeError` unhandled inside `GET /callback`. Fixed on branch `fix/issue-78-encryption-key-callback`, in an isolated worktree: (1) generated a `Fernet` key and set it as the `ENCRYPTION_KEY` repo secret (shared by both `ci.yml`/QA and `deploy.yml`/prod) — resolves that part of #61 too; (2) the callback now catches a missing-cipher `RuntimeError` and redirects to `/settings?error=storage_not_configured` with a clear banner instead of a raw 500, so any future misconfiguration degrades gracefully. Regression test added. Issue #61's remaining scope (registering the Drive redirect URI + `drive` scope on the Google OAuth client) is Google-Cloud-Console-side and still an open manual task.
+
+**Slice 8.1 (Dropbox StorageProvider) implemented.** Slice 7 has only #128 (deferred cleanup)
+outstanding, so work moved to Slice 8 (Dropbox + S3 storage providers) — picked over Slice 8.2 (S3)
+as the higher-value half of the pair since it reuses more of Slice 2's existing OAuth-connect
+plumbing (Google Drive is also OAuth-based; S3's manual-credential shape is a bigger departure).
+Issue #93 is implemented on branch `feature/slice-8.1-dropbox-storage-provider`, in an isolated
+worktree: `DropboxStorageProvider` (`app/services/storage/dropbox.py`) implements the
+`StorageProvider` ABC against the Dropbox API v2 via `httpx` (no official SDK dependency, mirroring
+`google_drive.py`), addressing files by Dropbox's stable `id:...` identifier rather than path.
+`app/api/v1/storage_dropbox.py` mirrors the Google Drive OAuth connect/disconnect flow, requesting
+explicit `files.content.write`/`files.content.read` scopes (a scoped Dropbox app grants nothing
+without them, unlike Google's client) and `token_access_type=offline` for a refresh token; its
+revoke call bypasses `httpx_oauth` since Dropbox's revoke endpoint authenticates via the token being
+revoked, not one passed in the request body. `app/services/storage/factory.py`'s
+`build_storage_provider` now actually branches on `config.provider` — previously it always resolved
+to Google Drive regardless of the stored provider, a latent placeholder from before Dropbox/S3
+existed, now fixed (and raises for S3 until #94 lands). New `DROPBOX_OAUTH_CLIENT_ID`/
+`DROPBOX_OAUTH_CLIENT_SECRET` settings (empty defaults) wired into `ci.yml`/`deploy.yml`'s Cloud Run
+env vars alongside the other provider credentials. 25 new tests (provider unit tests via
+`httpx.MockTransport`, OAuth flow tests, factory branching tests); `mypy --strict` clean. Deferred
+lower-priority idea (persisting the refreshed access token back to `storage_configs`, mirroring the
+existing Google Drive gap in #68) filed as `modelsuggested` issue #140. **Human setup before it
+works live:** register a Dropbox app (scoped access, `files.content.write`/`files.content.read`
+permissions) and set `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET` as repo secrets — same
+class of gap as issue #72's other provider setup steps. Settings > Storage tab UI support for
+Dropbox (#95, blocked on this issue and #94) is next once #94 (S3) lands.
 
 ## Completed Milestones
 

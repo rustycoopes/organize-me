@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     google_oauth_client_id: str
     google_oauth_client_secret: str
     google_oauth_redirect_uri: str
+    # Dropbox OAuth app credentials (Slice 8.1). Empty defaults (like the Resend/Gemini/Twilio
+    # keys above) so deploys/CI that don't set them yet don't fail Settings construction -
+    # get_dropbox_oauth_client() only needs real values once a user actually connects Dropbox.
+    dropbox_oauth_client_id: str = ""
+    dropbox_oauth_client_secret: str = ""
     # Empty default (rather than a required field) so existing deployments/CI jobs that don't
     # set RESEND_API_KEY yet don't fail Settings construction; ResendEmailSender only needs a
     # real value once forgot-password is actually exercised in a live environment.

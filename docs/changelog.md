@@ -25,6 +25,66 @@
 
   A code-review pass then caught two real bugs pre-merge: marking a row reviewed while "Show reviewed" was off used hand-written JS to remove the row and decrement a count, which desynced from the server on pagination boundaries (didn't backfill rows from the next page, didn't show the empty-state message when the last row was removed) — fixed by re-rendering `#dashboard-body` via `htmx.ajax()` after a successful PATCH instead, reusing the same swap every other filter/sort/page control on this page already uses; and `has_active_filters` didn't count the default `show_reviewed=false` hiding as a filter, so a returning user whose events were all reviewed saw the misleading first-time "No events yet" message — fixed using the already-fetched `event_types` list (unaffected by filters) as a free signal that the user has events at all. Also fixed in the same pass: a redundant `db.refresh()` after commit (the session is `expire_on_commit=False`) and duplicated owner-lookup code between `DELETE`/`PATCH` (extracted to `get_owned_event`). Two lower-priority suggestions deferred to issues #135 (type-filter dropdown includes types that only exist on reviewed events) and #136 (no e2e coverage for the reviewed checkbox/filter interaction), both `modelsuggested`.
 
+- **Issue #93 implemented** — Dropbox StorageProvider (Slice 8.1, branch
+  `feature/slice-8.1-dropbox-storage-provider`). New `DropboxStorageProvider`
+  (`app/services/storage/dropbox.py`) implements the `StorageProvider` ABC against the Dropbox API
+  v2 via an injected `httpx.AsyncClient` (no official `dropbox` SDK dependency, mirroring
+  `google_drive.py`'s pattern): files are addressed by Dropbox's stable `id:...` identifier rather
+  than path (paths change on move/rename), `list_new_files` walks `list_folder`/`list_folder/continue`
+  pagination filtering to `.tag == "file"` entries, and `move_file` creates the destination
+  `processed/`/`failed/` subfolder on first use (tolerating the "already exists" conflict).
+  New `app/api/v1/storage_dropbox.py` mirrors the Google Drive OAuth connect/disconnect flow
+  (`POST /auth`, `GET /callback`, `POST /disconnect`) with its own CSRF cookie/state audience,
+  requesting `files.content.write`/`files.content.read` scopes (a scoped Dropbox app only grants
+  what's explicitly requested, unlike Google's client) and `token_access_type=offline` for a
+  refresh token. Dropbox's revoke endpoint authenticates via the token being revoked (not a token
+  passed in the request body like Google's), so `revoke_dropbox_token` calls it directly rather
+  than through `httpx_oauth`. New `get_dropbox_oauth_client()` (`app/auth/oauth.py`) builds a
+  generic `httpx_oauth.oauth2.BaseOAuth2` client, since `httpx_oauth` ships no dedicated Dropbox
+  client (unlike Google/GitHub/etc). `app/services/storage/factory.py`'s `build_storage_provider`
+  now actually branches on `config.provider` (previously always resolved to Google Drive
+  regardless — a latent placeholder now fixed) and raises for the not-yet-implemented S3 provider
+  (Slice 8.2, #94). New settings `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET` (empty
+  defaults, same pattern as the other optional provider credentials). 25 new tests (provider unit
+  tests via `httpx.MockTransport`, OAuth flow tests mirroring `test_storage_google_drive.py`, and
+  factory branching tests); `mypy --strict` clean. Improvement pass: added the
+  `files.content.write`/`files.content.read` scope request (a scoped Dropbox app silently grants
+  no permissions without it — a real functional gap, not just a nice-to-have), wired
+  `DROPBOX_OAUTH_CLIENT_ID`/`SECRET` into `ci.yml`/`deploy.yml`'s Cloud Run env vars (mirroring the
+  Twilio/Google precedent), and decoupled the consent-URL test from ambient environment
+  configuration (overrides `get_dropbox_oauth_client` with a client built from literal test
+  credentials, rather than asserting against whatever `DROPBOX_OAUTH_CLIENT_ID` happens to be set
+  in the environment it runs in — no such secret exists in the repo yet). Deferred lower-priority
+  idea (persisting the refreshed access token back to `storage_configs`, mirroring the existing
+  Google Drive gap in #68) filed as `modelsuggested` issue #140. **Human setup before it works
+  live:** register a Dropbox app at dropbox.com/developers/apps (scoped access, `files.content.write`
+  + `files.content.read` permissions) and set `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET`
+  as repo secrets — same class of gap as issue #72's Google/Gemini/Twilio setup steps. Settings >
+  Storage tab UI support for Dropbox (provider selector, connect button) is Slice 8.3 (#95), not
+  in this issue's scope.
+  An 8-angle multi-agent code-review pass then caught and fixed four real issues, several
+  independently flagged by multiple angles: (1) `DropboxStorageProvider._raw_request`'s 401-retry
+  rebuilt headers with the stale dict spread last, so a just-refreshed Authorization header was
+  silently overwritten by the expired one that had just failed — any live 401 (a revoked token, or
+  the proactive expiry check being wrong) would refresh successfully but still retry with the same
+  invalid token and raise; (2) `_normalize_path` never guaranteed a leading `/`, but Dropbox
+  requires one on every non-root path — `folder_path`'s write-path validator is shared across all
+  three providers and only trims whitespace, so a value saved without a leading slash (harmless for
+  Google Drive's split-and-traverse resolution) would send a malformed path to every Dropbox call;
+  (3) `dropbox_disconnect` preferred the refresh token over the access token when calling Dropbox's
+  revoke endpoint, but that endpoint authenticates via the token *being revoked* as the Bearer
+  credential (unlike Google's body-param revoke, where either works) — since `token_access_type=
+  offline` means a refresh token is present on nearly every connection, disconnect would 401
+  against Dropbox, have the exception swallowed by the best-effort try/except, and leave the actual
+  grant live indefinitely while the UI showed "disconnected"; (4) `PUT /api/v1/storage-config`
+  didn't clear a config's stored credentials when the provider changed, so a config could stay
+  "connected" under a *different* provider than the one its token authenticates — reachable by
+  connecting Google Drive then switching `provider` to `s3` without disconnecting first, which
+  would hit `build_storage_provider`'s new not-yet-implemented-S3 `ValueError` instead of the
+  factory silently (if wrongly) building Google Drive as it did before this issue. 6 new regression
+  tests (live-401 retry, path normalization, disconnect token choice, provider-switch credential
+  clearing x2); full suite (422 tests) + `mypy --strict` green.
+
 - **Issue #110 implemented** — Import pending files button (branch
   `feature/slice-7-import-pending-files`). New `POST /api/v1/import-pending-files` scans the
   connected storage watch folder via `StorageProvider.list_new_files()`, creates one

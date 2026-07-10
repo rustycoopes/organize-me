@@ -19,16 +19,17 @@ import logging
 
 from app.core.config import Settings
 from app.core.security import CredentialCipher
-from app.models.storage_config import StorageConfig
+from app.models.storage_config import StorageConfig, StorageProviderType
 from app.services.storage.base import StorageProvider
+from app.services.storage.dropbox import DropboxStorageProvider
 from app.services.storage.ephemeral import EphemeralStorageProvider
 from app.services.storage.fake import FakeStorageProvider
 from app.services.storage.google_drive import GoogleDriveStorageProvider
 
 logger = logging.getLogger(__name__)
 
-# Generous per-call timeout: Drive uploads/downloads of a chat export are small, but the refresh +
-# API round-trips shouldn't hang a background task forever.
+# Generous per-call timeout: Drive/Dropbox uploads/downloads of a chat export are small, but the
+# refresh + API round-trips shouldn't hang a background task forever.
 _DRIVE_HTTP_TIMEOUT = httpx.Timeout(30.0)
 
 
@@ -53,6 +54,27 @@ def build_google_drive_provider(
     )
 
 
+def build_dropbox_provider(
+    config: StorageConfig, settings: Settings, cipher: CredentialCipher
+) -> DropboxStorageProvider:
+    """Construct a live Dropbox provider from a connected storage config."""
+    access_token = (
+        cipher.decrypt(config.oauth_access_token) if config.oauth_access_token else None
+    )
+    refresh_token = (
+        cipher.decrypt(config.oauth_refresh_token) if config.oauth_refresh_token else None
+    )
+    return DropboxStorageProvider(
+        client=httpx.AsyncClient(timeout=_DRIVE_HTTP_TIMEOUT),
+        folder_path=config.folder_path,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_expires_at=config.oauth_token_expires_at,
+        client_id=settings.dropbox_oauth_client_id,
+        client_secret=settings.dropbox_oauth_client_secret,
+    )
+
+
 def build_storage_provider(
     *,
     config: StorageConfig | None,
@@ -60,7 +82,8 @@ def build_storage_provider(
     cipher: CredentialCipher | None,
     fallback_to_ephemeral: bool = False,
 ) -> StorageProvider:
-    """Resolve the provider for a run: the E2E fake under test mode, else a real Drive provider.
+    """Resolve the provider for a run: the E2E fake under test mode, else a real provider chosen
+    by the config's ``provider`` column.
 
     ``config`` and ``cipher`` are required for the real path; callers gate on a connected config
     before reaching it (see app.api.v1.upload).
@@ -78,4 +101,9 @@ def build_storage_provider(
             return EphemeralStorageProvider()
         # pragma: no cover - guarded by the caller
         raise ValueError("a storage config and cipher are required outside E2E_TEST_MODE")
-    return build_google_drive_provider(config, settings, cipher)
+    if config.provider == StorageProviderType.DROPBOX:
+        return build_dropbox_provider(config, settings, cipher)
+    if config.provider == StorageProviderType.GOOGLE_DRIVE:
+        return build_google_drive_provider(config, settings, cipher)
+    # S3 lands in Slice 8.2 (#94); no live provider to build yet.
+    raise ValueError(f"unsupported storage provider: {config.provider}")
