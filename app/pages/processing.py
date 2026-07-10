@@ -31,6 +31,7 @@ from app.services.pipeline.progress import (
     build_step_views,
     load_step_statuses,
 )
+from app.services.processing_logs import LOG_PAGE_SIZE, filter_log_lines, paginate_log_lines
 
 router = APIRouter(tags=["pages"])
 
@@ -169,16 +170,8 @@ async def processing_run_logs_partial(
     if step is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    log_lines = step.log_lines or []
-    if search:
-        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        log_lines = [line for line in log_lines if escaped.lower() in line.lower()]
-
-    total = len(log_lines)
-    page_size = 50
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated = log_lines[start:end]
+    log_lines = filter_log_lines(step.log_lines or [], search)
+    paginated, total = paginate_log_lines(log_lines, page)
 
     return templates.TemplateResponse(
         request,
@@ -190,7 +183,7 @@ async def processing_run_logs_partial(
                 "step_name": step.step_name,
                 "log_lines": paginated,
                 "page": page,
-                "page_size": page_size,
+                "page_size": LOG_PAGE_SIZE,
                 "total": total,
             })(),
             "search": search,

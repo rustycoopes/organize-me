@@ -6,9 +6,14 @@ from datetime import date
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.upload import get_pipeline_scheduler, get_upload_storage
+from app.main import app
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
+from app.models.storage_config import StorageConfig, StorageProviderType
 from app.models.user import User
+from app.services.storage.fake import FakeStorageProvider
+from tests.test_storage_google_drive import FakeDriveOAuth2, _drive_connect
 
 
 def unique_email() -> str:
@@ -82,11 +87,12 @@ async def test_dashboard_renders_event_row_with_all_columns(
     assert "Dentist appointment" in body
     assert "Saturday 6 June 2026" in body
     assert "Saturday" in body
-    assert "Russ Cooper" in body
-    assert "Christine Cooper" in body
     assert "calendar.google.com" in body
     assert "tasks.google.com" in body
     assert f"openConfirm('{event.id}')" in body
+    # Agreed-by chips show initials only, with the full name available via tooltip.
+    assert '<span class="badge badge-ghost mr-1" title="Russ Cooper" tabindex="0">RC</span>' in body
+    assert '<span class="badge badge-ghost mr-1" title="Christine Cooper" tabindex="0">CC</span>' in body
 
 
 async def test_dashboard_shows_no_date_placeholder_for_unresolved_events(
@@ -208,6 +214,38 @@ async def test_dashboard_does_not_redirect_when_there_are_zero_events(
     assert "No events yet" in response.text
 
 
+async def test_dashboard_import_pending_files_button_disabled_without_connected_storage(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'id="import-pending-files-btn"' in response.text
+    assert "driveConnected:false" in response.text.replace(" ", "")
+
+
+async def test_dashboard_import_pending_files_button_enabled_with_connected_storage(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    db_session.add(
+        StorageConfig(
+            user_id=user_id,
+            provider=StorageProviderType.GOOGLE_DRIVE,
+            folder_path="/OrganizeMe",
+            oauth_access_token="ciphertext-token",
+        )
+    )
+    await db_session.flush()
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "driveConnected:true" in response.text.replace(" ", "")
+
+
 async def test_dashboard_shows_onboarding_checklist_for_a_new_user(
     client: AsyncClient,
 ) -> None:
@@ -228,7 +266,7 @@ async def test_dashboard_shows_onboarding_checklist_for_a_new_user(
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
     assert (
-        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<a href="/settings" class="link link-primary">Set Notification Preferences'
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
     assert (
@@ -264,9 +302,9 @@ async def test_dashboard_onboarding_checklist_marks_done_steps_and_keeps_incompl
         '<span class="sr-only"> (done)</span></span>'
     ) in body
     # The one incomplete step still renders as a link to its page (checklist-specific anchor, so
-    # the sidebar nav's own /profile link can't be what satisfies this).
+    # the sidebar nav's own /settings link can't be what satisfies this).
     assert (
-        '<a href="/profile" class="link link-primary">Set Notification Preferences'
+        '<a href="/settings" class="link link-primary">Set Notification Preferences'
         '<span class="sr-only"> (to do)</span></a>'
     ) in body
 
@@ -276,6 +314,48 @@ async def test_dashboard_hides_onboarding_checklist_once_all_steps_done(
 ) -> None:
     user_id = await _register_and_login(client)
     await _complete_onboarding(db_session, user_id)
+
+    response = await client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'id="onboarding-checklist"' not in response.text
+    assert "Getting Started" not in response.text
+
+
+async def test_dashboard_hides_onboarding_checklist_after_completing_flow_through_real_endpoints(
+    client: AsyncClient,
+) -> None:
+    """Regression test for #115: walks all three onboarding steps through their actual API
+    endpoints (Drive OAuth connect, notification-prefs PATCH, file upload) rather than flipping
+    the User flags directly, so a regression in any endpoint's flag-setting logic - not just in
+    the dashboard's read of those flags - would be caught here."""
+    await _register_and_login(client)
+
+    # Step 1: Connect Storage, via the real Google Drive OAuth connect flow.
+    await client.put(
+        "/api/v1/storage-config", json={"provider": "google_drive", "folder_path": "/OrganizeMe"}
+    )
+    await _drive_connect(client, FakeDriveOAuth2())
+
+    # Step 2: Set Notification Preferences, via the real profile PATCH endpoint.
+    await client.patch("/api/v1/users/me", json={"notification_email": True})
+
+    # Step 3: Upload First File, via the real upload endpoint (storage/scheduler faked).
+    app.dependency_overrides[get_upload_storage] = lambda: FakeStorageProvider()
+
+    class _RecordingScheduler:
+        async def schedule(self, **kwargs: object) -> None:
+            pass
+
+    app.dependency_overrides[get_pipeline_scheduler] = lambda: _RecordingScheduler()
+    try:
+        await client.post(
+            "/api/v1/upload",
+            files={"file": ("chat.txt", b"5/30/26, 10:00 - Russ: hi", "text/plain")},
+        )
+    finally:
+        app.dependency_overrides.pop(get_upload_storage, None)
+        app.dependency_overrides.pop(get_pipeline_scheduler, None)
 
     response = await client.get("/dashboard")
 

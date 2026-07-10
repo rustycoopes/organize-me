@@ -37,7 +37,7 @@ test.describe('Settings > Storage', () => {
     await expect(page.getByText('Save your folder path first')).toBeVisible();
 
     await page.locator('#folder_path').fill('/OrganizeMe');
-    await page.locator('form button[type="submit"]').click();
+    await page.locator('#storage-tab-panel form button[type="submit"]').click();
     await expect(page.getByText('Storage settings saved.')).toBeVisible();
 
     // Saving creates the config row, so the Connect control becomes available without a reload.
@@ -52,7 +52,7 @@ test.describe('Settings > Storage', () => {
 
     const folder = '/OrganizeMe/exports';
     await page.locator('#folder_path').fill(folder);
-    await page.locator('form button[type="submit"]').click();
+    await page.locator('#storage-tab-panel form button[type="submit"]').click();
     await expect(page.getByText('Storage settings saved.')).toBeVisible();
 
     // Reload from the server to prove the value was persisted, not just held in client state.

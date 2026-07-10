@@ -37,11 +37,14 @@
 
 <div class="card bg-base-100 shadow-xl">
   <div class="card-body">
-    {# The heading must read exactly "Dashboard" (not "Events") - the sidebar e2e spec
-       (e2e/tests/sidebar.spec.ts) asserts getByRole('heading', { name: 'Dashboard' }) after
-       clicking the nav link, matching the same nav-label-as-heading contract every other
-       authenticated page follows (e.g. Settings' <h1>Settings</h1>). #}
-    <h1 class="card-title">Dashboard</h1>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      {# The heading must read exactly "Dashboard" (not "Events") - the sidebar e2e spec
+         (e2e/tests/sidebar.spec.ts) asserts getByRole('heading', { name: 'Dashboard' }) after
+         clicking the nav link, matching the same nav-label-as-heading contract every other
+         authenticated page follows (e.g. Settings' <h1>Settings</h1>). #}
+      <h1 class="card-title">Dashboard</h1>
+      {% include "partials/import_pending_button.html" %}
+    </div>
 
     <div id="dashboard-body">
       {% include "partials/dashboard_body.html" %}

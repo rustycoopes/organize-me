@@ -77,3 +77,13 @@ async def test_upload_page_marks_drive_connected_when_token_present(
 
     assert response.status_code == 200
     assert "driveConnected:true" in response.text.replace(" ", "")
+
+
+async def test_upload_page_import_pending_files_button_present(client: AsyncClient) -> None:
+    await _register_and_login(client)
+
+    response = await client.get("/upload")
+
+    assert response.status_code == 200
+    assert 'id="import-pending-files-btn"' in response.text
+    assert "/api/v1/import-pending-files" in response.text

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user
+from app.core.config import Settings
 from app.db.session import get_db
 from app.models.storage_config import StorageConfig
 from app.models.user import User
@@ -29,6 +30,29 @@ async def get_user_storage_config(db: AsyncSession, user_id: uuid.UUID) -> Stora
     """
     result = await db.execute(select(StorageConfig).where(StorageConfig.user_id == user_id))
     return result.scalar_one_or_none()
+
+
+def config_is_connected(config: StorageConfig | None) -> bool:
+    """Whether a fetched config row represents a usable, connected Google Drive.
+
+    Split out from `is_drive_connected` so a caller that already fetched the config for another
+    reason (e.g. to build a StorageProvider from it) can reuse this same definition of "connected"
+    without an extra query - see app.api.v1.import_pending_files.get_import_storage.
+    """
+    return config is not None and config.oauth_access_token is not None
+
+
+async def is_drive_connected(db: AsyncSession, user_id: uuid.UUID, settings: Settings) -> bool:
+    """Whether the user has a usable, connected Google Drive (or E2E is faking one).
+
+    Shared by the Upload and Dashboard pages so both gate their "requires real storage" UI
+    (ephemeral-upload warning, the Import pending files button) on the same definition of
+    "connected" rather than each re-deriving it from the config row.
+    """
+    if settings.e2e_test_mode:
+        return True
+    config = await get_user_storage_config(db, user_id)
+    return config_is_connected(config)
 
 
 @router.get("/storage-config", response_model=StorageConfigRead)

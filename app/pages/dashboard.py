@@ -28,7 +28,9 @@ from app.api.v1.events import (
     parse_date_param,
     to_event_read,
 )
+from app.api.v1.storage_config import is_drive_connected
 from app.auth.users import current_active_user_optional
+from app.core.config import Settings, get_settings
 from app.core.onboarding import build_onboarding_steps, onboarding_complete
 from app.core.templating import templates
 from app.db.session import get_db
@@ -78,6 +80,7 @@ async def dashboard_page(
     show_reviewed: bool = Query(default=False),
     user: User | None = Depends(current_active_user_optional),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> HTMLResponse | RedirectResponse:
     if user is None:
         return RedirectResponse("/login", status_code=302)
@@ -125,6 +128,10 @@ async def dashboard_page(
     has_active_filters = bool(
         type or parsed_date_from or parsed_date_to or q or show_reviewed or event_types
     )
+    is_htmx_request = request.headers.get("hx-request") == "true"
+    # Only the full-page template renders the Import pending files button - skip the extra query
+    # on every HTMX filter/sort/pagination request, which never re-renders it.
+    drive_connected = False if is_htmx_request else await is_drive_connected(db, user.id, settings)
     context = {
         "user": user,
         "dark_mode": user.dark_mode,
@@ -147,10 +154,9 @@ async def dashboard_page(
         "sort_toggle_url": url_for(page=1, sort="asc" if sort == "desc" else "desc"),
         "onboarding_steps": build_onboarding_steps(user),
         "onboarding_complete": onboarding_complete(user),
+        "drive_connected": drive_connected,
     }
     template_name = (
-        "partials/dashboard_body.html"
-        if request.headers.get("hx-request") == "true"
-        else "dashboard.html"
+        "partials/dashboard_body.html" if is_htmx_request else "dashboard.html"
     )
     return templates.TemplateResponse(request, template_name, context)

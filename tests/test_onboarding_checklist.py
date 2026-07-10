@@ -29,7 +29,7 @@ def test_each_step_links_to_its_page() -> None:
 
     assert {s.label: s.url for s in steps} == {
         "Connect Storage": "/settings",
-        "Set Notification Preferences": "/profile",
+        "Set Notification Preferences": "/settings",
         "Upload First File": "/upload",
     }
 

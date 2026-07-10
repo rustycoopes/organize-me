@@ -14,11 +14,125 @@
 
   A code-review pass then caught two real bugs pre-merge: marking a row reviewed while "Show reviewed" was off used hand-written JS to remove the row and decrement a count, which desynced from the server on pagination boundaries (didn't backfill rows from the next page, didn't show the empty-state message when the last row was removed) — fixed by re-rendering `#dashboard-body` via `htmx.ajax()` after a successful PATCH instead, reusing the same swap every other filter/sort/page control on this page already uses; and `has_active_filters` didn't count the default `show_reviewed=false` hiding as a filter, so a returning user whose events were all reviewed saw the misleading first-time "No events yet" message — fixed using the already-fetched `event_types` list (unaffected by filters) as a free signal that the user has events at all. Also fixed in the same pass: a redundant `db.refresh()` after commit (the session is `expire_on_commit=False`) and duplicated owner-lookup code between `DELETE`/`PATCH` (extracted to `get_owned_event`). Two lower-priority suggestions deferred to issues #135 (type-filter dropdown includes types that only exist on reviewed events) and #136 (no e2e coverage for the reviewed checkbox/filter interaction), both `modelsuggested`.
 
+- **Issue #110 implemented** — Import pending files button (branch
+  `feature/slice-7-import-pending-files`). New `POST /api/v1/import-pending-files` scans the
+  connected storage watch folder via `StorageProvider.list_new_files()`, creates one
+  `processing_runs` row per pending file, and processes them **sequentially** in a single
+  background task (new `PipelineScheduler.schedule_batch()`, resolved via a clarifying question
+  before building — differs from the manual upload path's fire-and-forget-per-file `schedule()`).
+  Returns the first file's `run_id`; the client follows it to `/processing` like a manual upload,
+  with the rest of the batch visible afterward via `/logs`. New shared `is_drive_connected()`
+  helper (`app/api/v1/storage_config.py`) and `partials/import_pending_button.html` back the
+  button on both `/upload` and `/dashboard` without duplicating the Alpine fetch/redirect logic.
+  New Playwright `e2e/tests/import-pending-files.spec.ts` covers what's deterministic under
+  `E2E_TEST_MODE` (button enabled, "no pending files" on click); genuinely populating pending
+  files needs a real connected Drive account, out of e2e scope per the standing #23 decision.
+  Improvement pass: importing now also flips `onboarding_first_upload_done`, matching manual
+  upload. A code-review pass then caught and fixed three real issues confirmed independently by
+  multiple review angles: `_run_batch` never rolled back its shared session after an unhandled
+  per-file failure, which would silently poison every remaining file in the batch; `get_import_storage`
+  duplicated the "is Drive connected" check instead of reusing the `is_drive_connected()` helper
+  this same diff introduced; and a dead `db.refresh()` loop issued one wasted SELECT per pending
+  file despite `expire_on_commit=False` making it a no-op. Also fixed a minor storage-client leak
+  on the no-pending-files path and updated README.md. Two lower-priority findings deferred as
+  `modelsuggested`: auto-advancing `/processing` across a whole batch instead of only the first
+  file (#132), and guarding against a double-click/multi-tab race enqueuing duplicate batches —
+  same class of gap the existing single-file upload endpoint already has, backstopped by the
+  `events` table's dedup constraint (#133). 9 new/updated backend tests; full suite +
+  `mypy --strict` green.
+
+- **Issue #115 verified** — onboarding checklist hide-on-completion (branch
+  `feature/slice-5.3-onboarding-hide-verify`). No code changes were needed: the mechanism
+  (`onboarding_complete()` + the dashboard's conditional render) was already correct, and #88's
+  review pass had already fixed the one real bug (stale `/profile` link) blocking this from working.
+  Added a regression test that drives all three onboarding steps through their real endpoints
+  (Drive OAuth connect, notification-prefs PATCH, file upload) rather than setting the User flags
+  directly, so a regression in any endpoint's flag-flipping logic would be caught, not just in the
+  dashboard's read of those flags. Full Playwright e2e coverage of the flow stays out of scope per
+  the standing #23 decision to keep real Google OAuth out of e2e (tracked separately in the
+  already-open #91).
+
+- **Issue #88 implemented** — Slice 7.3 Settings > Notifications tab (branch
+  `feature/slice-7.3-notifications-tab`). New Notifications tab on `/settings` alongside Storage
+  (Alpine `activeTab` state switches between them client-side, no reload), with independent
+  email/SMS toggles backed by the existing `PATCH /api/v1/users/me` — `UserRead`/`UserUpdate`
+  gained `notification_email`/`notification_sms` (same NOT-NULL/explicit-null-rejection pattern
+  as `dark_mode`). Email toggle disabled unless `user.email` is set; SMS toggle disabled unless
+  `user.phone_number` is set; either way, hint text plus a read-only display of the current
+  email/phone linking to `/profile`. Saving sets `onboarding_notifications_done = True` the first
+  time either toggle is part of a PATCH payload (idempotent thereafter). New Playwright
+  `e2e/tests/notifications.spec.ts` (SMS toggle disabled → enabled after setting a phone number in
+  Profile; email toggle save/reload round-trip). The "toggle off stops that channel sending"
+  criterion is covered for both channels: email by Slice 7.1's existing test, and SMS by a new
+  test added here once Slice 7.2 (#87, merged to `main` the same day) landed the SMS sender —
+  closing the gap `modelsuggested` issue #129 had flagged. Also filed #128 (`modelsuggested`):
+  both Settings tabs hand-roll card/tab markup instead of the shared `card_page` macro, deferred
+  to avoid scope creep into the already-shipped Storage tab. 20+ new/updated backend tests; full
+  suite + `mypy --strict` clean.
+  A code-review pass then caught and fixed three real issues: the onboarding checklist's
+  "Set Notification Preferences" step still linked to `/profile` (no notification UI there) instead
+  of `/settings`; the onboarding-flag write did a second `db.commit()`/`refresh()` after
+  `user_manager.update()` had already committed (folded into the same transaction by setting the
+  flag on `user` before that call); and the tab bar's active/`aria-selected` state existed only in
+  Alpine bindings, so a screen reader or pre-hydration fetch saw neither tab marked active
+  (restored static `tab-active`/`aria-selected="true"` on Storage matching Alpine's initial state).
+  A fourth candidate fix - rejecting a channel toggle turned on with no matching contact info on
+  file - was tried and reverted: it contradicted Slice 7.2's already-shipped design, where
+  `RealNotificationSender` silently skips an SMS send with no phone number rather than treating it
+  as an error, and `notification_sms` defaults `True` for every user regardless of whether a phone
+  number is on file. The reverted validation broke `e2e-qa` (a user saving the email toggle alone
+  still resends the default-`True` `notification_sms`, which would have 422'd with no phone set) -
+  caught by the deployed Playwright suite, not by local pytest, since the local suite's fixtures
+  happened to always set a phone number first.
+
+- **Issue #87 implemented** — Slice 7.2 SMS notifications via Twilio (branch `feature/slice-7.2-sms-notifications`). New `app/services/notifications/sms.py`: `SmsSender` Protocol, real `TwilioSmsSender`, `FakeSmsSender` test double — mirrors the `EmailSender` pattern. `RealNotificationSender` now sends SMS alongside email, independently gated on `user.notification_sms` and a non-empty `user.phone_number` (silently skipped, info-logged, if the toggle is on but no phone number is on file — never raises or blocks the run). Success SMS: event count + dashboard link. Failure SMS: error summary + log page link. New config: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (empty defaults). New `twilio` dependency + mypy override (no bundled type stubs). Proactively wired `TWILIO_*` secrets into `ci.yml`/`deploy.yml`. Improvement pass: `TwilioSmsSender` now raises a clear error if credentials are unset instead of a confusing SDK error, and caches its `twilio.rest.Client` at class level instead of rebuilding it (and its connection pool) on every send. 9 new tests; full suite (353+ tests) + `mypy --strict` green. Deferred (`modelsuggested`): E.164 phone-number validation on the Profile page (#120), generalizing email/SMS dispatch in `RealNotificationSender` (#124), concurrent email+SMS sends (#125).
+
+- **Issue #111 implemented** — Redesigned `/logs` as an HTMX-driven spreadsheet grid (branch
+  `feature/logs-grid-redesign`). `GET /api/v1/processing-runs` gains `status`/`date_from`/
+  `date_to`/`sort_by`/`sort_dir` query params (`sort_by` one of `date`/`filename`/`status`), all
+  composing with each other and with pagination — same filter-composition pattern as the
+  dashboard's events endpoint (#55). New `ProcessingRunRead.detail_summary` field: the first
+  error log line for a `failed` run (falling back to any captured log line, then a fixed
+  placeholder, if no step itself was marked failed) or an `"N log lines"` count otherwise,
+  computed by `build_run_detail_summaries()` from the page's already-fetched steps (avoids
+  per-row queries). The `/logs` page's filter form (Status dropdown + date-range pickers) and
+  three sortable column headers (Date/Filename/Status, with `aria-sort` + a ▲/▼ indicator) swap
+  `#logs-body` in place via `partials/logs_body.html`/`partials/logs_grid.html`, mirroring
+  `partials/dashboard_body.html`. Each row is a full click target (keyboard-operable via
+  `tabindex`/Enter, not just mouse) linking to `/processing-runs/{id}`. Pagination keeps the
+  original page's First/Last jump links alongside Previous/Next. 30 tests (filter/sort/pagination
+  composition, detail-summary fallback + deterministic-ordering cases, HTMX partial response);
+  `mypy --strict` clean. Improvement pass: keyboard accessibility for row-click navigation,
+  `aria-sort` on active sort headers, and the detail-summary fallback chain for a FAILED run with
+  no step-level FAILED status. A multi-agent `/code-review` pass then caught a real correctness
+  bug: the steps query backing `detail_summary` had no `ORDER BY step_number`, so for a run with
+  multiple FAILED steps the "first error line" shown wasn't guaranteed to be the chronologically
+  earliest one — fixed by ordering both the API endpoint's and the page's steps query, locked in
+  with a test using deliberately out-of-order inserts. Same review pass also restored the
+  First/Last pagination links (present in the original table, silently dropped by the initial
+  grid) and simplified `sort_url_for` to reuse the existing `url_for` partial. Two lower-priority
+  duplication findings (`parse_date_param` duplicated from `app/api/v1/events.py`; the
+  runs+steps+summary fetch duplicated between the JSON endpoint and the HTML page) deferred rather
+  than bundled into this PR. Deferred model-suggested ideas filed as `modelsuggested`-labelled
+  issues (human-friendly date formatting, free-text search on the grid, a step-breakdown
+  alternative for the details column).
+
+- **Issue #85 implemented** — Slice 6.3 Searchable log filter + log download (branch `feature/slice-6.3-log-search-download`). The live HTMX search filter on the run detail page already existed from Slice 6.2; this issue added the missing piece: `GET /api/v1/processing-runs/{id}/logs/download`, which returns a run's full structured logs across all steps as a downloadable JSON file (`Content-Disposition: attachment`), plus a "Download logs" link on `/processing-runs/{id}`. Improvement pass: fixed a pre-existing bug where the log search escaped `%`/`_` as if for a SQL `LIKE` pattern even though matching was always a plain Python substring check, which silently broke searches containing those characters; extracted the duplicated search/pagination logic (API route + HTMX partial) into a shared `app/services/processing_logs.py` helper. Filed #118 (Intake) for a lower-priority follow-up: using the run's filename in the download's `Content-Disposition` filename instead of just the run id.
+
 - **Issue #86 implemented** — Slice 7.1 Branded email notifications (branch `feature/slice-7.1-email-notifications`). Real `NotificationSender` implementation sends branded HTML emails on processing-run completion (success, zero-event, failure). New `RealNotificationSender` in `app/services/notifications/sender.py` fetches the user's email and notification preference, renders Jinja2 templates with inline CSS, and respects the `user.notification_email` flag. Two email templates: `success.html.j2` (event summary table + dashboard link) and `failure.html.j2` (error details + log page link). Updated `get_pipeline_notifier()` factory to return the real sender instead of the logging stub. New configuration: `BASE_URL` (defaults to `https://organize-me.app`, overrideable for local dev). Comprehensive test coverage: 7 new tests verify success, zero-event, failure emails, the off-flag behavior, and link correctness. Template environment cached at class level for performance.
 
 - **Issue #84 implemented** — Slice 6.2 Run detail page with logs (branch `feature/slice-6.2-run-detail`, PR #107). New endpoints: `GET /api/v1/processing-runs/{id}` (run detail with steps), `GET /api/v1/processing-runs/{id}/logs` (paginated logs JSON), `GET /api/html/processing-runs/{id}/logs` (HTMX HTML partial). New page `/processing-runs/{id}` displays run metadata, 7 pipeline steps with status indicators, and expandable per-step logs (searchable, paginated via HTMX, 50 lines per page). Reuses step status rendering and progress service from `/processing` page. User scoping matches other resources (404 for non-owners). Comprehensive test coverage: 14 new tests, all 39 processing tests pass.
 
 ### Changed
+- **Issue #100** — Dashboard "Agreed by" chips now show initials (e.g. "Russ Cooper" → "RC")
+  instead of the full name, with the full name available via a `title` tooltip. New pure helper
+  `app/core/initials.py::to_initials()` (first letter of first word + first letter of last word,
+  uppercased; single-word names fall back to first letter; empty input returns empty string),
+  registered as a Jinja filter (`app/core/templating.py`) and used in
+  `partials/events_panel.html`. Improvement pass: made the chip focusable (`tabindex="0"`) so the
+  tooltip is reachable via keyboard, not just mouse hover. Filed #137 (Intake) — `title` tooltips
+  don't appear on touch devices at all, needs a product decision on a touch-friendly pattern — and
+  #138 (Intake) — two people sharing initials render identical, undistinguishable chips.
 - **Issue #31** — Extracted a shared `card_page` Jinja macro (`app/templates/macros/ui.html`) that
   renders the centred DaisyUI card shell (centering wrapper + `card`/`card-body`/`card-title` +
   optional subtitle). All five auth/profile templates (`login`, `register`, `forgot_password`,

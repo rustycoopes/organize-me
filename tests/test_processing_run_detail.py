@@ -89,6 +89,8 @@ async def test_processing_run_detail_page_renders_run_metadata_and_steps(
     assert "File Received" in body
     # All 7 step indicators should render
     assert "Deduplicate" in body or "deduplicate" in body.lower()
+    # Download logs link
+    assert f"/api/v1/processing-runs/{run.id}/logs/download" in body
 
 
 async def test_processing_run_logs_endpoint_returns_json(
@@ -174,6 +176,37 @@ async def test_processing_run_logs_searches_log_lines(
     assert len(data["log_lines"]) == 1
     assert "Error: invalid format" in data["log_lines"]
     assert data["total"] == 1
+
+
+async def test_processing_run_logs_search_matches_literal_percent_and_underscore(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Search is a plain substring match, not a SQL LIKE pattern — ``%``/``_`` are literal."""
+    user_id = await _register_and_login(client)
+    run = ProcessingRun(user_id=user_id, filename="test.txt", status=ProcessingRunStatus.SUCCESS)
+    db_session.add(run)
+    await db_session.flush()
+    step = ProcessingStep(
+        run_id=run.id,
+        step_number=1,
+        step_name="File Received",
+        status=ProcessingStepStatus.SUCCESS,
+        log_lines=["Progress: 50% complete", "some_var set", "unrelated line"],
+    )
+    db_session.add(step)
+    await db_session.flush()
+
+    response = await client.get(
+        f"/api/v1/processing-runs/{run.id}/logs?step_number=1&search=50%25"
+    )
+    data = response.json()
+    assert data["log_lines"] == ["Progress: 50% complete"]
+
+    response = await client.get(
+        f"/api/v1/processing-runs/{run.id}/logs?step_number=1&search=some_var"
+    )
+    data = response.json()
+    assert data["log_lines"] == ["some_var set"]
 
 
 async def test_processing_run_logs_paginates(
@@ -302,5 +335,79 @@ async def test_processing_run_detail_api_endpoint_404s_for_another_users_run(
     await _register_and_login(client)  # user A
 
     response = await client.get(f"/api/v1/processing-runs/{other_run.id}")
+
+    assert response.status_code == 404
+
+
+async def test_processing_run_logs_download_returns_valid_json(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    user_id = await _register_and_login(client)
+    run = ProcessingRun(user_id=user_id, filename="test.txt", status=ProcessingRunStatus.SUCCESS)
+    db_session.add(run)
+    await db_session.flush()
+    step1 = ProcessingStep(
+        run_id=run.id,
+        step_number=1,
+        step_name="File Received",
+        status=ProcessingStepStatus.SUCCESS,
+        log_lines=["Line 1", "Line 2"],
+    )
+    step2 = ProcessingStep(
+        run_id=run.id,
+        step_number=2,
+        step_name="Extract",
+        status=ProcessingStepStatus.SUCCESS,
+        log_lines=["Extract line 1"],
+    )
+    db_session.add_all([step1, step2])
+    await db_session.flush()
+
+    response = await client.get(f"/api/v1/processing-runs/{run.id}/logs/download")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert "attachment" in response.headers["content-disposition"]
+    assert str(run.id) in response.headers["content-disposition"]
+    data = response.json()
+    assert data["run_id"] == str(run.id)
+    assert data["filename"] == "test.txt"
+    assert len(data["steps"]) == 2
+    assert data["steps"][0]["step_number"] == 1
+    assert data["steps"][0]["log_lines"] == ["Line 1", "Line 2"]
+    assert data["steps"][1]["step_number"] == 2
+    assert data["steps"][1]["log_lines"] == ["Extract line 1"]
+
+
+async def test_processing_run_logs_download_requires_login(client: AsyncClient) -> None:
+    run_id = uuid.uuid4()
+    response = await client.get(f"/api/v1/processing-runs/{run_id}/logs/download")
+
+    assert response.status_code in (401, 403)
+
+
+async def test_processing_run_logs_download_404s_for_nonexistent_run(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client)
+    run_id = uuid.uuid4()
+
+    response = await client.get(f"/api/v1/processing-runs/{run_id}/logs/download")
+
+    assert response.status_code == 404
+
+
+async def test_processing_run_logs_download_404s_for_another_users_run(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    other_user_id = await _register_and_login(client)  # user B
+    other_run = ProcessingRun(
+        user_id=other_user_id, filename="secret.txt", status=ProcessingRunStatus.SUCCESS
+    )
+    db_session.add(other_run)
+    await db_session.flush()
+    await _register_and_login(client)  # user A
+
+    response = await client.get(f"/api/v1/processing-runs/{other_run.id}/logs/download")
 
     assert response.status_code == 404

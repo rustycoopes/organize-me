@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.events import router as events_router
+from app.api.v1.import_pending_files import router as import_pending_files_router
 from app.api.v1.internal_e2e import router as internal_e2e_router
 from app.api.v1.llm_prompt import router as llm_prompt_router
 from app.api.v1.processing_runs import router as processing_runs_router
@@ -46,6 +47,7 @@ app.include_router(users_router)
 app.include_router(storage_config_router)
 app.include_router(storage_google_drive_router)
 app.include_router(upload_router)
+app.include_router(import_pending_files_router)
 app.include_router(events_router)
 app.include_router(llm_prompt_router)
 app.include_router(processing_runs_router)

@@ -15,6 +15,9 @@ class ProcessingRunRead(BaseModel):
     status: ProcessingRunStatus
     events_extracted_count: int
     created_at: datetime
+    # Logs-grid expanded-details column (#111): the first error line for a failed run, or a
+    # "N log lines" count otherwise. Computed from the run's steps, not stored.
+    detail_summary: str
 
 
 class ProcessingRunListRead(BaseModel):
@@ -58,3 +61,20 @@ class ProcessingLogLineRead(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class ProcessingStepLogsRead(BaseModel):
+    """One step's full (unpaginated) log lines, for the run logs download (Slice 6.3, #85)."""
+
+    step_number: int
+    step_name: str
+    status: ProcessingStepStatus
+    log_lines: list[str]
+
+
+class ProcessingRunLogsDownloadRead(BaseModel):
+    """A run's full structured logs across all steps (Slice 6.3, #85)."""
+
+    run_id: uuid.UUID
+    filename: str
+    steps: list[ProcessingStepLogsRead]
