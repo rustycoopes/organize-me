@@ -19,12 +19,18 @@
   (the reported symptom: files visibly waiting in Drive, click fails anyway, no explanation). Both
   endpoints now catch `GoogleDriveError`/`DropboxError` around the storage call, `logger.exception`
   it (with the user id, for support/log correlation), close the provider, and return a `502` with
-  detail `storage_error`, which `import_pending_button.html` and `upload.html` map to "Couldn't reach
+  detail `storage_error`, which `import_pending_button.html` and `upload.html` map to "Could not reach
   your storage provider. Try reconnecting it in Settings, or try again in a moment." 2 new regression
   tests (`test_import_pending_files_api.py`, `test_upload_api.py`), each asserting the 502/detail and
-  that no run is created/scheduled on failure. Two lower-priority improvements deferred to issues
-  #146 (distinguish auth-failure from transient errors with a dedicated `storage_reauth_required`
-  detail) and #147 (e2e coverage for the `storage_error` path), both `modelsuggested`.
+  that no run is created/scheduled on failure. The first draft of that message used "Couldn't" - a
+  literal apostrophe inside the single-quoted `x-data='...'` Alpine attribute, which terminated the
+  attribute early and broke Alpine init for the whole button (the exact bug class #23's
+  `register.html` fix already warned about in this same file). CI's `e2e-qa` job caught it
+  (`import-pending-files.spec.ts`/`processing.spec.ts` failing against the deployed QA app even
+  though the backend was verified correct via direct API calls); reworded to "Could not" to sidestep
+  the apostrophe rather than escaping it. Two lower-priority improvements deferred to issues #146
+  (distinguish auth-failure from transient errors with a dedicated `storage_reauth_required` detail)
+  and #147 (e2e coverage for the `storage_error` path), both `modelsuggested`.
 
 - **Issue #94 implemented** — S3 StorageProvider (Slice 8.2, branch
   `feature/s3-storage-provider`). New `S3StorageProvider` (`app/services/storage/s3.py`) implements

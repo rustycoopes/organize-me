@@ -240,10 +240,15 @@ exactly the reported symptom (files visibly waiting in Drive, the button fails a
 explanation). Fixed on branch `fix/import-pending-files-error-detail`, in an isolated worktree: both
 endpoints now catch `GoogleDriveError`/`DropboxError` around the storage call, `logger.exception` it
 (with the user id, for support/log correlation), close the provider, and return `502` with detail
-`storage_error`, mapped by `import_pending_button.html`/`upload.html` to "Couldn't reach your storage
+`storage_error`, mapped by `import_pending_button.html`/`upload.html` to "Could not reach your storage
 provider. Try reconnecting it in Settings, or try again in a moment." 2 new regression tests; full
-suite green; `mypy --strict` clean. Two lower-priority improvements deferred to `modelsuggested`
-issues #146 (distinguish auth-failure from transient errors with a dedicated
+suite green; `mypy --strict` clean. The first draft wrote "Couldn't" - a literal apostrophe inside
+the single-quoted `x-data='...'` Alpine attribute, terminating it early and breaking Alpine init for
+the whole button (the same bug class #23's `register.html` fix already warned about in this file).
+`e2e-qa` caught it live against deployed QA (`import-pending-files.spec.ts`/`processing.spec.ts`
+failing even though the backend was independently verified correct via direct API calls); reworded
+to "Could not" to sidestep the apostrophe. Two lower-priority improvements deferred to
+`modelsuggested` issues #146 (distinguish auth-failure from transient errors with a dedicated
 `storage_reauth_required` detail) and #147 (e2e coverage for the `storage_error` path).
 
 ## Completed Milestones
