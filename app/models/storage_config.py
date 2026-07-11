@@ -30,12 +30,13 @@ class StorageConfig(Base):
     """
 
     __tablename__ = "storage_configs"
+    __table_args__ = {"schema": "event_creator"}
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     # UNIQUE: one active storage config per user. ON DELETE CASCADE so removing a user removes
     # their config (matches oauth_accounts).
     user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("users.id", ondelete="cascade"), nullable=False, unique=True
+        GUID, ForeignKey("host.users.id", ondelete="cascade"), nullable=False, unique=True
     )
     # values_callable stores the enum *values* ("google_drive"), not SQLAlchemy's default of the
     # member *names* ("GOOGLE_DRIVE"), so the DB labels match the spec and the JSON API.
@@ -43,6 +44,7 @@ class StorageConfig(Base):
         SAEnum(
             StorageProviderType,
             name="storage_provider",
+            schema="event_creator",
             values_callable=lambda enum: [member.value for member in enum],
         ),
         nullable=False,

@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-10 (issue #144 — notification delivery visibility fix)
+**Last updated:** 2026-07-11 (issue #156 — Slice R1 Database Schema Separation)
 
 ---
 
@@ -271,10 +271,20 @@ verified address - if prod hasn't verified a custom domain, this is an account/D
 the repo, filed as `modelsuggested` issue #152 (**human setup**, same class of gap as #61/#72's
 other provider-account setup steps).
 
+**Platform Restructure kicked off.** Issue #156 (Slice R1 — Database Schema Separation, the first
+slice of the Platform Restructure WBS in `docs/platform-restructure/`) is implemented on branch
+`restructure/r1-db-schema-separation`, in an isolated worktree. Pure DB/model prefactoring: `host`
+and `event_creator` Postgres schemas, tables moved via metadata-only `ALTER TABLE ... SET SCHEMA`,
+two `NOLOGIN` least-privilege roles (`host_app`, `event_creator_app`) for the eventual service
+split, all 7 models schema-qualified. The running app's own `DATABASE_URL` connection is
+unchanged — no behavioural change, no other slice unblocked yet by this alone. See
+`docs/changelog.md` for full detail.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-11 | Issue #156 (Slice R1 — Database Schema Separation) implemented on branch `restructure/r1-db-schema-separation`, in an isolated worktree. `host`/`event_creator` Postgres schemas created; `users`/`oauth_accounts` → `host`, `storage_configs`/`llm_prompts`/`processing_runs`/`processing_steps`/`events` (+ their enum types) → `event_creator`, all via metadata-only `ALTER ... SET SCHEMA` (no row rewrite). Two `NOLOGIN` roles (`host_app`, `event_creator_app`) grant least-privilege access per schema, with `event_creator_app` limited to `REFERENCES`-only on `host.users` for the cross-schema FK — dormant until a later slice wires the app to connect as them. All 7 SQLAlchemy models schema-qualified (`__table_args__` + fully-qualified cross-schema `ForeignKey`s); the three `SAEnum` columns needed an explicit `schema="event_creator"` too, since Postgres couldn't otherwise resolve the relocated enum type name at insert time — caught by the new tests before merge. `version_table_schema` pinned to `public`. New `tests/test_schema_separation.py` (9 tests, via `has_schema_privilege`/`has_table_privilege` since the roles are `NOLOGIN`) plus a delete-cascade regression test. App's own DB connection unchanged; `mypy --strict` clean |
 | 2026-07-09 | Issue #113 (reviewed flag + filter on dashboard events) implemented on branch `feature/slice-5-events-reviewed-flag`, in an isolated worktree. New `reviewed` boolean column on `events` (migration `a7b8c9d0e1f2`, default `false`) plus a partial index `ix_events_user_id_unreviewed_sort` (migration `b8c9d0e1f2a3`) covering the default `reviewed = false` query. `GET /api/v1/events`/`/dashboard` gain a `show_reviewed` param (default `false`, composes with the other filters/pagination). New `PATCH /api/v1/events/{id}` (owner-scoped via shared `get_owned_event`, 404 either way, mirrors `DELETE`) toggles the flag. Dashboard: per-row "Reviewed" checkbox (Alpine `fetch` PATCH, no reload, re-renders `#dashboard-body` via `htmx.ajax()` on success, reverts on failure) + a "Show reviewed" filter checkbox. Code-review pass fixed two real bugs (client-side row-removal desync at pagination boundaries; `has_active_filters` missing the default reviewed-hiding, causing a misleading "No events yet" for all-reviewed users) plus a redundant `db.refresh()` and duplicated owner-lookup code. 15 new tests; full suite green; `mypy --strict` clean |
 | 2026-07-09 | Issue #100 (Dashboard "Agreed by" chips show initials, not full name) implemented directly on `main` (small, self-contained UI tweak, no branch per CLAUDE.md's minor-change rule), in an isolated worktree. New pure helper `app/core/initials.py::to_initials()` (first + last word initials, uppercased; single-word falls back to first letter; empty input → empty string), registered as a Jinja filter and used in `partials/events_panel.html` — chip text is now initials with the full name in a `title` tooltip. Improvement pass: made the chip focusable (`tabindex="0"`) so the tooltip is keyboard-reachable. Follow-ups filed as #137 (Intake — `title` tooltips don't appear on touch devices) and #138 (Intake — two people sharing initials render identical chips). `mypy --strict` clean; targeted test suite green |
 | 2026-07-09 | Issue #85 (Slice 6.3 — searchable log filter + log download) implemented on branch `feature/slice-6.3-log-search-download`, in an isolated worktree. The HTMX search filter already existed from #84; added `GET /api/v1/processing-runs/{id}/logs/download` (full structured logs across all steps as a downloadable JSON file) + a "Download logs" link on the run detail page. Improvement pass fixed a pre-existing search bug (`%`/`_` wrongly escaped for a SQL `LIKE` pattern that was never used) and deduplicated search/pagination logic into `app/services/processing_logs.py`. Follow-up filed as #118 (Intake). With #85, Slice 6 is complete |

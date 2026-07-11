@@ -31,10 +31,13 @@ class ProcessingStep(Base):
     """
 
     __tablename__ = "processing_steps"
+    __table_args__ = {"schema": "event_creator"}
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("processing_runs.id", ondelete="cascade"), nullable=False
+        GUID,
+        ForeignKey("event_creator.processing_runs.id", ondelete="cascade"),
+        nullable=False,
     )
     step_number: Mapped[int] = mapped_column(Integer, nullable=False)
     step_name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -42,6 +45,7 @@ class ProcessingStep(Base):
         SAEnum(
             ProcessingStepStatus,
             name="processing_step_status",
+            schema="event_creator",
             values_callable=lambda enum: [member.value for member in enum],
         ),
         nullable=False,

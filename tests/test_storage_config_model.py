@@ -38,7 +38,7 @@ async def test_storage_config_persists_and_provider_enum_round_trips(
     # member name ("GOOGLE_DRIVE"). (A mismatch would in fact fail the INSERT above, since the
     # migration's enum type only defines the lowercase labels - this asserts it explicitly.)
     stored_provider = await db_session.scalar(
-        text("SELECT provider::text FROM storage_configs WHERE user_id = :uid"),
+        text("SELECT provider::text FROM event_creator.storage_configs WHERE user_id = :uid"),
         {"uid": user.id},
     )
     assert stored_provider == "google_drive"
@@ -71,7 +71,9 @@ async def test_storage_provider_enum_has_exactly_the_spec_labels(db_session: Asy
     # guards both the spec contract and the model's values_callable (member value vs member name).
     labels = (
         await db_session.scalars(
-            text("SELECT unnest(enum_range(NULL::storage_provider))::text ORDER BY 1")
+            text(
+                "SELECT unnest(enum_range(NULL::event_creator.storage_provider))::text ORDER BY 1"
+            )
         )
     ).all()
 
