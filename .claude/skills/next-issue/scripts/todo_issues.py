@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""List Todo issues in the OrganizeMe project, grouped by slice number then priority tier.
+"""List Todo issues in the OrganizeMe project, grouped by restructure slice then priority tier.
 
 The skill uses this to get a deterministic shortlist so it doesn't re-derive the gathering,
 slice-ordering, and tiering logic on every run. It intentionally does NOT make the final pick —
 the ordering *within* a tier is a judgment call (dependencies, what unblocks the most, what makes
 a good foundation) that the model makes after reading the candidate issue bodies.
 
-Slice ordering: work is preferred by slice number, lowest first (slice1 before slice2 before
-slice3 …). Earlier slices are the foundation later ones build on, so finish them first. Within a
-single slice, issues are bucketed by priority tier.
+Scope: only issues carrying the `framework-refactor` label are considered. Among those, the slice
+is read from a `restructure-rN` label (restructure-r1, restructure-r2, …). Work is preferred by
+slice number, lowest first — earlier slices are the foundation later ones build on, so finish them
+first. Within a single slice, issues are bucketed by priority tier.
 
 Usage:
-    python todo_issues.py                       # all slices, ordered by slice number
-    python todo_issues.py --slice slice2        # restrict to one slice
+    python todo_issues.py                             # all restructure slices, ordered by number
+    python todo_issues.py --slice restructure-r2      # restrict to one slice
     python todo_issues.py --status "In Progress"
 
 Priority tiers (highest first): bug > enhancement > future-enhancement > (other/untiered)
@@ -31,7 +32,8 @@ PROJECT_OWNER = "rustycoopes"
 # Highest priority first. An issue is placed in the first tier whose label it carries.
 TIER_ORDER = ["bug", "enhancement", "future-enhancement"]
 
-SLICE_RE = re.compile(r"^slice(\d+)$")
+SCOPE_LABEL = "framework-refactor"
+SLICE_RE = re.compile(r"^restructure-r(\d+)$")
 
 
 def fetch_items():
@@ -56,7 +58,7 @@ def classify(labels):
 
 
 def slice_number(labels):
-    """Return the lowest slice number among an issue's labels, or None if it carries no slice label."""
+    """Return the lowest restructure-rN number among an issue's labels, or None if it carries none."""
     nums = [int(m.group(1)) for label in labels if (m := SLICE_RE.match(label))]
     return min(nums) if nums else None
 
@@ -64,7 +66,7 @@ def slice_number(labels):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--slice", default=None,
-                    help="restrict to a single slice label (e.g. slice2); default: all slices")
+                    help="restrict to a single slice label (e.g. restructure-r2); default: all slices")
     ap.add_argument("--status", default="Todo",
                     help="project Status value to filter by (default: Todo)")
     args = ap.parse_args()
@@ -79,8 +81,10 @@ def main():
         if (item.get("status") or "") != args.status:
             continue
         labels = item.get("labels") or []
+        if SCOPE_LABEL not in labels:  # only the restructure/framework-refactor track
+            continue
         snum = slice_number(labels)
-        if snum is None:  # not part of any slice
+        if snum is None:  # no restructure-rN label
             continue
         if args.slice is not None and args.slice not in labels:
             continue
@@ -97,7 +101,7 @@ def main():
         for t in tiers:
             tiers[t].sort(key=lambda c: c["number"])
         slices.append({
-            "slice": f"slice{snum}",
+            "slice": f"restructure-r{snum}",
             "number": snum,
             "total": sum(len(v) for v in tiers.values()),
             "tiers": tiers,

@@ -21,42 +21,39 @@ build order gives the project a solid base: finish earlier slices before later o
 broken before adding new things, land foundational pieces before the work that depends on them, and
 don't sink effort into low-priority polish while higher-value work sits waiting.
 
-**Scope: all slices, earliest first.** This skill considers `Todo` issues labeled 'framework-refactor' and 'restructure-rN'.  Each increment of label
-(`restructure-r1`, `restructure-r2`, `restructure-r3`, …) is considered a slice.
-, you should strongly prefer the lowest-numbered slice that still has
-ready work — an earlier slice is the foundation later ones build on, so it gets drained before the
-next one starts. Only once a slice has no `Todo` work does selection move to the next slice up.
+**Scope: the restructure track, earliest slice first.** This skill only considers `Todo` issues
+that carry the `framework-refactor` label. Among those, the slice is read from a `restructure-rN`
+label (`restructure-r1`, `restructure-r2`, `restructure-r3`, …) — each increment is a slice. Always
+strongly prefer the lowest-numbered restructure slice that still has ready work — an earlier slice
+is the foundation later ones build on, so it gets drained before the next one starts. Only once a
+slice has no `Todo` work does selection move to the next slice up.
 
 **Ignore `In Progress` issues completely.** An `In Progress` issue is already claimed — assume
 another worker (or a concurrent loop session) owns it. Never pick, resume, or hand off to an
 `In Progress` issue, even if it would otherwise be the highest-priority next thing to do. Select
-only from work that has **not been started** (`Todo`) and work identified as an "enhancement" not a "future-enhancement. 
-
-
-
-
-If the item you'd expect to pick next is
+only from work that has **not been started** (`Todo`). If the item you'd expect to pick next is
 `In Progress`, skip it and take the next-best not-started `Todo` item instead. The gathering helper
 in Step 1 already filters to `Todo`, so `In Progress` issues won't appear in the candidate list —
 do not go around that filter to look them up.
 
 ## Step 1 — Gather what's ready
 
-Run the bundled helper to get every `Todo` issue across all slices, grouped by slice number and
-then by priority tier:
+Run the bundled helper to get every `Todo` restructure-track issue across all slices, grouped by
+slice number and then by priority tier:
 
 ```bash
 python .claude/skills/next-issue/scripts/todo_issues.py
 ```
 
-It reads the project board via `gh`, keeps only items whose Status is `Todo` that carry a `sliceN`
-label, and returns a `slices` array ordered by slice number ascending; within each slice, issues
-are bucketed into `bug` → `enhancement` → `future-enhancement` → `other`. It deliberately does
-**not** pick for you — ordering *within* a tier is a judgment call the next steps make. (Pass
-`--slice slice2` to restrict to a single slice if the user asks for one specifically.)
+It reads the project board via `gh`, keeps only items whose Status is `Todo` that carry the
+`framework-refactor` label and a `restructure-rN` label, and returns a `slices` array ordered by
+slice number ascending; within each slice, issues are bucketed into `bug` → `enhancement` →
+`future-enhancement` → `other`. It deliberately does **not** pick for you — ordering *within* a
+tier is a judgment call the next steps make. (Pass `--slice restructure-r2` to restrict to a single
+slice if the user asks for one specifically.)
 
 If the helper returns zero issues across all slices, there's nothing to start: tell the user there's
-no `Todo` work and stop.
+no `Todo` restructure work and stop.
 
 ## Step 2 — Narrow to a slice, then to the top tier
 
@@ -66,11 +63,14 @@ work. Everything in higher-numbered slices is out of contention for this run.
 Then, within that slice, priority is strict across tiers, highest first:
 
 1. **`bug`** — a broken thing undermines the base everything else builds on, so bugs come first.
-2. **`framework-refactor`** — the planned features for that slice.
+2. **`enhancement`** — the planned work for that slice.
 3. **`future-enhancement`** — deferred improvements/decisions; worth doing but lowest priority.
+4. **`other`** — untiered issues (in practice, most restructure-track issues land here, since they
+   typically carry only `framework-refactor` + `restructure-rN` with no bug/enhancement label).
 
 Take the highest non-empty tier. Everything below it is out of contention — you only choose *within*
-the top occupied tier of the earliest occupied slice.
+the top occupied tier of the earliest occupied slice. In the common case where a slice's only
+candidate(s) are untiered, `other` is that top tier — treat it like any other tier for Step 3.
 
 ## Step 3 — Choose within the tier (this is the real work)
 
@@ -80,8 +80,7 @@ Do **not** default to the lowest issue number. Read the candidate issues in the 
 - **What unblocks the most?** An issue that other Todo issues depend on should go first. Issue
   bodies often say this outright (e.g. "Blocked by #17", "before #16/#17"). Prefer the *unblocker*
   over the *blocked*. (Example: sidebar shell #17 is a dependency of the E2E-tests issue #23, so
-  #17 goes first even though both are enhancement
-  s.)
+  #17 goes first even though both are enhancements.)
 - **What's foundational?** Shared plumbing, scaffolding, or interfaces that later work reuses beat
   leaf features.
 - **Is it actually ready?** If a candidate is blocked by something still open, or (common for
@@ -104,7 +103,7 @@ Before starting any implementation, tell the user:
 
 ## Step 5 — Hand off to implementation
 
- start the selected issue with the `/to-implementation` skill, passing it the
+Start the selected issue with the `/to-implementation` skill, passing it the
 chosen issue. From there, `to-implementation` owns the branch/worktree, build loop, review, PR, and
 marking the issue done — this skill's job is finished once the right issue is handed over.
 
