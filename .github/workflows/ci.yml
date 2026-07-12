@@ -106,10 +106,6 @@ jobs:
           TWILIO_ACCOUNT_SID: "${TWILIO_ACCOUNT_SID}"
           TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN}"
           TWILIO_PHONE_NUMBER: "${TWILIO_PHONE_NUMBER}"
-          # Domain-scoped SSO cookie (Slice R4/R6): shared origin host so the organizeme_auth
-          # cookie is visible to every service behind the Load Balancer, not just the Host's own
-          # *.run.app host.
-          COOKIE_DOMAIN: "organizeme.qa.russcoopersoftware.com"
           EOF
 
       - name: Build image
