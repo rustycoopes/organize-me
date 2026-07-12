@@ -42,6 +42,7 @@ def fetch_items():
             ["gh", "project", "item-list", PROJECT_NUMBER,
              "--owner", PROJECT_OWNER, "--format", "json", "--limit", "300"],
             capture_output=True, text=True, check=True,
+            encoding="utf-8", errors="replace",
         ).stdout
     except FileNotFoundError:
         sys.exit("error: `gh` CLI not found on PATH.")
