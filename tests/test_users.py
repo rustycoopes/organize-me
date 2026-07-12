@@ -117,7 +117,9 @@ async def test_patch_rejects_whole_request_when_email_conflicts_alongside_notifi
     )
     assert 400 <= response.status_code < 500
 
-    user = await db_session.scalar(select(User).where(User.email == email_a))
+    user = await db_session.scalar(
+        select(User).where(User.email == email_a)  # type: ignore[arg-type]
+    )
     assert user is not None
     settings = await db_session.scalar(
         select(UserSettings).where(UserSettings.user_id == user.id)
