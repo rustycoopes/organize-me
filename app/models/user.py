@@ -16,6 +16,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         # SQLAlchemyUserDatabase.get_by_email), so uniqueness must be enforced the same way,
         # or two accounts differing only by case could be created.
         Index("ix_users_email_lower", text("lower(email)"), unique=True),
+        {"schema": "host"},
     )
 
     # Override the mixin's plain case-sensitive unique index; ix_users_email_lower above

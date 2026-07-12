@@ -17,12 +17,13 @@ class LLMPrompt(Base):
     """
 
     __tablename__ = "llm_prompts"
+    __table_args__ = {"schema": "event_creator"}
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     # UNIQUE: one prompt per user. ON DELETE CASCADE so removing a user removes their prompt
     # (matches storage_configs / oauth_accounts).
     user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("users.id", ondelete="cascade"), nullable=False, unique=True
+        GUID, ForeignKey("host.users.id", ondelete="cascade"), nullable=False, unique=True
     )
     prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

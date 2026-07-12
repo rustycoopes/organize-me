@@ -27,7 +27,7 @@ shared chrome, per-app schema/Alembic, independent deploy) is exercised.
 - One content-only page: `GET /dashboard` → verify JWT → extract `user_id` → render chrome +
   placeholder Dashboard body. **No** login/session/registration code.
 - New Cloud Run service `event-creator-qa`; attached to the R5 URL map's second NEG so
-  `organize-me.app/dashboard` routes here.
+  `organizeme.qa.russcoopersoftware.com/dashboard` routes here.
 - Reads the JWT signing secret from Secret Manager (per R4), same key as the Host.
 
 ## Relevant files (new repo)
@@ -53,7 +53,7 @@ shared chrome, per-app schema/Alembic, independent deploy) is exercised.
 ## Acceptance criteria
 - [ ] `event-creator` repo exists with an independent CI/CD pipeline that deploys
       `event-creator-qa` with **no** Host build/redeploy.
-- [ ] Logging in at the Host, then requesting `organize-me.app/dashboard`, is served by the Event
+- [ ] Logging in at the Host, then requesting `organizeme.qa.russcoopersoftware.com/dashboard`, is served by the Event
       Creator service and renders a full page (shared chrome + placeholder body) for the correct user.
 - [ ] Event Creator verifies the Host JWT (signature + expiry) with no network call to the Host and
       no login/session code.

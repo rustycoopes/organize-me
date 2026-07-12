@@ -11,7 +11,7 @@ This document resolves the engineering decisions the PRD deliberately left open 
 
 ## Architecture at a Glance
 
-- One shared custom domain (`organize-me.app`) fronted by a **GCP External HTTPS Load Balancer** with a **path-based URL map**.
+- One shared custom subdomain of the operator-owned `russcoopersoftware.com` (Squarespace-managed) — `organizeme.russcoopersoftware.com` in prod, `organizeme.qa.russcoopersoftware.com` in QA — fronted by a **GCP External HTTPS Load Balancer** with a **path-based URL map**.
 - The URL map routes each request directly to one of two independently deployed **Cloud Run services** — **Host** or **Event Creator** — with **no server-to-server calls between them at request time**.
 - Each service renders **full pages independently** (chrome + content), using a **shared, versioned chrome/theme package** published by the Host repo, so there is exactly one visual definition of the sidebar/header/Settings tab-bar.
 - **Single sign-on** is stateless: the Host issues a signed JWT cookie on the shared domain; every hosted app verifies that signature independently (no login logic, no network call back to the Host).
@@ -24,7 +24,7 @@ This document resolves the engineering decisions the PRD deliberately left open 
 
 ```mermaid
 graph TB
-    Browser["Browser<br/>single origin: organize-me.app"]
+    Browser["Browser<br/>single origin: organizeme.russcoopersoftware.com"]
     LB["GCP External HTTPS Load Balancer<br/>URL Map — path-based routing<br/>Google-managed SSL cert"]
 
     subgraph HostSvc["Host — Cloud Run service (repo: organize-me)"]
@@ -72,7 +72,7 @@ sequenceDiagram
     U->>LB: POST /login (credentials)
     LB->>H: routed to Host
     H->>H: verify credentials, sign JWT
-    H-->>U: Set-Cookie (JWT; Domain=organize-me.app; Path=/; HttpOnly)
+    H-->>U: Set-Cookie (JWT; Domain=organizeme.russcoopersoftware.com; Path=/; HttpOnly)
 
     U->>LB: GET /dashboard (cookie attached automatically)
     LB->>EC: routed to Event Creator (no call to Host)
@@ -141,9 +141,9 @@ apps:
 
 ### Load Balancer / routing
 
-- GCP External HTTPS Load Balancer, Google-managed SSL certificate for `organize-me.app`.
+- GCP External HTTPS Load Balancer, Google-managed SSL certificate for the shared subdomain (`organizeme.qa.russcoopersoftware.com` in QA, `organizeme.russcoopersoftware.com` in prod).
 - URL map with one Serverless NEG per Cloud Run service, path rules generated from the app-registry file.
-- **Prerequisite (unconfirmed):** whether `organize-me.app` is already registered with DNS ready to point at the Load Balancer, or whether that needs to happen as part of this work. Flagged for confirmation before infra provisioning begins.
+- **DNS mechanism:** the subdomain is pointed at the LB's global static IP via a Squarespace **Custom A/AAAA record** — **not** Squarespace Domain Forwarding, which is an HTTP redirect and would break both managed-cert validation and the shared-origin cookie. `russcoopersoftware.com` is already operator-owned, so no domain purchase is needed (see R0).
 
 ---
 
@@ -161,7 +161,7 @@ apps:
 ## Auth / SSO
 
 1. User logs in at the Host (email/password or Google OAuth) — unchanged from today's flow.
-2. Host signs a JWT and sets it as an `HttpOnly` cookie: `Domain=organize-me.app`, `Path=/`, `SameSite=Lax` — matching today's cookie approach, just explicitly scoped to the whole shared domain rather than implicitly scoped to a single app.
+2. Host signs a JWT and sets it as an `HttpOnly` cookie: `Domain=<per-env origin host>` (`organizeme.russcoopersoftware.com` / `organizeme.qa.russcoopersoftware.com`), `Path=/`, `SameSite=Lax` — matching today's cookie approach, just explicitly scoped to the shared origin rather than implicitly scoped to a single app. Scope to the exact host (never `.russcoopersoftware.com`) so the cookie is not sent to the main Squarespace site.
 3. Any subsequent request to any hosted app's path is routed directly there by the Load Balancer; the cookie rides along automatically because it's the same origin.
 4. The hosted app's shared JWT-verification helper checks the signature (via a secret in Secret Manager, shared per the platform's "shared infra" tenet) and expiry, and extracts the user id. **No network call to the Host, no session store lookup.**
 5. This scales to any number of future hosted apps for free — each just needs the shared chrome package (which bundles the verification helper) and read access to the same signing secret.
@@ -178,7 +178,7 @@ apps:
 
 ## Cutover Sequence
 
-1. Confirm `organize-me.app` DNS/registration status; provision the Load Balancer, URL map, and managed SSL cert.
+1. Confirm editable Squarespace DNS for the `russcoopersoftware.com` subdomains (R0); provision the Load Balancer, URL map, and managed SSL cert, pointing the subdomain at the LB IP via a Custom A/AAAA record.
 2. Introduce `host` and `event_creator` schemas plus their DB roles in the existing database; move existing tables via `ALTER TABLE ... SET SCHEMA` (no data movement).
 3. Strip `organize-me` down to the Host; publish v1 of the shared chrome/theme package.
 4. Build the Event Creator repo consuming that package; verify against `docs/prd.md`'s acceptance criteria plus the new boundary E2E suite, in QA.
@@ -190,7 +190,7 @@ apps:
 
 ## Open Items Carried Into Implementation
 
-- **`organize-me.app` domain/DNS readiness** — confirm before Load Balancer provisioning (blocking for cutover step 1).
+- **Subdomain DNS readiness** (`organizeme.russcoopersoftware.com` / `organizeme.qa.russcoopersoftware.com`) — confirm editable Squarespace Custom Records before Load Balancer provisioning (blocking for cutover step 1). Resolved: use A/AAAA records, not Domain Forwarding.
 - **IaC tooling** for generating the Load Balancer URL map from the app-registry file (e.g. Terraform vs. a `gcloud` deploy script) — implementation choice, not a design decision.
 - **Private package registry** for the shared chrome/theme package — recommend GitHub Packages (matches existing GitHub-hosted repos); confirm during build.
 - **JWT signing secret rotation policy** — inherits today's approach unless a reason emerges to change it.

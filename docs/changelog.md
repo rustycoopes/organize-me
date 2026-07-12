@@ -10,6 +10,30 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #156 implemented — Slice R1: Database Schema Separation** (branch
+  `restructure/r1-db-schema-separation`). Platform Restructure prefactoring: introduces `host`
+  and `event_creator` Postgres schemas in the shared Supabase QA database and moves the existing
+  tables into them via metadata-only `ALTER TABLE ... SET SCHEMA` (`users`, `oauth_accounts` →
+  `host`; `storage_configs`, `llm_prompts`, `processing_runs`, `processing_steps`, `events` →
+  `event_creator`), including their Postgres enum types (`storage_provider`,
+  `processing_run_status`, `processing_step_status`). Creates two `NOLOGIN` roles - `host_app`
+  (full R/W on `host`, no access to `event_creator`) and `event_creator_app` (full R/W on
+  `event_creator`, `REFERENCES`-only on `host.users`, no other `host` access) - as the
+  least-privilege grants the eventual service split will use; the running app keeps its existing
+  admin `DATABASE_URL` connection unchanged in this slice, so nothing about the app's runtime
+  behaviour changes. All 7 SQLAlchemy models now declare their schema via `__table_args__`
+  (cross-schema FKs fully schema-qualified, e.g. `ForeignKey("host.users.id", ...)`) and the three
+  `SAEnum` columns now declare `schema="event_creator"` explicitly - omitting it left Postgres
+  unable to resolve the now-relocated enum type name at insert time (`type "..._status" does not
+  exist`), caught by the new regression tests before merge. Alembic's `version_table_schema` is
+  now pinned to `public` (unchanged in practice - that's where the version table already lived -
+  but now explicit, prepping for per-repo Alembic history in a later slice). New
+  `tests/test_schema_separation.py` (9 tests) verifies table→schema placement, the role grants
+  (via `has_schema_privilege`/`has_table_privilege` - the roles are `NOLOGIN` so a real
+  connect-as-role test isn't possible this slice), and that deleting a `host.users` row still
+  cascades to a user's `event_creator` rows. No app code outside `app/models/*.py` changed - no
+  endpoint issues unqualified table names, so this was a pure DB/model change.
+
 - **Issue #144 fixed** — notification delivery failures now surface with detail (branch
   `fix/notification-delivery-visibility`). A real email/SMS delivery failure (bad/unset
   credentials, the provider rejecting the recipient, a network error, ...) inside

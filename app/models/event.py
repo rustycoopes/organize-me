@@ -27,14 +27,15 @@ class Event(Base):
         UniqueConstraint(
             "user_id", "description", "resolved_date", name="uq_events_user_description_resolved_date"
         ),
+        {"schema": "event_creator"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("users.id", ondelete="cascade"), nullable=False
+        GUID, ForeignKey("host.users.id", ondelete="cascade"), nullable=False
     )
     run_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("processing_runs.id", ondelete="cascade"), nullable=False
+        GUID, ForeignKey("event_creator.processing_runs.id", ondelete="cascade"), nullable=False
     )
     # Dynamic, LLM-provided category ("Medical", "School", ...) - free text, not an enum.
     type: Mapped[str] = mapped_column(Text, nullable=False)

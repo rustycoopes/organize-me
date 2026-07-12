@@ -29,11 +29,12 @@ class ProcessingRun(Base):
     """
 
     __tablename__ = "processing_runs"
+    __table_args__ = {"schema": "event_creator"}
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     # ON DELETE CASCADE so removing a user removes their runs (matches the other user-owned tables).
     user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID, ForeignKey("users.id", ondelete="cascade"), nullable=False
+        GUID, ForeignKey("host.users.id", ondelete="cascade"), nullable=False
     )
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     # values_callable stores the enum *values* ("in_progress"), not the member names, so the DB
@@ -42,6 +43,7 @@ class ProcessingRun(Base):
         SAEnum(
             ProcessingRunStatus,
             name="processing_run_status",
+            schema="event_creator",
             values_callable=lambda enum: [member.value for member in enum],
         ),
         nullable=False,

@@ -20,8 +20,12 @@ This slice makes the cookie and secret ready for cross-service SSO, still inside
 exactly as today, just with an explicitly domain-scoped cookie and a Secret-Manager-sourced key.
 
 ## Includes
-- Set the auth cookie attributes to `Domain=organize-me.app`, `Path=/`, `SameSite=Lax`,
-  `HttpOnly`, `Secure` — matching today's approach but explicitly scoped to the whole domain.
+- Set the auth cookie attributes to `Domain=<origin host>`, `Path=/`, `SameSite=Lax`,
+  `HttpOnly`, `Secure` — matching today's approach but explicitly scoped to the shared origin. The
+  `Domain` value is **per-environment**, sourced from config (`base_url` host), not hard-coded:
+  `organizeme.russcoopersoftware.com` in prod, `organizeme.qa.russcoopersoftware.com` in QA. Scope
+  to the **exact host** — never `.russcoopersoftware.com` — so the auth cookie is not sent to the
+  main Squarespace site.
 - Wire the JWT signing secret through **GCP Secret Manager** (`--set-secrets` on the Cloud Run
   deploy, replacing the plaintext env-var injection for this secret); the R3 verify helper reads
   the same secret.
@@ -39,18 +43,19 @@ exactly as today, just with an explicitly domain-scoped cookie and a Secret-Mana
 ## Design notes
 - Logout stays client-side cookie-clear (stateless JWT) — this slice adds no server-side session
   revocation, inheriting today's property.
-- Until the Load Balancer (R5) puts both services on `organize-me.app`, testing the domain scope
+- Until the Load Balancer (R5) puts both services on the shared origin, testing the domain scope
   in QA means exercising it against the shared-domain QA setup once R5 lands; the cookie/secret
   wiring itself is verifiable now.
 - Secret-rotation policy inherits today's approach unless a reason emerges to change it (open item).
 
 ## Blocked by
 - R3 (the standalone JWT-verify helper the hosted-app side will use).
-- R0 (the `organize-me.app` domain must exist to scope the cookie to it).
+- R0 (DNS control of the `russcoopersoftware.com` subdomains — the origin host the cookie is scoped to).
 
 ## Acceptance criteria
-- [ ] The auth cookie is issued with `Domain=organize-me.app`, `Path=/`, `SameSite=Lax`,
-      `HttpOnly`, `Secure` from every issuance site.
+- [ ] The auth cookie is issued with `Domain=<per-env origin host>` (`organizeme.russcoopersoftware.com`
+      / `organizeme.qa.russcoopersoftware.com`), `Path=/`, `SameSite=Lax`, `HttpOnly`, `Secure`
+      from every issuance site.
 - [ ] The JWT signing secret is read from GCP Secret Manager on Cloud Run (not a plaintext
       env-vars-file entry) for both QA and prod.
 - [ ] Login and logout behave identically for the user in QA.

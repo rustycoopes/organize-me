@@ -30,6 +30,12 @@ target_metadata = Base.metadata
 # raises ValueError.
 DATABASE_URL = to_asyncpg_url(get_settings().database_url)
 
+# The migration history table lives in "public" rather than either app schema (Slice R1 -
+# Database Schema Separation, #156): it tracks a single shared history for both host and
+# event_creator during the monolith phase, so it doesn't belong to either one. Per-repo Alembic
+# in a later slice will give each split-out service its own version table in its own schema.
+VERSION_TABLE_SCHEMA = "public"
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -48,6 +54,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_schema=VERSION_TABLE_SCHEMA,
     )
 
     with context.begin_transaction():
@@ -55,7 +62,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table_schema=VERSION_TABLE_SCHEMA,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

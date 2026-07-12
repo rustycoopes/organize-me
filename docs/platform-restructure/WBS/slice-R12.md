@@ -15,7 +15,8 @@ migration. Rollback is a routine Cloud Run revision / URL-map revert.
 
 ## Includes
 - Provision the production Load Balancer, URL map, Serverless NEGs, and Google-managed cert for
-  `organize-me.app` (prod), mirroring R5's QA setup.
+  `organizeme.russcoopersoftware.com` (prod), mirroring R5's QA setup. Point the production
+  subdomain at the LB with a Squarespace **Custom A/AAAA record** (not Domain Forwarding).
 - Apply the `host` + `event_creator` schema separation to the **production** database (the same
   metadata-only `ALTER TABLE … SET SCHEMA` proven in QA), if not already applied.
 - Deploy the production Host (`organizeme-prod`, repurposed) and `event-creator-prod` services.
@@ -36,8 +37,8 @@ migration. Rollback is a routine Cloud Run revision / URL-map revert.
 - R11 (QA cutover fully green — the P0 gate).
 
 ## Acceptance criteria
-- [ ] Production LB + URL map + managed cert serve `https://organize-me.app` routing to both prod
-      services.
+- [ ] Production LB + URL map + managed cert serve `https://organizeme.russcoopersoftware.com`
+      routing to both prod services.
 - [ ] Every existing user can log in post-cutover and see their pre-existing data (events,
       processing history, settings) intact.
 - [ ] No maintenance window was required; no data was migrated.
