@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
+from app.models.user_settings import UserSettings
 
 
 def unique_email() -> str:
@@ -95,6 +96,37 @@ async def test_patch_with_duplicate_email_returns_4xx(client: AsyncClient) -> No
     assert 400 <= response.status_code < 500
 
 
+async def test_patch_rejects_whole_request_when_email_conflicts_alongside_notification_fields(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Regression test: a PATCH combining a conflicting email with notification-field changes must
+    reject the whole request atomically - it must not silently persist the notification/onboarding
+    change to UserSettings while reporting the email conflict as a failure (#158's move off `User`
+    onto a separately-fetched UserSettings row introduced, then fixed, exactly this risk - the
+    UserSettings mutation must ride on the same commit as the User update, not an earlier one)."""
+    email_a = unique_email()
+    email_b = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email_a, "password": password})
+    await client.post("/api/v1/auth/register", data={"email": email_b, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email_a, "password": password})
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"email": email_b, "notification_sms": False, "notification_email": False},
+    )
+    assert 400 <= response.status_code < 500
+
+    user = await db_session.scalar(select(User).where(User.email == email_a))
+    assert user is not None
+    settings = await db_session.scalar(
+        select(UserSettings).where(UserSettings.user_id == user.id)
+    )
+    # The core update is rejected before UserSettings is ever touched, so no row should exist yet
+    # for this brand-new user - the rejected PATCH's notification-field payload must not land.
+    assert settings is None
+
+
 async def test_patch_with_explicit_null_email_returns_422(client: AsyncClient) -> None:
     email = unique_email()
     password = "correct-horse-battery"
@@ -164,9 +196,13 @@ async def test_patch_notification_field_sets_onboarding_flag_on_first_save(
     response = await client.patch("/api/v1/users/me", json={"notification_sms": False})
 
     assert response.status_code == 200
-    result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
-    user = result.unique().scalar_one()
-    assert user.onboarding_notifications_done is True
+    user_result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
+    user = user_result.unique().scalar_one()
+    settings_result = await db_session.execute(
+        select(UserSettings).where(UserSettings.user_id == user.id)
+    )
+    settings = settings_result.scalar_one()
+    assert settings.onboarding_notifications_done is True
 
 
 async def test_patch_unrelated_field_does_not_set_onboarding_flag(
@@ -180,9 +216,13 @@ async def test_patch_unrelated_field_does_not_set_onboarding_flag(
     response = await client.patch("/api/v1/users/me", json={"name": "New Name"})
 
     assert response.status_code == 200
-    result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
-    user = result.unique().scalar_one()
-    assert user.onboarding_notifications_done is False
+    user_result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
+    user = user_result.unique().scalar_one()
+    settings_result = await db_session.execute(
+        select(UserSettings).where(UserSettings.user_id == user.id)
+    )
+    settings = settings_result.scalar_one()
+    assert settings.onboarding_notifications_done is False
 
 
 async def test_patch_notification_field_on_second_save_keeps_flag_and_updates_toggle(
@@ -201,10 +241,14 @@ async def test_patch_notification_field_on_second_save_keeps_flag_and_updates_to
 
     assert response.status_code == 200
     assert response.json()["notification_sms"] is True
-    result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
-    user = result.unique().scalar_one()
-    assert user.onboarding_notifications_done is True
-    assert user.notification_sms is True
+    user_result = await db_session.execute(select(User).where(User.email == email))  # type: ignore[arg-type]
+    user = user_result.unique().scalar_one()
+    settings_result = await db_session.execute(
+        select(UserSettings).where(UserSettings.user_id == user.id)
+    )
+    settings = settings_result.scalar_one()
+    assert settings.onboarding_notifications_done is True
+    assert settings.notification_sms is True
 
 
 async def test_patch_allows_enabling_sms_without_a_phone_number(client: AsyncClient) -> None:

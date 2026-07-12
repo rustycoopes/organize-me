@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-11 (issue #156 — Slice R1 Database Schema Separation)
+**Last updated:** 2026-07-12 (issue #158 — Slice R2 Decouple Event-Creator Data from the Host `users` Model)
 
 ---
 
@@ -280,10 +280,22 @@ split, all 7 models schema-qualified. The running app's own `DATABASE_URL` conne
 unchanged — no behavioural change, no other slice unblocked yet by this alone. See
 `docs/changelog.md` for full detail.
 
+**Slice R2 (Decouple Event-Creator Data from the Host `users` Model) implemented.** Issue #158 is
+implemented on branch `restructure/r2-decouple-event-creator-user-data`, in an isolated worktree.
+Removes the last two Host↔Event-Creator data couplings: notification/onboarding fields moved off
+`host.users` into a new `event_creator.user_settings` table (one row per user, lazily created —
+mirrors the existing `LLMPrompt` lazy-seed pattern), and the eager `LLMPrompt` insert dropped from
+`on_after_register` entirely (the pre-existing lazy self-heal path already covers new-user
+seeding). Every reader/writer across the users API, Settings/Dashboard pages, notification
+sender, pipeline runner, and the four onboarding-flag writers was repointed at the new table; no
+API/URL contract change. Full local suite green, `mypy --strict` clean. See `docs/changelog.md`
+for full detail.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-12 | Issue #158 (Slice R2 — Decouple Event-Creator Data from the Host `users` Model) implemented on branch `restructure/r2-decouple-event-creator-user-data`, in an isolated worktree. New `event_creator.user_settings` table (one row per user, FK-cascaded to `host.users.id`) holds `notification_sms`/`notification_email`/the three `onboarding_*_done` flags, moved off `host.users` via migration `e6f7a8b9c0d1` (backfills real values, then drops the columns) and created lazily via `get_or_create_user_settings` rather than eagerly at registration. The eager `LLMPrompt` insert in `on_after_register` is removed entirely; the pre-existing lazy `get_or_create_user_prompt` self-heal path now covers all new-user seeding. Repointed every reader/writer: the users API (`GET`/`PATCH /api/v1/users/me`, no contract change), Settings/Dashboard pages, the onboarding checklist view-model, the notification sender + pipeline runner's silent-channel warning, and the four onboarding-flag writers (now sharing `mark_storage_onboarding_done`/`mark_first_upload_onboarding_done` helpers). A code-review pass caught and fixed a partial-commit regression in the PATCH endpoint (a rejected email-conflict PATCH could otherwise still persist a notification-prefs change) — now covered by a dedicated regression test. Two lower-priority follow-ups filed as `modelsuggested` issues #174/#175. Full suite green; `mypy --strict` clean |
 | 2026-07-11 | Issue #156 (Slice R1 — Database Schema Separation) implemented on branch `restructure/r1-db-schema-separation`, in an isolated worktree. `host`/`event_creator` Postgres schemas created; `users`/`oauth_accounts` → `host`, `storage_configs`/`llm_prompts`/`processing_runs`/`processing_steps`/`events` (+ their enum types) → `event_creator`, all via metadata-only `ALTER ... SET SCHEMA` (no row rewrite). Two `NOLOGIN` roles (`host_app`, `event_creator_app`) grant least-privilege access per schema, with `event_creator_app` limited to `REFERENCES`-only on `host.users` for the cross-schema FK — dormant until a later slice wires the app to connect as them. All 7 SQLAlchemy models schema-qualified (`__table_args__` + fully-qualified cross-schema `ForeignKey`s); the three `SAEnum` columns needed an explicit `schema="event_creator"` too, since Postgres couldn't otherwise resolve the relocated enum type name at insert time — caught by the new tests before merge. `version_table_schema` pinned to `public`. New `tests/test_schema_separation.py` (9 tests, via `has_schema_privilege`/`has_table_privilege` since the roles are `NOLOGIN`) plus a delete-cascade regression test. App's own DB connection unchanged; `mypy --strict` clean |
 | 2026-07-09 | Issue #113 (reviewed flag + filter on dashboard events) implemented on branch `feature/slice-5-events-reviewed-flag`, in an isolated worktree. New `reviewed` boolean column on `events` (migration `a7b8c9d0e1f2`, default `false`) plus a partial index `ix_events_user_id_unreviewed_sort` (migration `b8c9d0e1f2a3`) covering the default `reviewed = false` query. `GET /api/v1/events`/`/dashboard` gain a `show_reviewed` param (default `false`, composes with the other filters/pagination). New `PATCH /api/v1/events/{id}` (owner-scoped via shared `get_owned_event`, 404 either way, mirrors `DELETE`) toggles the flag. Dashboard: per-row "Reviewed" checkbox (Alpine `fetch` PATCH, no reload, re-renders `#dashboard-body` via `htmx.ajax()` on success, reverts on failure) + a "Show reviewed" filter checkbox. Code-review pass fixed two real bugs (client-side row-removal desync at pagination boundaries; `has_active_filters` missing the default reviewed-hiding, causing a misleading "No events yet" for all-reviewed users) plus a redundant `db.refresh()` and duplicated owner-lookup code. 15 new tests; full suite green; `mypy --strict` clean |
 | 2026-07-09 | Issue #100 (Dashboard "Agreed by" chips show initials, not full name) implemented directly on `main` (small, self-contained UI tweak, no branch per CLAUDE.md's minor-change rule), in an isolated worktree. New pure helper `app/core/initials.py::to_initials()` (first + last word initials, uppercased; single-word falls back to first letter; empty input → empty string), registered as a Jinja filter and used in `partials/events_panel.html` — chip text is now initials with the full name in a `title` tooltip. Improvement pass: made the chip focusable (`tabindex="0"`) so the tooltip is keyboard-reachable. Follow-ups filed as #137 (Intake — `title` tooltips don't appear on touch devices) and #138 (Intake — two people sharing initials render identical chips). `mypy --strict` clean; targeted test suite green |

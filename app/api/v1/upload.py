@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api.v1.storage_config import get_user_storage_config
 from app.auth.users import current_active_user
 from app.core.config import Settings, get_settings
 from app.core.prompts import FACTORY_DEFAULT_PROMPT
@@ -36,7 +37,7 @@ from app.services.storage.base import RemoteFile, StorageProvider
 from app.services.storage.dropbox import DropboxError
 from app.services.storage.factory import build_storage_provider
 from app.services.storage.google_drive import GoogleDriveError
-from app.api.v1.storage_config import get_user_storage_config
+from app.services.user_settings import mark_first_upload_onboarding_done
 
 logger = logging.getLogger(__name__)
 
@@ -290,9 +291,9 @@ async def upload_file(
         user_id=user.id, filename=filename, status=ProcessingRunStatus.PENDING
     )
     db.add(run)
-    # First upload completes the onboarding step; it stays true thereafter.
-    user.onboarding_first_upload_done = True
-    await db.commit()
+    # First upload completes the onboarding step; it stays true thereafter. mark_first_upload_
+    # onboarding_done's own commit also persists the `run` add above (same session).
+    await mark_first_upload_onboarding_done(db, user.id)
     await db.refresh(run)
 
     prompt_text = await _prompt_text_for(db, user.id)

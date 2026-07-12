@@ -43,6 +43,7 @@ from app.core.security import CredentialCipher, get_credential_cipher
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.storage_config import StorageConfigRead
+from app.services.user_settings import mark_storage_onboarding_done
 
 logger = logging.getLogger(__name__)
 
@@ -232,8 +233,7 @@ async def google_drive_callback(
     )
     # First successful connection completes the storage onboarding step; it stays true thereafter
     # (a later disconnect doesn't reset it).
-    user.onboarding_storage_done = True
-    await db.commit()
+    await mark_storage_onboarding_done(db, user.id)
 
     redirect = RedirectResponse(f"{SETTINGS_PATH}?connected=1", status_code=status.HTTP_302_FOUND)
     redirect.delete_cookie(DRIVE_OAUTH_STATE_COOKIE_NAME)

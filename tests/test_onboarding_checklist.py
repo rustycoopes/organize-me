@@ -1,13 +1,11 @@
 """Unit tests for the Getting Started onboarding checklist view-model (#56, Slice 5.3)."""
 
 from app.core.onboarding import build_onboarding_steps, onboarding_complete
-from app.models.user import User
+from app.models.user_settings import UserSettings
 
 
-def _user(storage: bool, notifications: bool, first_upload: bool) -> User:
-    return User(
-        email="checklist@example.com",
-        hashed_password="x",
+def _user(storage: bool, notifications: bool, first_upload: bool) -> UserSettings:
+    return UserSettings(
         onboarding_storage_done=storage,
         onboarding_notifications_done=notifications,
         onboarding_first_upload_done=first_upload,

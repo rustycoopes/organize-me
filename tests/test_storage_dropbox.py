@@ -20,6 +20,7 @@ from app.auth.oauth import get_dropbox_oauth_client
 from app.core.security import CredentialCipher
 from app.models.storage_config import StorageConfig
 from app.models.user import User
+from app.services.user_settings import get_user_settings
 
 _CIPHER_KEY = Fernet.generate_key()
 _CIPHER = CredentialCipher(_CIPHER_KEY)
@@ -265,8 +266,9 @@ async def test_callback_stores_encrypted_tokens_and_sets_onboarding_flag(
     assert config.oauth_token_expires_at is not None
     assert int(config.oauth_token_expires_at.timestamp()) == 1_900_000_000
 
-    user = (await db_session.scalars(select(User).where(User.id == user_id))).unique().one()  # type: ignore[arg-type]
-    assert user.onboarding_storage_done is True
+    settings = await get_user_settings(db_session, user_id)
+    assert settings is not None
+    assert settings.onboarding_storage_done is True
 
 
 async def test_callback_marks_config_connected_for_subsequent_reads(
@@ -295,8 +297,9 @@ async def test_onboarding_flag_stays_true_after_disconnect(
     assert disconnect.status_code == 200
     assert disconnect.json()["is_connected"] is False
 
-    user = (await db_session.scalars(select(User).where(User.id == user_id))).unique().one()  # type: ignore[arg-type]
-    assert user.onboarding_storage_done is True
+    settings = await get_user_settings(db_session, user_id)
+    assert settings is not None
+    assert settings.onboarding_storage_done is True
 
 
 async def test_callback_rejects_tampered_state(

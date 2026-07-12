@@ -17,6 +17,7 @@ from app.core.templating import templates
 from app.db.session import get_db
 from app.models.storage_config import StorageProviderType
 from app.models.user import User
+from app.services.user_settings import get_or_create_user_settings
 
 router = APIRouter(tags=["pages"])
 
@@ -44,9 +45,10 @@ async def settings_page(
         # (the tokens attach to that row), so the button is gated on this.
         "has_config": config is not None,
     }
+    user_settings = await get_or_create_user_settings(db, user.id)
     notifications_data = {
-        "notification_email": user.notification_email,
-        "notification_sms": user.notification_sms,
+        "notification_email": user_settings.notification_email,
+        "notification_sms": user_settings.notification_sms,
         "email": user.email,
         "phone_number": user.phone_number or "",
     }

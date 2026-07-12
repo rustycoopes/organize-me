@@ -18,6 +18,7 @@ from app.models.user import User
 from app.services.storage.base import RemoteFile, StorageProvider
 from app.services.storage.fake import FakeStorageProvider
 from app.services.storage.google_drive import GoogleDriveError
+from app.services.user_settings import get_user_settings
 
 
 def unique_email() -> str:
@@ -174,9 +175,9 @@ async def test_successful_upload_creates_run_flips_onboarding_and_schedules(
     assert run.filename == "chat.txt"
 
     # First upload flips the onboarding flag.
-    user = await db_session.get(User, user_id)
-    assert user is not None
-    assert user.onboarding_first_upload_done is True
+    settings = await get_user_settings(db_session, user_id)
+    assert settings is not None
+    assert settings.onboarding_first_upload_done is True
 
     # The pipeline was handed off exactly once with the created run + resolved prompt.
     assert len(scheduler.calls) == 1

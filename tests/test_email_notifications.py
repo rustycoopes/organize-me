@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.models.user_settings import UserSettings
 from app.services.notifications.email import FakeEmailSender
 from app.services.notifications.pipeline import (
     NotificationOutcome,
@@ -22,10 +23,12 @@ async def test_user(db_session: AsyncSession) -> User:
         email="test@example.com",
         hashed_password="hashed",
         is_active=True,
-        notification_email=True,
-        notification_sms=False,
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=True, notification_sms=False)
+    )
     await db_session.commit()
     await db_session.refresh(user)
     return user
@@ -38,10 +41,12 @@ async def test_user_notifications_disabled(db_session: AsyncSession) -> User:
         email="notified@example.com",
         hashed_password="hashed",
         is_active=True,
-        notification_email=False,
-        notification_sms=False,
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=False, notification_sms=False)
+    )
     await db_session.commit()
     await db_session.refresh(user)
     return user
