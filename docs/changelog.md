@@ -10,6 +10,46 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #160 implemented — Slice R4: Domain-Scoped SSO Cookie + Secret Manager**
+  (branch `restructure/r4-domain-cookie-secret-manager`). Adds the capability the future
+  cross-service SSO (R6+) needs, without flipping it on live yet. `app/auth/backend.py` gains a
+  `COOKIE_DOMAIN` env var (read via plain `os.environ`, mirroring the existing `COOKIE_SECURE`
+  pattern — the module is built once at import time, before `Settings`/`get_settings()` would
+  normally resolve), wired into `fastapi_users`' `CookieTransport(cookie_domain=...)`. Blank/unset
+  collapses to `None`, which is byte-for-byte identical to omitting the parameter (verified against
+  `CookieTransport`/Starlette's `Response.set_cookie` source — no `Domain` attribute is ever
+  emitted), so today's implicit host-only cookie behaviour is completely unchanged. **Deliberately
+  left unset in `ci.yml`/`deploy.yml`** rather than set to `organizeme(.qa).russcoopersoftware.com`
+  as the WBS spec's literal example values: QA/prod currently serve on `*.run.app` hosts, not those
+  eventual shared-origin hostnames (DNS cutover R0 and the Load Balancer R5 haven't landed), and a
+  cookie scoped to a host the browser isn't actually talking to would never be sent back — breaking
+  login in QA/prod immediately. This was an explicit user decision (proceed with R4 ahead of R0/R5
+  rather than wait, but keep the flip inert until they land) rather than an implementation gap.
+  New `tests/test_auth_backend_cookie_domain.py` (3 tests) exercises the unset/blank/set cases via
+  `importlib.reload` under patched env vars — necessary because, like `COOKIE_SECURE`, the value is
+  parsed once at import; confirmed by code review that this reload cannot leak into other test
+  files since every other module consumes `auth_backend`/`cookie_transport` by value
+  (`from app.auth.backend import ...`), not by live module-attribute access. The three
+  "cookie issuance sites" the WBS spec calls out (`app/api/v1/auth.py`, `storage_google_drive.py`,
+  `storage_dropbox.py`) needed no changes — their `set_cookie()` calls are unrelated OAuth CSRF
+  state cookies; the actual auth cookie is issued once via the shared `cookie_transport` object and
+  relayed verbatim by `_redirect_with_login_cookie`, so all three pick up the domain scoping
+  automatically. Also wired the JWT signing secret through GCP Secret Manager on Cloud Run:
+  `ci.yml`/`deploy.yml` no longer write `JWT_SECRET` into the plaintext `--env-vars-file`, instead
+  passing `--set-secrets=JWT_SECRET=jwt-secret-qa:latest` / `jwt-secret-prod:latest` on the
+  `gcloud run deploy` step (the `test` job's plain `JWT_SECRET` GitHub Actions secret, used for
+  local pytest/mypy against real QA, is untouched — separate concern). **Human setup required
+  before deploy succeeds:** the `jwt-secret-qa`/`jwt-secret-prod` GCP Secret Manager secrets don't
+  exist yet — no local `gcloud` credentials were available this session to create them. The
+  operator must create both secrets (seeded with the existing `JWT_SECRET_QA`/`JWT_SECRET_PROD`
+  values so already-issued tokens stay valid), and grant the Cloud Run runtime service account
+  (`170051512639-compute@developer.gserviceaccount.com`, the project default — neither service sets
+  a custom `--service-account`) `roles/secretmanager.secretAccessor` on each. Until then,
+  `deploy-qa`/`deploy-prod` will fail at the `--set-secrets` step — expected, not a regression.
+  Full suite (488 tests, chunked due to background-process flakiness in this environment — zero
+  failures across all chunks) + `packages/chrome`'s own suite (9 tests) + `mypy --strict` (both
+  `app`/`tests` and `packages/chrome`) all clean. Both `code-review-master` and
+  `code-quality-guardian` review passes came back with no changes requested.
 - **Issue #157 implemented — Slice R3: Extract Shared Chrome/Theme Package + App-Registry**
   (branch `feature/restructure-r3-chrome-package`). New installable package,
   `packages/chrome/` (`organizeme-chrome`, own `pyproject.toml`/src-layout/pytest/mypy), owning
