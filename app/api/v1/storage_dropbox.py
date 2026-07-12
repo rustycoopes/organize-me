@@ -12,7 +12,8 @@ has to flex around that.
 Flow:
 - `POST /auth` returns Dropbox's consent URL as JSON and sets a CSRF cookie.
 - `GET /callback` exchanges the code and stores the encrypted tokens, flipping
-  `onboarding_storage_done` on the first successful connection.
+  `onboarding_storage_done` on the user's Event-Creator settings row on the first successful
+  connection.
 - `POST /disconnect` revokes the token at Dropbox (best-effort) then clears it locally.
 """
 
@@ -38,6 +39,7 @@ from app.core.security import CredentialCipher, get_credential_cipher
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.storage_config import StorageConfigRead
+from app.services.user_settings import mark_storage_onboarding_done
 
 logger = logging.getLogger(__name__)
 
@@ -222,8 +224,7 @@ async def dropbox_callback(
     )
     # First successful connection completes the storage onboarding step; it stays true thereafter
     # (a later disconnect doesn't reset it).
-    user.onboarding_storage_done = True
-    await db.commit()
+    await mark_storage_onboarding_done(db, user.id)
 
     redirect = RedirectResponse(f"{SETTINGS_PATH}?connected=1", status_code=status.HTTP_302_FOUND)
     redirect.delete_cookie(DROPBOX_OAUTH_STATE_COOKIE_NAME)

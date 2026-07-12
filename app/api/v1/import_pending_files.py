@@ -42,6 +42,7 @@ from app.services.storage.base import StorageProvider
 from app.services.storage.dropbox import DropboxError
 from app.services.storage.factory import build_storage_provider
 from app.services.storage.google_drive import GoogleDriveError
+from app.services.user_settings import mark_first_upload_onboarding_done
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +99,11 @@ async def import_pending_files(
     db.add_all(runs)
     # Completes "Upload First File" the same as a manual upload does - a user who only ever uses
     # Import (never the Upload page directly) shouldn't have that onboarding step stuck forever.
-    user.onboarding_first_upload_done = True
     # get_db's sessionmaker uses expire_on_commit=False, so each run's Python-side-default id
     # (ProcessingRun.id, populated at flush) is still readable after commit - no refresh needed.
-    await db.commit()
+    # mark_first_upload_onboarding_done's own commit also persists the `runs` add above (same
+    # session).
+    await mark_first_upload_onboarding_done(db, user.id)
 
     prompt_text = await _prompt_text_for(db, user.id)
     await scheduler.schedule_batch(

@@ -34,15 +34,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     name: Mapped[str | None] = mapped_column(nullable=True)
     phone_number: Mapped[str | None] = mapped_column(nullable=True)
     dark_mode: Mapped[bool] = mapped_column(default=False, server_default="false")
-    notification_sms: Mapped[bool] = mapped_column(default=True, server_default="true")
-    notification_email: Mapped[bool] = mapped_column(default=True, server_default="true")
-    onboarding_storage_done: Mapped[bool] = mapped_column(default=False, server_default="false")
-    onboarding_notifications_done: Mapped[bool] = mapped_column(
-        default=False, server_default="false"
-    )
-    onboarding_first_upload_done: Mapped[bool] = mapped_column(
-        default=False, server_default="false"
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

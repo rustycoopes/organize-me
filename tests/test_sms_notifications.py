@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.models.user_settings import UserSettings
 from app.services.notifications.pipeline import (
     NotificationOutcome,
     PipelineNotification,
@@ -22,11 +23,13 @@ async def test_user(db_session: AsyncSession) -> User:
         email="test@example.com",
         hashed_password="hashed",
         is_active=True,
-        notification_email=False,
-        notification_sms=True,
         phone_number="+15551234567",
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=False, notification_sms=True)
+    )
     await db_session.commit()
     await db_session.refresh(user)
     return user
@@ -39,11 +42,13 @@ async def test_user_sms_disabled(db_session: AsyncSession) -> User:
         email="notified@example.com",
         hashed_password="hashed",
         is_active=True,
-        notification_email=False,
-        notification_sms=False,
         phone_number="+15551234567",
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=False, notification_sms=False)
+    )
     await db_session.commit()
     await db_session.refresh(user)
     return user
@@ -56,11 +61,13 @@ async def test_user_no_phone(db_session: AsyncSession) -> User:
         email="nophone@example.com",
         hashed_password="hashed",
         is_active=True,
-        notification_email=False,
-        notification_sms=True,
         phone_number=None,
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=False, notification_sms=True)
+    )
     await db_session.commit()
     await db_session.refresh(user)
     return user
