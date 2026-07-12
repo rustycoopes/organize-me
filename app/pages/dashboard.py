@@ -35,6 +35,7 @@ from app.core.onboarding import build_onboarding_steps, onboarding_complete
 from app.core.templating import templates
 from app.db.session import get_db
 from app.models.user import User
+from app.services.user_settings import get_or_create_user_settings
 
 router = APIRouter(tags=["pages"])
 
@@ -132,6 +133,7 @@ async def dashboard_page(
     # Only the full-page template renders the Import pending files button - skip the extra query
     # on every HTMX filter/sort/pagination request, which never re-renders it.
     drive_connected = False if is_htmx_request else await is_drive_connected(db, user.id, settings)
+    user_settings = await get_or_create_user_settings(db, user.id)
     context = {
         "user": user,
         "dark_mode": user.dark_mode,
@@ -152,8 +154,8 @@ async def dashboard_page(
         "prev_url": url_for(page=page - 1, sort=sort) if page > 1 else None,
         "next_url": url_for(page=page + 1, sort=sort) if page < total_pages else None,
         "sort_toggle_url": url_for(page=1, sort="asc" if sort == "desc" else "desc"),
-        "onboarding_steps": build_onboarding_steps(user),
-        "onboarding_complete": onboarding_complete(user),
+        "onboarding_steps": build_onboarding_steps(user_settings),
+        "onboarding_complete": onboarding_complete(user_settings),
         "drive_connected": drive_connected,
     }
     template_name = (

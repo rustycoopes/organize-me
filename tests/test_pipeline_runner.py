@@ -21,6 +21,7 @@ from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.processing_step import ProcessingStep, ProcessingStepStatus
 from app.models.user import User
+from app.models.user_settings import UserSettings
 from app.services.llm.gemini import FakeGeminiClient, GeminiError
 from app.services.notifications.pipeline import FakeNotificationSender, NotificationOutcome
 from app.services.pipeline.runner import run_pipeline
@@ -381,8 +382,9 @@ async def _run_notify_only(db_session: AsyncSession, user: User) -> ProcessingSt
 
 async def test_notify_step_warns_when_all_channels_disabled(db_session: AsyncSession) -> None:
     user = await _make_user(db_session)
-    user.notification_email = False
-    user.notification_sms = False
+    db_session.add(
+        UserSettings(user_id=user.id, notification_email=False, notification_sms=False)
+    )
     await db_session.flush()
 
     notify_step = await _run_notify_only(db_session, user)
@@ -393,7 +395,7 @@ async def test_notify_step_warns_when_all_channels_disabled(db_session: AsyncSes
 
 async def test_notify_step_warns_for_disabled_email_only(db_session: AsyncSession) -> None:
     user = await _make_user(db_session)
-    user.notification_email = False
+    db_session.add(UserSettings(user_id=user.id, notification_email=False))
     user.phone_number = "+15551234567"
     await db_session.flush()
 
@@ -404,7 +406,7 @@ async def test_notify_step_warns_for_disabled_email_only(db_session: AsyncSessio
 
 async def test_notify_step_warns_for_disabled_sms_only(db_session: AsyncSession) -> None:
     user = await _make_user(db_session)
-    user.notification_sms = False
+    db_session.add(UserSettings(user_id=user.id, notification_sms=False))
     await db_session.flush()
 
     notify_step = await _run_notify_only(db_session, user)

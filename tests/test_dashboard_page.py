@@ -11,8 +11,8 @@ from app.main import app
 from app.models.event import Event
 from app.models.processing_run import ProcessingRun, ProcessingRunStatus
 from app.models.storage_config import StorageConfig, StorageProviderType
-from app.models.user import User
 from app.services.storage.fake import FakeStorageProvider
+from app.services.user_settings import get_or_create_user_settings
 from tests.test_storage_google_drive import FakeDriveOAuth2, _drive_connect
 
 
@@ -21,11 +21,10 @@ def unique_email() -> str:
 
 
 async def _complete_onboarding(db: AsyncSession, user_id: uuid.UUID) -> None:
-    user = await db.get(User, user_id)
-    assert user is not None
-    user.onboarding_storage_done = True
-    user.onboarding_notifications_done = True
-    user.onboarding_first_upload_done = True
+    settings = await get_or_create_user_settings(db, user_id)
+    settings.onboarding_storage_done = True
+    settings.onboarding_notifications_done = True
+    settings.onboarding_first_upload_done = True
     await db.flush()
 
 
@@ -280,10 +279,9 @@ async def test_dashboard_onboarding_checklist_marks_done_steps_and_keeps_incompl
 ) -> None:
     user_id = await _register_and_login(client)
     # Complete only Connect Storage and Upload First File; leave notifications incomplete.
-    user = await db_session.get(User, user_id)
-    assert user is not None
-    user.onboarding_storage_done = True
-    user.onboarding_first_upload_done = True
+    settings = await get_or_create_user_settings(db_session, user_id)
+    settings.onboarding_storage_done = True
+    settings.onboarding_first_upload_done = True
     await db_session.flush()
 
     response = await client.get("/dashboard")

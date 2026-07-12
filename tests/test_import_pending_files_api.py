@@ -20,6 +20,7 @@ from app.models.user import User
 from app.services.storage.base import RemoteFile
 from app.services.storage.fake import FakeStorageProvider
 from app.services.storage.google_drive import GoogleDriveError
+from app.services.user_settings import get_user_settings
 
 
 class _FailingStorageProvider(FakeStorageProvider):
@@ -145,9 +146,9 @@ async def test_import_pending_files_creates_one_run_per_file_and_schedules_batch
 
     # Completes onboarding the same as a manual upload does - a user who only ever imports
     # shouldn't have "Upload First File" stuck incomplete forever.
-    user = await db_session.get(User, user_id)
-    assert user is not None
-    assert user.onboarding_first_upload_done is True
+    settings = await get_user_settings(db_session, user_id)
+    assert settings is not None
+    assert settings.onboarding_first_upload_done is True
 
     # The returned run_id is the first pending file's run, matching schedule_batch's first entry.
     assert len(scheduler.calls) == 1

@@ -30,7 +30,6 @@ async def test_insert_and_read_back_user(db_session: AsyncSession) -> None:
     assert fetched.name == "Smoke Test"
     assert fetched.is_active is True
     assert fetched.dark_mode is False
-    assert fetched.notification_sms is True
 
 
 async def test_email_uniqueness_is_case_insensitive(db_session: AsyncSession) -> None:

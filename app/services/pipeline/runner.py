@@ -45,6 +45,7 @@ from app.services.notifications.pipeline import (
     PipelineNotification,
 )
 from app.services.storage.base import FileDestination, RemoteFile, StorageProvider
+from app.services.user_settings import get_or_create_user_settings
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,9 @@ async def _deduplicate_and_save(
     return new_count
 
 
-def _silent_notification_modes_warning(user: User | None) -> str | None:
+def _silent_notification_modes_warning(
+    *, notification_email: bool, notification_sms: bool, phone_number: str | None
+) -> str | None:
     """A single warning line naming which notification channels will silently not fire for this
     run (issue #112), or ``None`` if every configured channel is live.
 
@@ -188,14 +191,12 @@ def _silent_notification_modes_warning(user: User | None) -> str | None:
     only reported when SMS is otherwise enabled - if SMS itself is off, the missing phone number
     isn't why nothing was sent, so reporting both would be redundant.
     """
-    if user is None:  # pragma: no cover - the run always has a real owning user
-        return None
     disabled: list[str] = []
-    if not user.notification_email:
+    if not notification_email:
         disabled.append("disabled email")
-    if not user.notification_sms:
+    if not notification_sms:
         disabled.append("disabled SMS")
-    elif not user.phone_number:
+    elif not phone_number:
         disabled.append("no phone number")
     if not disabled:
         return None
@@ -226,7 +227,15 @@ async def _notify(
     )
     log_lines = [f"Notified user: {message}"]
     user = await session.get(User, user_id)
-    warning = _silent_notification_modes_warning(user)
+    if user is None:  # pragma: no cover - the run always has a real owning user
+        warning = None
+    else:
+        settings = await get_or_create_user_settings(session, user_id)
+        warning = _silent_notification_modes_warning(
+            notification_email=settings.notification_email,
+            notification_sms=settings.notification_sms,
+            phone_number=user.phone_number,
+        )
     if warning is not None:
         log_lines.append(warning)
     # A genuine delivery failure (bad/unset credentials, the provider rejecting the recipient, a

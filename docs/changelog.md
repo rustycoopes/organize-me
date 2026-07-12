@@ -27,7 +27,7 @@
   loader and exposes `nav_items`/`settings_tabs`/theme globals; every page template now extends
   `chrome_base.html`/`chrome_authenticated_base.html` instead of the deleted originals. Host pins
   the package as a **git-tag dependency** (`organizeme-chrome @
-  git+https://github.com/rustycoopes/organize-me@chrome-v0.1.0#subdirectory=packages/chrome`) —
+  git+https://github.com/rustycoopes/organize-me@chrome-v0.1.1#subdirectory=packages/chrome`) —
   chosen over GitHub's beta PyPI registry to avoid extra registry-auth-token plumbing for no
   functional benefit; a new `.github/workflows/publish-chrome.yml` builds and attaches a
   versioned wheel/sdist to a GitHub Release on `chrome-v*` tag push, so a Host-side chrome edit
@@ -35,10 +35,41 @@
   `tests/test_chrome_jwt_interop.py` proves a real Host-issued auth cookie verifies via the
   package helper; `packages/chrome/tests/` covers the JWT helper and registry in isolation.
   `tests/test_sidebar.py` (unchanged) is the byte-for-byte parity check that the Host still
-  renders identically post-extraction. Local `pytest` run showed a large batch of unrelated
-  failures (`column users.notification_sms does not exist`) — a pre-existing QA database
-  schema-drift issue confirmed identical against unmodified `main`, not introduced by this slice;
-  CI's freshly-migrated QA secret is the authoritative gate.
+  renders identically post-extraction. Local `pytest` initially showed a large batch of failures
+  (`column users.notification_sms does not exist`); root cause turned out to be Slice R2 (#158,
+  below) mid-flight on the same shared QA database, stamping its migration ahead of what this
+  branch's history knew about — resolved by merging `main` (with R2's migration) into this branch
+  once #158 landed, not a bug in this slice.
+- **Issue #158 implemented — Slice R2: Decouple Event-Creator Data from the Host `users` Model**
+  (branch `restructure/r2-decouple-event-creator-user-data`). Removes the two remaining
+  Host↔Event-Creator data couplings identified in the Platform Restructure design: (1) moved
+  `notification_sms`, `notification_email`, `onboarding_storage_done`,
+  `onboarding_notifications_done`, `onboarding_first_upload_done` off `host.users` into a new
+  `event_creator.user_settings` table (one row per user, FK-cascaded to `host.users.id`), created
+  lazily via `get_or_create_user_settings` (`app/services/user_settings.py`) rather than eagerly
+  at registration - mirrors the existing `get_or_create_user_prompt` lazy-seed pattern, so
+  `on_after_register` never writes Event-Creator data; (2) removed the eager `LLMPrompt` insert
+  from `app/auth/users.py::on_after_register` entirely, relying on that same pre-existing lazy
+  self-heal path (`app/api/v1/llm_prompt.py::get_or_create_user_prompt`) to seed a new user's
+  prompt on first visit to the Prompt page instead. A single Alembic migration
+  (`e6f7a8b9c0d1`) creates `event_creator.user_settings`, backfills it from every existing
+  `host.users` row's real values (not column defaults), then drops the five moved columns -
+  backfill-then-drop keeps rollback safe. Every reader/writer of these fields was repointed:
+  the users API (`GET`/`PATCH /api/v1/users/me`), the Settings/Dashboard pages, the onboarding
+  checklist view-model, the notification sender and pipeline runner's "silently disabled
+  channel" warning, and the four onboarding-flag writers (Dropbox/Google Drive OAuth callbacks,
+  manual upload, import-pending-files) - the latter two now share
+  `mark_storage_onboarding_done`/`mark_first_upload_onboarding_done` helpers instead of
+  duplicating a get-or-create-then-commit sequence four times. `PATCH /api/v1/users/me`'s
+  notification-prefs write is sequenced *after* the core `user_manager.update()` call succeeds
+  (not before) specifically so a request that fails on a conflicting email never partially
+  persists the notification-prefs half of the same PATCH - a regression a code review caught
+  before merge, now covered by a dedicated test. No API/URL contract changes this slice (the
+  `notification_email`/`notification_sms` fields stay on `UserRead`/`UserUpdate` exactly as
+  before) - only where the data is stored/read server-side changed. Two lower-priority follow-ups
+  from code review filed as `modelsuggested` issues #174 (shared test fixture for the
+  notification-prefs `UserSettings` row) and #175 (migration `downgrade()` column-definition
+  duplication).
 
 - **Issue #156 implemented — Slice R1: Database Schema Separation** (branch
   `restructure/r1-db-schema-separation`). Platform Restructure prefactoring: introduces `host`

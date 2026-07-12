@@ -12,6 +12,7 @@ from app.models.user import User
 from app.services.notifications.email import EmailSender, ResendEmailSender
 from app.services.notifications.pipeline import NotificationOutcome, PipelineNotification
 from app.services.notifications.sms import SmsSender, TwilioSmsSender
+from app.services.user_settings import get_or_create_user_settings
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,11 @@ class RealNotificationSender:
             logger.warning("User not found for notification: %s", notification.user_id)
             return []
 
+        settings = await get_or_create_user_settings(session, notification.user_id)
+
         failures: list[str] = []
 
-        if user.notification_email:
+        if settings.notification_email:
             try:
                 if notification.outcome == NotificationOutcome.FAILED:
                     await self._send_failure_email(user.email, notification)
@@ -90,7 +93,7 @@ class RealNotificationSender:
                 notification.user_id,
             )
 
-        if user.notification_sms:
+        if settings.notification_sms:
             if not user.phone_number:
                 logger.info(
                     "Skipping SMS notification: user %s has notification_sms=True but no "
