@@ -10,6 +10,36 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #157 implemented — Slice R3: Extract Shared Chrome/Theme Package + App-Registry**
+  (branch `feature/restructure-r3-chrome-package`). New installable package,
+  `packages/chrome/` (`organizeme-chrome`, own `pyproject.toml`/src-layout/pytest/mypy), owning
+  the sidebar/header/Settings-tab-bar Jinja templates (moved verbatim from
+  `app/templates/base.html` + `authenticated_base.html`, now deleted), the Tailwind/DaisyUI theme
+  strings, the app-registry (`organizeme_chrome.registry` — nav items + Settings tabs per hosted
+  app, replacing `app/pages/nav.py`), and a standalone JWT-verify helper
+  (`organizeme_chrome.verify_token` — PyJWT, HS256, signature + expiry + audience only, no
+  fastapi-users import, no network call) that a future hosted app (Event Creator, R6) will depend
+  on for identity instead of the Host's full fastapi-users auth stack. The Settings tab-bar was
+  generalized from OrganizeMe's hardcoded Storage/Notifications markup into a data-driven
+  `settings_tab_bar(tabs)` Jinja macro, driven by the registry's `settings_tabs` per app. Host
+  wiring: `app/core/templating.py` calls `organizeme_chrome.register_chrome(env,
+  app_service_name="organizeme")`, which adds the package's template directory to the Jinja
+  loader and exposes `nav_items`/`settings_tabs`/theme globals; every page template now extends
+  `chrome_base.html`/`chrome_authenticated_base.html` instead of the deleted originals. Host pins
+  the package as a **git-tag dependency** (`organizeme-chrome @
+  git+https://github.com/rustycoopes/organize-me@chrome-v0.1.1#subdirectory=packages/chrome`) —
+  chosen over GitHub's beta PyPI registry to avoid extra registry-auth-token plumbing for no
+  functional benefit; a new `.github/workflows/publish-chrome.yml` builds and attaches a
+  versioned wheel/sdist to a GitHub Release on `chrome-v*` tag push, so a Host-side chrome edit
+  never reaches a consumer until it bumps its pin, per the platform-restructure design. New
+  `tests/test_chrome_jwt_interop.py` proves a real Host-issued auth cookie verifies via the
+  package helper; `packages/chrome/tests/` covers the JWT helper and registry in isolation.
+  `tests/test_sidebar.py` (unchanged) is the byte-for-byte parity check that the Host still
+  renders identically post-extraction. Local `pytest` initially showed a large batch of failures
+  (`column users.notification_sms does not exist`); root cause turned out to be Slice R2 (#158,
+  below) mid-flight on the same shared QA database, stamping its migration ahead of what this
+  branch's history knew about — resolved by merging `main` (with R2's migration) into this branch
+  once #158 landed, not a bug in this slice.
 - **Issue #158 implemented — Slice R2: Decouple Event-Creator Data from the Host `users` Model**
   (branch `restructure/r2-decouple-event-creator-user-data`). Removes the two remaining
   Host↔Event-Creator data couplings identified in the Platform Restructure design: (1) moved

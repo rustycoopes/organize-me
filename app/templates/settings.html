@@ -1,4 +1,5 @@
-{% extends "authenticated_base.html" %}
+{% extends "chrome_authenticated_base.html" %}
+{% from "macros/chrome_tabs.html" import settings_tab_bar %}
 
 {% block title %}Settings — OrganizeMe{% endblock %}
 
@@ -8,31 +9,9 @@
     <div class="card-body" x-data="{ activeTab: 'storage' }">
       <h1 class="card-title">Settings</h1>
 
-      {# Storage | Notifications | Preferences per the implementation plan; Preferences lands in a
-         later slice. #}
-      <div role="tablist" class="tabs tabs-bordered mt-2">
-        {# Static "tab-active"/aria-selected="true" on Storage matches activeTab's initial value
-           above, so the tab bar is already correct in the raw server-rendered HTML - before
-           Alpine hydrates - for no-JS clients, screen readers, and plain HTTP fetches. Alpine's
-           :class/:aria-selected bindings take over from there for the actual click-to-switch
-           behaviour. #}
-        <a
-          role="tab"
-          class="tab tab-active"
-          :class="activeTab === 'storage' ? 'tab-active' : ''"
-          aria-selected="true"
-          :aria-selected="activeTab === 'storage'"
-          @click="activeTab = 'storage'"
-        >Storage</a>
-        <a
-          role="tab"
-          class="tab"
-          :class="activeTab === 'notifications' ? 'tab-active' : ''"
-          aria-selected="false"
-          :aria-selected="activeTab === 'notifications'"
-          @click="activeTab = 'notifications'"
-        >Notifications</a>
-      </div>
+      {# Tab list driven by the app-registry's settings_tabs (organizeme_chrome.registry) —
+         Storage | Notifications today; Preferences lands in a later slice. #}
+      {{ settings_tab_bar(settings_tabs) }}
 
       {#
         Single-quoted x-data so the double-quoted JS strings inside don't terminate the attribute

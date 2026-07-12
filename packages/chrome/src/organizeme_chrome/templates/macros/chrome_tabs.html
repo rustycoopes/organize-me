@@ -1,0 +1,41 @@
+{#
+  settings_tab_bar — shared DaisyUI tablist for a hosted app's Settings page.
+
+  Usage:
+    {% from "macros/chrome_tabs.html" import settings_tab_bar %}
+    <div x-data="{ activeTab: 'storage' }">
+      {{ settings_tab_bar(settings_tabs) }}
+      ...
+    </div>
+
+  Parameters
+    tabs           — list of {id, label} (e.g. organizeme_chrome.registry.SettingsTab); the
+                     first tab is the default-active one, matching `active_var`'s initial value.
+    active_var     — Alpine data property name holding the active tab id (default "activeTab").
+
+  The first tab renders with the static tab-active/aria-selected="true" markup so the page is
+  already correct in raw server-rendered HTML — before Alpine hydrates — for no-JS clients,
+  screen readers, and plain HTTP fetches. Alpine's :class/:aria-selected bindings take over from
+  there for the actual click-to-switch behaviour.
+
+  tab.id is interpolated as a single-quoted JS string literal inside a double-quoted HTML
+  attribute (matching the app's existing convention, e.g. app/templates/settings.html's x-data).
+  Jinja's autoescaping protects the HTML-attribute boundary; it does not protect the *nested* JS
+  string boundary, so a tab.id containing an apostrophe would break the generated Alpine
+  expression. Fine today - registry.py's tab ids are fixed, trusted config - but if a future
+  hosted app registers tabs dynamically, escape/validate ids there rather than here.
+#}
+{% macro settings_tab_bar(tabs, active_var="activeTab") %}
+<div role="tablist" class="tabs tabs-bordered mt-2">
+  {% for tab in tabs %}
+  <a
+    role="tab"
+    class="tab{% if loop.first %} tab-active{% endif %}"
+    :class="{{ active_var }} === '{{ tab.id }}' ? 'tab-active' : ''"
+    aria-selected="{{ 'true' if loop.first else 'false' }}"
+    :aria-selected="{{ active_var }} === '{{ tab.id }}'"
+    @click="{{ active_var }} = '{{ tab.id }}'"
+  >{{ tab.label }}</a>
+  {% endfor %}
+</div>
+{% endmacro %}
