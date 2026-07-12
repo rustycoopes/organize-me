@@ -1,0 +1,49 @@
+name: Publish chrome package
+
+# Publishes packages/chrome as a versioned, installable artifact whenever a chrome-vX.Y.Z tag is
+# pushed. The Host (and later, other hosted-app repos) pin to a specific tag via a git dependency
+# rather than a floating registry version - a chrome edit only reaches a consumer once it bumps
+# its pin, per the platform-restructure design (docs/platform-restructure/WBS/slice-R3.md).
+on:
+  push:
+    tags:
+      - "chrome-v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/chrome
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run pytest
+        run: uv run pytest
+
+      - name: Run mypy
+        run: uv run mypy src
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Publish GitHub Release with build artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: packages/chrome/dist/*
+          generate_release_notes: true

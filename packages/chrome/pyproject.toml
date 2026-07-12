@@ -1,0 +1,29 @@
+[project]
+name = "organizeme-chrome"
+version = "0.1.0"
+description = "Shared chrome (sidebar/header/settings tab-bar), theme, app-registry, and JWT-verify helper for OrganizeMe-hosted apps"
+requires-python = ">=3.12"
+dependencies = [
+    "jinja2>=3.1",
+    "pyjwt>=2.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "mypy>=1.13",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/organizeme_chrome"]

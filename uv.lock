@@ -1441,6 +1441,7 @@ dependencies = [
     { name = "google-genai" },
     { name = "httpx-oauth" },
     { name = "jinja2" },
+    { name = "organizeme-chrome" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
     { name = "python-multipart" },
@@ -1473,6 +1474,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=2.10.0" },
     { name = "httpx-oauth", specifier = ">=0.16.1" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "organizeme-chrome", directory = "packages/chrome" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
@@ -1490,6 +1492,27 @@ dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "types-python-dateutil", specifier = ">=2.9.0.20260518" },
+]
+
+[[package]]
+name = "organizeme-chrome"
+version = "0.1.0"
+source = { directory = "packages/chrome" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "pyjwt" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jinja2", specifier = ">=3.1" },
+    { name = "pyjwt", specifier = ">=2.9" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.13" },
+    { name = "pytest", specifier = ">=8.3" },
 ]
 
 [[package]]

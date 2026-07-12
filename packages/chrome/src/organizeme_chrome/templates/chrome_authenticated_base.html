@@ -1,9 +1,10 @@
-{% extends "base.html" %}
+{% extends "chrome_base.html" %}
 
 {#
-  Shared layout for every authenticated page. Renders the persistent left sidebar
-  (from the nav_items global — see app/pages/nav.py) and exposes a `page` block for
-  the actual page content. The active item is derived from the request path.
+  Shared layout for every authenticated page across every OrganizeMe-hosted app. Renders the
+  persistent left sidebar (from the nav_items global — see organizeme_chrome.registry) and
+  exposes a `page` block for the actual page content. The active item is derived from the
+  request path.
 #}
 
 {% block content %}

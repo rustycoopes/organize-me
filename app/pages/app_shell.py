@@ -10,17 +10,17 @@ profile page's gating.
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from organizeme_chrome import get_app
 
 from app.auth.users import current_active_user_optional
 from app.core.templating import templates
 from app.models.user import User
-from app.pages.nav import NAV_ITEMS
 
 router = APIRouter(tags=["pages"])
 
 # Placeholder pages are every nav destination except the ones with their own router and real
 # content (/profile, /settings, /prompt, /upload, /dashboard, /processing, /logs).
-# Derived from NAV_ITEMS so paths/labels have a single source of truth.
+# Derived from the app-registry (organizeme_chrome) so paths/labels have a single source of truth.
 PAGES_WITH_OWN_ROUTER = {
     "/profile",
     "/settings",
@@ -31,7 +31,9 @@ PAGES_WITH_OWN_ROUTER = {
     "/logs",
 }
 PLACEHOLDER_PAGES: list[tuple[str, str]] = [
-    (item.path, item.label) for item in NAV_ITEMS if item.path not in PAGES_WITH_OWN_ROUTER
+    (item.path, item.label)
+    for item in get_app("organizeme").nav
+    if item.path not in PAGES_WITH_OWN_ROUTER
 ]
 
 

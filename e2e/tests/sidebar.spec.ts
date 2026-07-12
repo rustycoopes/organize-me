@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { registerNewUser } from '../utils/helpers';
 
-// Documented sidebar order from app/pages/nav.py.
+// Documented sidebar order from packages/chrome (organizeme_chrome.registry).
 const EXPECTED_NAV = ['Dashboard', 'Upload', 'Processing', 'Logs', 'Prompt', 'Settings', 'Profile'];
 
 test.describe('Sidebar navigation', () => {
