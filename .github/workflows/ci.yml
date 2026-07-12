@@ -75,10 +75,12 @@ jobs:
       # NOTE: E2E_TEST_MODE=true is written here for QA ONLY. It enables the test-only
       # /api/v1/internal/e2e/* helper endpoints (issue #23). It must never appear in prod's
       # deploy (deploy.yml) - those routes return 404 wherever the flag is unset.
+      # JWT_SECRET is intentionally absent here (Slice R4): it's wired below via
+      # --set-secrets from GCP Secret Manager (secret `jwt-secret-qa`), not this plaintext
+      # env-vars-file, so the hosted-app side (R6) can read the same Secret Manager value.
       - name: Write Cloud Run env vars file
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET_QA }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -93,7 +95,6 @@ jobs:
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
-          JWT_SECRET: "${JWT_SECRET}"
           RESEND_API_KEY: "${RESEND_API_KEY}"
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
@@ -127,6 +128,7 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
+            --set-secrets=JWT_SECRET=jwt-secret-qa:latest \
             --no-cpu-throttling \
             --quiet
 

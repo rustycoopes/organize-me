@@ -19,9 +19,20 @@ COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 # before any request-scoped settings lookup would normally happen.
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").strip().lower() != "false"
 
+# Unset (None) by default - the cookie stays implicitly host-scoped, exactly as it behaves today.
+# Slice R4 (SSO prep): once the shared origin actually serves this app (R0 DNS cutover + R5 Load
+# Balancer), set COOKIE_DOMAIN to the per-environment origin host (organizeme.russcoopersoftware.com
+# in prod, organizeme.qa.russcoopersoftware.com in QA) so the auth cookie rides across the second
+# hosted service (R6). Must be the exact host, never a leading-dot parent domain, so the cookie is
+# never sent to the main Squarespace site. Deliberately NOT flipped on for QA/prod yet: until the
+# origin host actually resolves to this service, a cookie scoped to it would never be sent back by
+# the browser to the *.run.app host the service is still reachable at, breaking login.
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", "").strip() or None
+
 cookie_transport = CookieTransport(
     cookie_name="organizeme_auth",
     cookie_max_age=COOKIE_MAX_AGE_SECONDS,
+    cookie_domain=COOKIE_DOMAIN,
     cookie_secure=COOKIE_SECURE,
     cookie_httponly=True,
     cookie_samesite="lax",
