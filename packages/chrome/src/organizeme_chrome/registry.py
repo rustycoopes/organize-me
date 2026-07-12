@@ -27,10 +27,20 @@ class AppEntry(NamedTuple):
 
 
 APPS: list[AppEntry] = [
+    # R6: /dashboard is now served by the independent event-creator service (the Host↔Event
+    # Creator boundary tracer bullet). Listed first so the merged sidebar nav (see
+    # templating.register_chrome) keeps Dashboard in its original position, ahead of the
+    # still-Host-served pages below.
+    AppEntry(
+        service_name="event-creator",
+        nav=[
+            AppNavItem("/dashboard", "Dashboard"),
+        ],
+        settings_tabs=[],
+    ),
     AppEntry(
         service_name="organizeme",
         nav=[
-            AppNavItem("/dashboard", "Dashboard"),
             AppNavItem("/upload", "Upload"),
             AppNavItem("/processing", "Processing"),
             AppNavItem("/logs", "Logs"),

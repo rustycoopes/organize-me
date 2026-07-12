@@ -70,9 +70,10 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # JWT_SECRET is intentionally absent here (Slice R4): it's wired below via
-      # --set-secrets from GCP Secret Manager (secret `jwt-secret-prod`), not this plaintext
-      # env-vars-file, so the hosted-app side (R6) can read the same Secret Manager value.
+      # JWT_SECRET and ENCRYPTION_KEY are intentionally absent here (Slice R4 / R6): both are
+      # wired below via --set-secrets from GCP Secret Manager (`jwt-secret-prod`,
+      # `encryption-key-prod`), not this plaintext env-vars-file, so the hosted-app side (R6,
+      # event-creator) can read the same Secret Manager values without a network call to the Host.
       - name: Write Cloud Run env vars file
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_PROD_URL }}
@@ -82,7 +83,6 @@ jobs:
           GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-prod-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
           DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
           DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
-          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
@@ -96,11 +96,14 @@ jobs:
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
           DROPBOX_OAUTH_CLIENT_ID: "${DROPBOX_OAUTH_CLIENT_ID}"
           DROPBOX_OAUTH_CLIENT_SECRET: "${DROPBOX_OAUTH_CLIENT_SECRET}"
-          ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
           GEMINI_API_KEY: "${GEMINI_API_KEY}"
           TWILIO_ACCOUNT_SID: "${TWILIO_ACCOUNT_SID}"
           TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN}"
           TWILIO_PHONE_NUMBER: "${TWILIO_PHONE_NUMBER}"
+          # Domain-scoped SSO cookie (Slice R4/R6): shared origin host so the organizeme_auth
+          # cookie is visible to every service behind the Load Balancer, not just the Host's own
+          # *.run.app host.
+          COOKIE_DOMAIN: "organizeme.russcoopersoftware.com"
           EOF
 
       - name: Build image
@@ -122,6 +125,6 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
-            --set-secrets=JWT_SECRET=jwt-secret-prod:latest \
+            --set-secrets=JWT_SECRET=jwt-secret-prod:latest,ENCRYPTION_KEY=encryption-key-prod:latest \
             --no-cpu-throttling \
             --quiet
