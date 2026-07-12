@@ -17,9 +17,11 @@ records below resolve. Run it from an authenticated gcloud session:
     gcloud config set project gen-lang-client-0791944342
     .\infra\gcp_lb\provision.ps1
 
-Today there is only one Cloud Run service (organizeme-qa) — it serves both the Host shell and the
-"organizeme" app, so host-backend and organizeme-backend both point at the same Serverless NEG
-until R6 introduces Event Creator as its own service (see the "R6" notes at the bottom).
+R6 introduces Event Creator as its own independent Cloud Run service (event-creator-qa), so it
+gets its own Serverless NEG + backend service, distinct from the Host's. Re-running this script is
+what wires that second backend into the URL map (which regenerates from the R3 app-registry and
+now routes /dashboard to event-creator-backend). This requires event-creator-qa to already be
+deployed (its own repo's CI/CD does that) — run this only after that first deploy.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -33,6 +35,11 @@ $RunService = "organizeme-qa"
 $NegName = "organizeme-qa-neg"
 $BackendHost = "host-backend"
 $BackendOrganizeme = "organizeme-backend"
+
+$EventCreatorRunService = "event-creator-qa"
+$EventCreatorNegName = "event-creator-qa-neg"
+$BackendEventCreator = "event-creator-backend"
+
 $IpV4Name = "organizeme-lb-ipv4"
 $IpV6Name = "organizeme-lb-ipv6"
 $CertName = "organizeme-qa-cert"
@@ -80,21 +87,32 @@ if (-not (Test-GcloudResource @("compute", "ssl-certificates", "describe", $Cert
 }
 Write-Host "NOTE: cert stays PROVISIONING until the A/AAAA records above resolve and Google validates them (can take up to ~24h)."
 
-Write-Host "== 4. Serverless NEG for $RunService =="
+Write-Host "== 4. Serverless NEGs (organizeme-qa + event-creator-qa) =="
 if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $NegName, "--region=$Region"))) {
     gcloud compute network-endpoint-groups create $NegName `
         --region=$Region `
         --network-endpoint-type=serverless `
         --cloud-run-service=$RunService
 }
+if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $EventCreatorNegName, "--region=$Region"))) {
+    gcloud compute network-endpoint-groups create $EventCreatorNegName `
+        --region=$Region `
+        --network-endpoint-type=serverless `
+        --cloud-run-service=$EventCreatorRunService
+}
 
-Write-Host "== 5. Backend services (host-backend + organizeme-backend, same NEG for now) =="
+Write-Host "== 5. Backend services (host-backend, organizeme-backend -> organizeme NEG; event-creator-backend -> its own NEG) =="
 foreach ($Backend in @($BackendHost, $BackendOrganizeme)) {
     if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $Backend, "--global"))) {
         gcloud compute backend-services create $Backend --global --load-balancing-scheme=EXTERNAL_MANAGED
         gcloud compute backend-services add-backend $Backend --global `
             --network-endpoint-group=$NegName --network-endpoint-group-region=$Region
     }
+}
+if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $BackendEventCreator, "--global"))) {
+    gcloud compute backend-services create $BackendEventCreator --global --load-balancing-scheme=EXTERNAL_MANAGED
+    gcloud compute backend-services add-backend $BackendEventCreator --global `
+        --network-endpoint-group=$EventCreatorNegName --network-endpoint-group-region=$Region
 }
 
 Write-Host "== 6. URL map, generated from the R3 app-registry =="
@@ -132,11 +150,4 @@ if (-not (Test-GcloudResource @("compute", "forwarding-rules", "describe", $FwdR
 
 Write-Host "Done. Once the cert shows ACTIVE (gcloud compute ssl-certificates describe $CertName --global),"
 Write-Host "verify with: curl https://$QaHost/login"
-
-# --- R6 (adding Event Creator as a second hosted app) ---
-# 1. Deploy the Event Creator Cloud Run service (e.g. "event-creator-qa").
-# 2. Add an entry for it in packages/chrome/src/organizeme_chrome/registry.py (APPS list).
-# 3. Create its own Serverless NEG + backend service (e.g. "event-creator-backend"), mirroring
-#    steps 4-5 above with RunService=event-creator-qa, NegName=event-creator-qa-neg.
-# 4. Re-run this script (or just steps 6-7) — the URL map regenerates from the updated registry
-#    and automatically adds a path rule routing Event Creator's nav paths to its own backend.
+Write-Host "verify Event Creator routing with: curl https://$QaHost/dashboard"
