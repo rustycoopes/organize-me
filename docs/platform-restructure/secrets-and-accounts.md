@@ -56,8 +56,8 @@ flowchart TB
         GHEC_JWT_PROD["JWT_SECRET_PROD"]
     end
 
-    H1 -.sets.-> GH_SA & GH_DB_QA & GH_DB_PROD & GH_JWT_QA & GH_JWT_PROD & GH_ENC & GH_OTHER
-    H1 -.sets.-> GHEC_SA & GHEC_DB_QA & GHEC_DB_PROD & GHEC_JWT_QA & GHEC_JWT_PROD
+    H1 -. "sets" .-> GH_SA & GH_DB_QA & GH_DB_PROD & GH_JWT_QA & GH_JWT_PROD & GH_ENC & GH_OTHER
+    H1 -. "sets" .-> GHEC_SA & GHEC_DB_QA & GHEC_DB_PROD & GHEC_JWT_QA & GHEC_JWT_PROD
 
     subgraph gsm["GCP Secret Manager — gen-lang-client-0791944342"]
         direction TB
@@ -67,30 +67,30 @@ flowchart TB
         SM_ENC_PROD[("encryption-key-prod")]
     end
 
-    H1 -.creates once via gcloud secrets create,\nsame value as the GitHub secret.-> SM_JWT_QA & SM_JWT_PROD & SM_ENC_QA & SM_ENC_PROD
+    H1 -. "creates once via gcloud secrets create, same value as the GitHub secret" .-> SM_JWT_QA & SM_JWT_PROD & SM_ENC_QA & SM_ENC_PROD
 
     subgraph sa["Deploy/runtime identity"]
         SA["170051512639-compute@\ndeveloper.gserviceaccount.com\n(granted roles/secretmanager.secretAccessor\non all 4 secrets above)"]
     end
 
-    SM_JWT_QA & SM_JWT_PROD & SM_ENC_QA & SM_ENC_PROD -. secretAccessor grant .-> SA
+    SM_JWT_QA & SM_JWT_PROD & SM_ENC_QA & SM_ENC_PROD -. "secretAccessor grant" .-> SA
 
     subgraph ci_om["organize-me CI/CD (ci.yml = QA, deploy.yml = prod)"]
         direction TB
-        CI_OM["gcloud auth (GCP_SA_KEY)\n--&gt; docker build/push\n--&gt; gcloud run deploy organizeme-qa/prod"]
+        CI_OM["gcloud auth (GCP_SA_KEY), then docker build/push,\nthen gcloud run deploy organizeme-qa/prod"]
     end
 
     subgraph ci_ec["event-creator CI/CD (ci.yml = QA, deploy.yml = prod)"]
         direction TB
-        CI_EC["gcloud auth (GCP_SA_KEY)\n--&gt; docker build/push\n--&gt; gcloud run deploy event-creator-qa/prod"]
+        CI_EC["gcloud auth (GCP_SA_KEY), then docker build/push,\nthen gcloud run deploy event-creator-qa/prod"]
     end
 
     GH_SA --> CI_OM
     GHEC_SA --> CI_EC
-    GH_DB_QA & GH_DB_PROD & GH_OTHER -. plaintext cloud-run-env.yaml .-> CI_OM
-    GHEC_DB_QA & GHEC_DB_PROD -. plaintext cloud-run-env.yaml .-> CI_EC
-    GH_JWT_QA & GH_JWT_PROD -. only for CI's own\npytest/alembic run .-> CI_OM
-    GHEC_JWT_QA & GHEC_JWT_PROD -. only for CI's own\npytest/alembic run .-> CI_EC
+    GH_DB_QA & GH_DB_PROD & GH_OTHER -. "plaintext cloud-run-env.yaml" .-> CI_OM
+    GHEC_DB_QA & GHEC_DB_PROD -. "plaintext cloud-run-env.yaml" .-> CI_EC
+    GH_JWT_QA & GH_JWT_PROD -. "only for CI's own pytest/alembic run" .-> CI_OM
+    GHEC_JWT_QA & GHEC_JWT_PROD -. "only for CI's own pytest/alembic run" .-> CI_EC
 
     subgraph run_om["Cloud Run: organizeme-qa / organizeme-prod"]
         direction TB
@@ -104,8 +104,8 @@ flowchart TB
 
     CI_OM -- "gcloud run deploy\n--set-secrets=JWT_SECRET=jwt-secret-qa/prod:latest,\nENCRYPTION_KEY=encryption-key-qa/prod:latest" --> RUN_OM
     CI_EC -- "gcloud run deploy\n--set-secrets=JWT_SECRET=jwt-secret-qa/prod:latest" --> RUN_EC
-    SA -. runtime identity fetches secret value at container start .-> RUN_OM
-    SA -. runtime identity fetches secret value at container start .-> RUN_EC
+    SA -. "runtime identity fetches secret value at container start" .-> RUN_OM
+    SA -. "runtime identity fetches secret value at container start" .-> RUN_EC
 
     subgraph browser["Browser"]
         USER["End user"]
@@ -115,11 +115,11 @@ flowchart TB
         LB["URL map, generated from\norganizeme_chrome.registry"]
     end
 
-    USER -- "1. POST /login\n(credentials)" --> LB --> RUN_OM
-    RUN_OM -- "2. Set-Cookie: organizeme_auth=<JWT signed with JWT_SECRET>\nDomain=shared origin host" --> USER
-    USER -- "3. GET /dashboard\nCookie: organizeme_auth=<JWT>" --> LB
-    LB -- "routed by URL map\n(/dashboard is event-creator's path)" --> RUN_EC
-    RUN_EC -- "4. verify_token(jwt, JWT_SECRET)\nsame Secret Manager value, no call to organizeme" --> RUN_EC
+    USER -- "1. POST /login (credentials)" --> LB --> RUN_OM
+    RUN_OM -- "2. Set-Cookie organizeme_auth = JWT signed with JWT_SECRET,\nDomain=shared origin host" --> USER
+    USER -- "3. GET /dashboard, Cookie organizeme_auth = JWT" --> LB
+    LB -- "routed by URL map, /dashboard is event-creator's path" --> RUN_EC
+    RUN_EC -- "4. verify_token(jwt, JWT_SECRET), same Secret Manager value, no call to organizeme" --> RUN_EC
     RUN_EC -- "5. render page for verified user_id" --> USER
 
     RUN_OM -. "encrypt/decrypt storage_configs\ncredentials with ENCRYPTION_KEY" .-> DB[("Shared Supabase Postgres\nschemas: host, event_creator")]
