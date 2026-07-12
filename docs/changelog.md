@@ -10,6 +10,49 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #159 implemented — Slice R5: GCP HTTPS Load Balancer + Path Routing + Managed SSL**
+  (branch `restructure/r5-load-balancer`). Provisions the shared External HTTPS Load Balancer that
+  will front `organizeme.qa.russcoopersoftware.com`. New `infra/gcp_lb/generate_url_map.py` is a
+  pure function turning the R3 app-registry (`organizeme_chrome.registry`) into URL-map path rules
+  — Host-owned auth routes (`/`, `/login`, `/register`, `/forgot-password`, `/reset-password`,
+  `/profile`) are a fixed list since they aren't part of any app's nav, everything else is derived
+  per-app so a path never needs hand-maintaining separately from the registry that also drives
+  chrome rendering (R3). `tests/test_url_map_generator.py` (5 tests, TDD) covers host/app path
+  dedup and proves the generator is registry-driven, including that R6's Event Creator can be
+  added without changing the generator. **IaC tooling decision** (open item in the WBS spec):
+  chose a `gcloud` shell script (`infra/gcp_lb/provision.sh`) over Terraform, matching this repo's
+  existing pattern of plain `gcloud` calls in `ci.yml`/`deploy.yml` rather than introducing a new
+  toolchain. The script is idempotent (existence-checked before each create) and provisions two
+  global static IPs (v4+v6), Cloud DNS A/AAAA records in the `russcoopersoftware-com` zone (R0),
+  a Google-managed SSL cert, a Serverless NEG against `organizeme-qa`, two backend services
+  (`host-backend` + `organizeme-backend`, both on the same NEG today since Host and the
+  "organizeme" app are one Cloud Run service pre-R6), the generated URL map, a target-HTTPS-proxy,
+  and global forwarding rules. **Deliberately not run as part of this PR/CI**: per user decision
+  (mirroring R0's and R4's manual-operator pattern), this creates real billable GCP resources and
+  the managed cert can't validate until DNS propagates — up to ~24h — so `infra/gcp_lb/README.md`
+  documents running `provision.sh` manually post-merge; the live-LB acceptance criterion isn't
+  something this PR's CI can verify. A `code-review-master` pass caught three real bugs before
+  merge, all fixed: (1) `provision.sh`'s backend-service idempotency check used a `{ ... }` block
+  as the RHS of `||`, which cascades bash's `errexit` exemption into the whole block (BashFAQ/105)
+  — a failing `add-backend` after a successful `create` would silently continue past step 5 with
+  no NEG attached, and re-running would then skip the block entirely since `describe` now
+  succeeds; replaced with an explicit `if`. (2) The forwarding-rules `create` calls omitted
+  `--load-balancing-scheme=EXTERNAL_MANAGED`, defaulting to the classic `EXTERNAL` scheme and
+  mismatching the backend services' scheme — would have failed at the very last provisioning
+  step, after all the billable resources before it were already created; both calls now specify
+  it explicitly. (3) The generated URL-map YAML referenced backend services by bare name
+  (`service: host-backend`); `gcloud compute url-maps import`'s schema expects a resource path
+  (`global/backendServices/host-backend`) — bare names are silently misresolved rather than
+  rejected. Also added, on review: a cross-app path-collision guard in `generate_path_rules`
+  (raises naming both apps if two non-host apps claim the same nav path, since `gcloud` would
+  otherwise reject the resulting ambiguous URL map) and 2 more tests (7 total) covering the
+  collision guard and parsing the rendered YAML structure end-to-end (`pyyaml` added as a dev
+  dependency). One review finding deferred rather than fixed now: the generator only routes paths
+  present in each app's `nav` list, not an app's full route surface (nested pages, `/api/v1/*`) —
+  harmless in R5 since there's only one real backend, but a genuine gap once R6 splits Event
+  Creator into its own service; filed as issue #178 (`modelsuggested`, Intake). Full mypy
+  (`--strict`, whole repo) clean; both review agents' fixes verified, `code-quality-guardian`
+  returned no changes requested on the original pass.
 - **Issue #160 implemented — Slice R4: Domain-Scoped SSO Cookie + Secret Manager**
   (branch `restructure/r4-domain-cookie-secret-manager`). Adds the capability the future
   cross-service SSO (R6+) needs, without flipping it on live yet. `app/auth/backend.py` gains a
