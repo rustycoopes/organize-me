@@ -64,8 +64,3 @@ packages = ["app"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
-
-# TEMP local-dev override while chrome-v0.1.0 doesn't exist as a pushed tag yet; removed before
-# this branch merges so `uv sync` resolves the real pinned git dependency above.
-[tool.uv.sources]
-organizeme-chrome = { path = "packages/chrome" }

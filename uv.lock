@@ -1474,7 +1474,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=2.10.0" },
     { name = "httpx-oauth", specifier = ">=0.16.1" },
     { name = "jinja2", specifier = ">=3.1" },
-    { name = "organizeme-chrome", directory = "packages/chrome" },
+    { name = "organizeme-chrome", git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.1.0" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
@@ -1497,22 +1497,10 @@ dev = [
 [[package]]
 name = "organizeme-chrome"
 version = "0.1.0"
-source = { directory = "packages/chrome" }
+source = { git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.1.0#e2e7d24d2e38c61d86a2092cd9c6059660f35dc5" }
 dependencies = [
     { name = "jinja2" },
     { name = "pyjwt" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "jinja2", specifier = ">=3.1" },
-    { name = "pyjwt", specifier = ">=2.9" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.13" },
-    { name = "pytest", specifier = ">=8.3" },
 ]
 
 [[package]]
