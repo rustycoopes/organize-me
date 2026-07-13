@@ -1,12 +1,16 @@
-"""Tests for the Settings > Storage page (issue #46)."""
+"""Tests for the Settings page shell (issue #46).
+
+R7 (docs/platform-restructure/WBS/slice-R7.md): the Host renders only the Settings *shell* here
+(the tab-bar chrome, driven by the event-creator app-registry entry's settings_tabs) — Storage,
+Notifications, and Preferences tab *content* now lives in the independent event-creator service
+and is fetched as an HTML fragment via HTMX (GET /settings/event-creator/{tab.id}). These tests
+therefore only cover the shell: tab-bar rendering and each panel's HTMX wiring, not the tab
+content itself (that's event-creator's own test suite, in its own repo).
+"""
 
 import uuid
-from html.parser import HTMLParser
 
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.storage_config import StorageConfig, StorageProviderType
 
 
 def unique_email() -> str:
@@ -28,181 +32,71 @@ async def test_settings_page_redirects_anonymous_visitor_to_login(client: AsyncC
     assert response.headers["location"] == "/login"
 
 
-async def test_settings_page_renders_storage_tab_and_provider_options(client: AsyncClient) -> None:
+async def test_settings_page_renders_tab_bar_from_the_event_creator_registry_entry(
+    client: AsyncClient,
+) -> None:
     await _register_and_login(client)
 
     response = await client.get("/settings")
 
     assert response.status_code == 200
     body = response.text
+    assert "Settings" in body
+    assert 'role="tablist"' in body
+    # Tabs are declared on event-creator's app-registry entry (R7), not organizeme's own — see
+    # packages/chrome/src/organizeme_chrome/registry.py.
     assert "Storage" in body
-    assert 'id="provider"' in body
-    # All three enum providers appear as options; only Google Drive is wired up but the column
-    # reserves the others.
-    assert 'value="google_drive"' in body
-    assert 'value="dropbox"' in body
-    assert 'value="s3"' in body
-    assert 'id="folder_path"' in body
-
-
-async def test_settings_page_hides_dropbox_and_s3_by_default(client: AsyncClient) -> None:
-    await _register_and_login(client)
-
-    response = await client.get("/settings")
-
-    body = response.text
-    # The Dropbox/S3 stubs are gated behind x-show on the selected provider, so they aren't shown
-    # until picked. Drive is the default-visible section.
-    assert "x-show=\"provider === 'dropbox'\"" in body
-    assert "x-show=\"provider === 's3'\"" in body
-    assert "x-show=\"provider === 'google_drive'\"" in body
-
-
-async def test_settings_page_shows_connect_controls_for_disconnected_drive(
-    client: AsyncClient,
-) -> None:
-    await _register_and_login(client)
-
-    response = await client.get("/settings")
-
-    assert response.status_code == 200
-    body = response.text
-    # A fresh user has no stored OAuth token: the tab offers a Connect control and gates it behind
-    # saving a folder path first.
-    assert 'id="connect-drive"' in body
-    assert "Connect Google Drive" in body
-    assert "Save your folder path first" in body
-    assert 'x-show="!is_connected"' in body
-
-
-async def test_settings_page_shows_disconnect_control_when_drive_connected(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
-    await _register_and_login(client)
-    me = await client.get("/api/v1/users/me")
-    user_id = uuid.UUID(me.json()["id"])
-    # Simulate a connected config (a stored, encrypted-at-rest token) directly in the DB.
-    db_session.add(
-        StorageConfig(
-            user_id=user_id,
-            provider=StorageProviderType.GOOGLE_DRIVE,
-            folder_path="/OrganizeMe",
-            oauth_access_token="ciphertext-token",
-        )
-    )
-    await db_session.flush()
-
-    response = await client.get("/settings")
-
-    assert response.status_code == 200
-    body = response.text
-    assert 'id="disconnect-drive"' in body
-    assert "Disconnect Google Drive" in body
-    # is_connected is seeded true into the x-data, so the tab renders the connected branch
-    # (tolerant of tojson's spacing).
-    assert '"is_connected":true' in body.replace(" ", "")
-
-
-async def test_settings_page_prefills_saved_folder_path(client: AsyncClient) -> None:
-    await _register_and_login(client)
-    await client.put(
-        "/api/v1/storage-config",
-        json={"provider": "google_drive", "folder_path": "/OrganizeMe/reports"},
-    )
-
-    response = await client.get("/settings")
-
-    assert response.status_code == 200
-    assert 'value="/OrganizeMe/reports"' in response.text
-
-
-async def test_settings_page_renders_notifications_tab_with_toggles(client: AsyncClient) -> None:
-    await _register_and_login(client)
-
-    response = await client.get("/settings")
-
-    assert response.status_code == 200
-    body = response.text
     assert "Notifications" in body
-    assert 'id="notification_email"' in body
-    assert 'id="notification_sms"' in body
-
-    def _input_tag(input_id: str) -> str:
-        start = body.index(f'id="{input_id}"')
-        return body[max(0, start - 200) : start + 200]
-
-    # Fresh user has an email (set at registration) but no phone number: email toggle enabled,
-    # SMS toggle disabled with hint text.
-    assert "disabled" not in _input_tag("notification_email").split("/>")[0]
-    assert "disabled" in _input_tag("notification_sms").split("/>")[0]
-    assert "Set your phone number in Profile to enable." in body
+    assert "Preferences" in body
 
 
-async def test_settings_page_reflects_saved_notification_prefs(client: AsyncClient) -> None:
+async def test_settings_page_defaults_the_active_tab_to_the_first_registered_tab(
+    client: AsyncClient,
+) -> None:
     await _register_and_login(client)
-    await client.patch(
-        "/api/v1/users/me",
-        json={
-            "phone_number": "+15551234567",
-            "notification_email": False,
-            "notification_sms": True,
-        },
-    )
 
     response = await client.get("/settings")
 
     assert response.status_code == 200
-    body = response.text.replace(" ", "")
-    assert '"notification_email":false' in body
-    assert '"notification_sms":true' in body
-    assert '"phone_number":"+15551234567"' in body
+    assert "activeTab: 'storage'" in response.text
 
 
-async def test_settings_page_notifications_x_data_is_not_truncated_by_a_stray_quote(
+async def test_settings_page_fetches_each_tabs_content_from_event_creator_via_htmx(
     client: AsyncClient,
 ) -> None:
     await _register_and_login(client)
+
     response = await client.get("/settings")
 
-    collector = _XDataCollector()
-    collector.feed(response.text)
+    assert response.status_code == 200
+    body = response.text
+    # Each tab's panel is a same-origin HTMX fragment fetch to event-creator (R7) — never rendered
+    # inline by the Host.
+    assert 'id="storage-tab-panel"' in body
+    assert 'hx-get="/settings/event-creator/storage"' in body
+    assert 'id="notifications-tab-panel"' in body
+    assert 'hx-get="/settings/event-creator/notifications"' in body
+    assert 'id="preferences-tab-panel"' in body
+    assert 'hx-get="/settings/event-creator/preferences"' in body
+    assert "htmx.org" in body
 
-    notifications_x_data = [
-        v
-        for v in collector.x_data_values
-        if "notification_email" in v and "async save()" in v
+
+async def test_settings_page_only_the_first_tab_panel_is_visible_without_x_cloak(
+    client: AsyncClient,
+) -> None:
+    # The first tab (storage) matches the default activeTab and renders without x-cloak, so it's
+    # visible before Alpine hydrates; the rest are x-cloak'd so they don't flash visible.
+    await _register_and_login(client)
+
+    response = await client.get("/settings")
+
+    body = response.text
+    storage_panel_start = body.index('id="storage-tab-panel"')
+    storage_panel = body[storage_panel_start : body.index(">", storage_panel_start)]
+    assert "x-cloak" not in storage_panel
+
+    notifications_panel_start = body.index('id="notifications-tab-panel"')
+    notifications_panel = body[
+        notifications_panel_start : body.index(">", notifications_panel_start)
     ]
-    assert notifications_x_data, "settings page has no notifications x-data component"
-    assert "/api/v1/users/me" in notifications_x_data[0]
-
-
-class _XDataCollector(HTMLParser):
-    """Collects every `x-data` attribute value, honouring HTML attribute-quote termination - so a
-    stray quote that truncates the attribute (the register.html bug from #23) is caught here too."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.x_data_values: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        for name, value in attrs:
-            if name == "x-data" and value is not None:
-                self.x_data_values.append(value)
-
-
-async def test_settings_page_x_data_attribute_is_not_truncated_by_a_stray_quote(
-    client: AsyncClient,
-) -> None:
-    # Same class of regression guard as the register page: parse as a browser would and assert the
-    # storage component's x-data survives intact past where an embedded quote could cut it short.
-    await _register_and_login(client)
-    response = await client.get("/settings")
-
-    collector = _XDataCollector()
-    collector.feed(response.text)
-
-    storage_x_data = [v for v in collector.x_data_values if "async save()" in v]
-    assert storage_x_data, "settings page has no x-data component with a save() method"
-    # This fetch call lives well past the start of the attribute; if the value were truncated at a
-    # stray quote it wouldn't survive HTML attribute parsing.
-    assert '/api/v1/storage-config' in storage_x_data[0]
+    assert "x-cloak" in notifications_panel

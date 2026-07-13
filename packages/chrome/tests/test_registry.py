@@ -22,7 +22,10 @@ def test_get_app_returns_the_matching_entry() -> None:
         "/settings",
         "/profile",
     ]
-    assert [tab.id for tab in app.settings_tabs] == ["storage", "notifications"]
+    # R7: Storage/Notifications/Preferences moved to "event-creator" — the Host still renders the
+    # Settings shell but no longer owns any tab's content.
+    assert app.settings_tabs == []
+    assert app.api_prefixes == []
 
 
 def test_get_app_event_creator_owns_dashboard() -> None:
@@ -30,7 +33,19 @@ def test_get_app_event_creator_owns_dashboard() -> None:
     app = get_app("event-creator")
 
     assert [item.path for item in app.nav] == ["/dashboard"]
-    assert app.settings_tabs == []
+
+
+def test_get_app_event_creator_owns_settings_tabs_and_api_prefixes() -> None:
+    # R7: storage-connection + settings functionality migrated into Event Creator.
+    app = get_app("event-creator")
+
+    assert [tab.id for tab in app.settings_tabs] == ["storage", "notifications", "preferences"]
+    assert [tab.label for tab in app.settings_tabs] == ["Storage", "Notifications", "Preferences"]
+    assert app.api_prefixes == [
+        "/api/v1/storage-config",
+        "/api/v1/user-settings",
+        "/settings/event-creator",
+    ]
 
 
 def test_get_app_raises_for_unknown_service() -> None:
