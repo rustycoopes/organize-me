@@ -19,9 +19,14 @@ const AUTH_COOKIE_NAME = 'organizeme_auth';
  * - No-cookie rejection: sidebar.spec.ts's second test already asserts a fresh (unauthenticated)
  *   context hitting `/dashboard` redirects to `/login`.
  *
- * This file adds the two trust-boundary cases those don't cover (a malformed cookie value, and a
- * well-formed-but-wrongly-signed token) plus logout propagation, which no existing spec asserts
- * against an Event-Creator-owned route.
+ * This file adds logout propagation, which no existing spec asserts against an Event-Creator-owned
+ * route, plus the garbage-cookie and tampered-signature-token cases - both of which already have
+ * fast unit-test coverage in event-creator's own test_dashboard_auth.py
+ * (test_garbage_cookie_value_redirects_to_host_login, test_tampered_signature_redirects_to_host_
+ * login), exercised there via a direct ASGI client rather than a real browser. Repeating them here
+ * is deliberate defense-in-depth: it proves the same rejection holds through the real cookie-
+ * domain/Load-Balancer path end-to-end, not just against a mocked transport - not an oversight that
+ * they exist elsewhere.
  *
  * The remaining acceptance criteria are covered outside this file entirely:
  * - "A Host Profile field reaches an Event-Creator-owned dependency": notifications.spec.ts's
@@ -36,7 +41,17 @@ const AUTH_COOKIE_NAME = 'organizeme_auth';
  *   test_storage_config_model.py, test_llm_prompt_model.py, test_event_model.py).
  */
 test.describe('Host<->Event Creator boundary', () => {
-  test('logging out at the Host ends the Event Creator session too', async ({ page }) => {
+  test('logging out at the Host clears the cookie Event Creator relies on for auth', async ({
+    page,
+  }) => {
+    // The Host's auth backend (app/auth/backend.py) is a stateless JWTStrategy with no server-
+    // side session/blocklist - logout only clears the browser's cookie via Set-Cookie, it does
+    // not revoke the token itself (a captured pre-logout token would still authenticate if
+    // replayed manually, until its natural 7-day expiry - see account-deletion.spec.ts for the
+    // contrasting case where the *user* is gone and even a replayed token is rejected). What this
+    // test proves is narrower but still real: after logout, the *browser* no longer holds a
+    // cookie Event Creator will accept, so a normal subsequent navigation is treated as logged
+    // out on both services - not just the Host's own pages.
     await registerNewUser(page, 'boundary-logout');
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
