@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-13 (issue #162 — Slice R7 Parity 1: Storage + Settings Tabs)
+**Last updated:** 2026-07-13 (issue #163 — Slice R8 Parity 2: Upload + Pipeline + Processing + Logs)
 
 For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
 up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
@@ -396,10 +396,38 @@ masked by the same `PLAYWRIGHT_BASE_URL` bug). Both prod deploys succeeded; prod
 shared LB yet (that cutover is R11/R12), so prod-side cross-service Settings routing isn't expected
 to work until then. See `docs/changelog.md` for full detail.
 
+**Issue #163 (Slice R8 — Parity 2: Upload + Pipeline + Processing + Logs) implemented.** The
+heaviest feature area — file intake, the 7-step extraction pipeline, live SSE progress, processing
+history/logs, and notification dispatch — migrated from the monolith into `event-creator` (branch
+`restructure/r8-parity2-pipeline`), including standing up a **real** Celery worker: unlike the
+monolith, where `app/worker.py` was a never-deployed stub (`autostart=false`, no `REDIS_URL`, no
+task defined, pipeline ran as a plain in-process asyncio task), Event Creator now runs the pipeline
+as an actual Celery task dispatched from `POST /api/v1/upload`/`/api/v1/import-pending-files`, with
+supervisord starting both `[program:web]` and `[program:worker]` (both `autostart=true`) in the
+same container against a new Upstash Redis instance (`redis-url-{qa,prod}` in Secret Manager,
+IAM-granted to the Cloud Run runtime service account, `REDIS_URL` wired via `--set-secrets`,
+`--timeout=3600` added for the long-lived SSE connection). New `app/worker.py`: a thin
+async-to-sync bridge whose task takes only JSON-serialisable arguments (never a live
+`StorageProvider`/DB session, which can't cross the Redis-brokered process hop) and reconstructs
+its collaborators — a `"configured"` mode rebuilds the real Drive/Dropbox/S3 provider from the
+user's persisted `storage_configs` row; `"ephemeral"`/`"fake"` modes (no persistent cross-process
+store) carry the file's bytes base64-encoded in the task payload itself and re-seed a fresh
+in-memory provider. `app/services/pipeline/{runner,progress}.py`, the Gemini/message-filter/
+date-parser core, the notification sender (wired to this repo's own R7 `user_settings`, not the
+monolith's), the upload/import-pending-files/processing-runs/logs endpoints and pages, and the
+Celery task layer were all ported and independently unit/integration tested (`FakeStorageProvider`
++ `FakeGeminiClient` + `FakeNotificationSender`, mirroring the monolith's pattern) — LLM-failure
+(fail immediately, no retry, file → `failed/`) and zero-new-events (success, file → `processed/`)
+paths behave identically to today. `mypy --strict` clean across the full repo (98 source files).
+Backfilled the previously-missing Slice R7 section in `host-integration-guide.md` (the doc had
+gone stale, still saying "R7–R13 not yet landed" after R7 had already merged) alongside the new R8
+section.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-13 | Issue #163 (Slice R8 — Parity 2: Upload + Pipeline + Processing + Logs) implemented: upload, the 7-step extraction pipeline, live SSE progress, processing history/logs, and notification dispatch migrated from the Host monolith into `event-creator`, plus a **real** Celery worker replacing the monolith's never-deployed stub — new `app/worker.py` async-to-sync task bridge, `redis-url-{qa,prod}` Secret Manager secrets, supervisord running `[program:web]`+`[program:worker]`, `--timeout=3600` for SSE. LLM-failure and zero-new-events paths verified at parity via ported integration tests. Backfilled the stale Slice R7 section in `host-integration-guide.md` |
 | 2026-07-13 | Issue #162 (Slice R7 — Parity 1: Storage + Settings Tabs) implemented: Storage/Notifications/Preferences Settings tabs and storage-provider OAuth connect/disconnect (Google Drive/Dropbox; S3 stub) migrated from the Host monolith into `event-creator`, with the Host reduced to the Settings shell chrome + `hx-get` fragment wiring. New `AppEntry.api_prefixes` field closes #178. Found and fixed a real, previously-masked bug: E2E's `PLAYWRIGHT_BASE_URL` pointed at the Host's bare Cloud Run URL instead of the shared LB domain, so relative htmx fragment fetches never reached `event-creator` through the LB's routing at all |
 | 2026-07-13 | Issue #161 (Slice R6 — Event Creator Scaffold + SSO-Trust Tracer Bullet) implemented: new independent `rustycoopes/event-creator` repo/Cloud Run service (`GET /dashboard`, JWT trust boundary via shared `organizeme_chrome.jwt_verify`, own `event_creator` schema + Alembic history) plus Host prereqs (registry split + merged nav, LB third backend, Secret Manager for `JWT_SECRET`/`ENCRYPTION_KEY`, request-based billing confirmed on both repos). Caught and fixed a stale chrome dependency pin on the Host's own `pyproject.toml` that silently kept the live URL map on the pre-split registry. `COOKIE_DOMAIN` and full cross-domain SSO deferred to Slice R11 |
 | 2026-07-12 | Issue #159 (Slice R5 — GCP HTTPS Load Balancer + Path Routing + Managed SSL) implemented on branch `restructure/r5-load-balancer`, in an isolated worktree. New `infra/gcp_lb/generate_url_map.py` (pure function, 7 TDD tests in `tests/test_url_map_generator.py`) generates URL-map path rules from the R3 app-registry (`organizeme_chrome.registry`) — Host's fixed auth routes (`/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/profile`) plus each app's nav paths, deduplicated so Host always wins a collision, with a cross-app collision guard (two non-host apps can't claim the same path) and tests parsing the rendered YAML end-to-end. IaC tooling decision (open item in the WBS spec): a `gcloud` shell script (`infra/gcp_lb/provision.sh`), idempotent (existence-checked before each create), matching the existing plain-`gcloud` pattern in `ci.yml`/`deploy.yml` rather than introducing Terraform. Provisions two global static IPs (v4+v6), Cloud DNS A/AAAA records in the `russcoopersoftware-com` zone (R0), a Google-managed SSL cert, a Serverless NEG against `organizeme-qa`, two backend services (`host-backend` + `organizeme-backend`) sharing that NEG until R6 splits Event Creator into its own Cloud Run service, the generated URL map, a target-HTTPS-proxy, and global forwarding rules. **Deliberately not run as part of this PR/CI** — real billable GCP resources plus a managed cert that can take up to ~24h to validate once DNS propagates; `infra/gcp_lb/README.md` documents the manual `provision.sh` run and verification steps, mirroring R0's/R4's manual-operator precedent. `code-review-master` caught and fixed 3 pre-merge bugs (a bash `errexit`-exemption cascade masking a failed `add-backend`, a missing forwarding-rule `--load-balancing-scheme`, bare vs. full-resource-path backend-service references in the generated YAML); one lower-priority finding (generator covers nav paths only, not an app's full route surface) deferred to issue #178 (`modelsuggested`). Full-repo `mypy --strict` clean; `code-quality-guardian` returned no changes requested |

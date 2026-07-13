@@ -10,6 +10,40 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #163 implemented — Slice R8: Parity 2 (Upload + Pipeline + Processing + Logs).**
+  Migrates the heaviest feature area — file intake, the 7-step extraction pipeline, live SSE
+  progress, processing history/logs, and notification dispatch — from the monolith into
+  `event-creator` (branch `restructure/r8-parity2-pipeline`). Includes standing up a **real**
+  Celery worker: the monolith's own `app/worker.py` was a never-deployed stub
+  (`[program:worker]` `autostart=false`, no `REDIS_URL`, no task defined — the pipeline actually
+  ran as a plain in-process asyncio background task). Event Creator now runs the pipeline as an
+  actual Celery task: new `app/worker.py` (`Celery("event_creator", broker=REDIS_URL, ...)`) is a
+  thin async-to-sync bridge whose task takes only JSON-serialisable arguments — never a live
+  `StorageProvider`/DB session, which can't survive the Redis-brokered hop to a separate worker
+  process — and reconstructs its collaborators inside the task. Three storage-reconstruction
+  modes: `"configured"` rebuilds the real Drive/Dropbox/S3 provider from the user's persisted
+  `storage_configs` row and downloads by remote file id; `"ephemeral"`/`"fake"` (no persistent,
+  cross-process-durable backing store) carry the file's bytes base64-encoded directly in the task
+  payload (capped at the same 10 MB the upload endpoint already enforces) and re-seed a fresh
+  in-memory provider. `CeleryPipelineScheduler` (`app/api/v1/upload.py`) replaces the monolith's
+  `BackgroundPipelineScheduler`; `import_pending_files.py`'s batch dispatches via a Celery `chain`
+  to preserve the monolith's "sequential, not parallel" per-file guarantee. New GCP Secret Manager
+  secrets `redis-url-{qa,prod}` (an Upstash `rediss://` URL), IAM-granted `secretAccessor` to the
+  Cloud Run runtime service account, wired via `--set-secrets` alongside the existing
+  `JWT_SECRET`/`ENCRYPTION_KEY`/OAuth-client-secret entries; `--timeout=3600` added to both
+  `gcloud run deploy` commands for the long-lived SSE connection. `supervisord.conf` (new to this
+  repo) runs `[program:web]` and `[program:worker]`, both `autostart=true`; the `Dockerfile` now
+  installs and invokes supervisord instead of plain uvicorn. `app/services/pipeline/{runner,
+  progress}.py`, the Gemini client/message-filter/date-parser core, and the notification sender
+  (rewired to read this repo's own R7 `user_settings`/`HostUser` instead of the monolith's
+  `User`/settings) are near-verbatim ports, independently unit/integration tested with
+  `FakeStorageProvider`/`FakeGeminiClient`/`FakeNotificationSender` mirroring the monolith's own
+  test pattern — LLM-failure (fail immediately, no retry, file → `failed/`, failure notification)
+  and zero-new-events (success, file → `processed/`, "0 new events" notification) paths verified
+  at parity. `mypy --strict` clean across the full repo (98 source files). Backfilled the
+  previously-missing Slice R7 section in `docs/platform-restructure/host-integration-guide.md`
+  (the doc had gone stale, still claiming "R7–R13 not yet landed" after R7 had already merged)
+  alongside the new R8 section.
 - **Issue #162 implemented — Slice R7: Parity 1 (Storage + Settings Tabs).** Migrates
   storage-connection (Google Drive / Dropbox / S3) and the Settings tab content (Storage /
   Notifications / Preferences) from the monolith into `event-creator` (branch
