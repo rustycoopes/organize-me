@@ -7,24 +7,26 @@ test.describe('Settings > Storage', () => {
     await page.goto('/settings');
 
     const folderPath = page.locator('#folder_path');
-    const dropboxStub = page.getByText('Dropbox support is coming soon.');
     const s3Stub = page.getByText('Amazon S3 support is coming soon.');
 
-    // Google Drive is the default: its folder field is visible, the other providers' stubs aren't.
+    // Google Drive is the default: the shared folder field is visible, the S3 stub isn't.
     await expect(folderPath).toBeVisible();
-    await expect(dropboxStub).toBeHidden();
     await expect(s3Stub).toBeHidden();
 
-    // Selecting Dropbox hides the Drive fields and reveals the Dropbox stub - no page reload.
+    // Dropbox (R7) reuses the same folder field as Google Drive - only S3 hides it.
     await page.locator('#provider').selectOption('dropbox');
-    await expect(folderPath).toBeHidden();
-    await expect(dropboxStub).toBeVisible();
+    await expect(folderPath).toBeVisible();
     await expect(s3Stub).toBeHidden();
 
-    // Back to Google Drive restores the Drive fields.
+    // Selecting S3 hides the folder field and reveals its stub - no page reload.
+    await page.locator('#provider').selectOption('s3');
+    await expect(folderPath).toBeHidden();
+    await expect(s3Stub).toBeVisible();
+
+    // Back to Google Drive restores the shared folder field.
     await page.locator('#provider').selectOption('google_drive');
     await expect(folderPath).toBeVisible();
-    await expect(dropboxStub).toBeHidden();
+    await expect(s3Stub).toBeHidden();
   });
 
   test('Connect Google Drive control appears once a folder path is saved', async ({ page }) => {
@@ -34,7 +36,12 @@ test.describe('Settings > Storage', () => {
     // A brand-new user has no saved config: Connect is gated behind saving a folder path first.
     const connectButton = page.locator('#connect-drive');
     await expect(connectButton).toBeHidden();
-    await expect(page.getByText('Save your folder path first')).toBeVisible();
+    // Full text (not the shared "Save your folder path first" substring) - Dropbox's Connect
+    // panel has the same lead-in and is present (if hidden) in the DOM at the same time, so a
+    // partial-text locator resolves to both and violates Playwright's strict mode.
+    await expect(
+      page.getByText('Save your folder path first, then connect Google Drive.')
+    ).toBeVisible();
 
     await page.locator('#folder_path').fill('/OrganizeMe');
     await page.locator('#storage-tab-panel form button[type="submit"]').click();
