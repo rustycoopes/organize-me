@@ -3,13 +3,17 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright config for the OrganizeMe E2E suite (issue #23).
  *
- * These tests drive the REAL deployed QA Cloud Run app end-to-end - there is no local web
- * server started here. `PLAYWRIGHT_BASE_URL` must point at the QA instance (set in CI after
- * `deploy-qa` succeeds); it falls back to the known QA URL for convenient local runs.
+ * These tests drive the REAL deployed QA app end-to-end - there is no local web server started
+ * here. `PLAYWRIGHT_BASE_URL` must point at the shared Load Balancer's custom domain (set in CI
+ * after `deploy-qa` succeeds), not the Host's Cloud Run URL directly - relative `hx-get`/fetch
+ * calls (e.g. Settings' Storage/Notifications fragments, R7) resolve against whatever origin the
+ * page was loaded from, and only the LB's URL map (infra/gcp_lb/generate_url_map.py) knows how to
+ * route those paths to Event Creator's own Cloud Run service. Hitting the Host's Cloud Run URL
+ * directly bypasses that routing entirely. Falls back to the known QA domain for convenient
+ * local runs.
  */
 const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL ??
-  'https://organizeme-qa-170051512639.northamerica-northeast1.run.app';
+  process.env.PLAYWRIGHT_BASE_URL ?? 'https://organizeme.qa.russcoopersoftware.com';
 
 export default defineConfig({
   testDir: './tests',

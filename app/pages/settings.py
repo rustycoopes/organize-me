@@ -1,64 +1,53 @@
 """The authenticated Settings page (issue #46).
 
-Hosts a **Storage** tab (pick a provider, set the watch-folder path, backed by
-`GET`/`PUT /api/v1/storage-config`) and a **Notifications** tab (toggle SMS/email, backed by the
-existing `PATCH /api/v1/users/me`, issue #88). Served here (rather than as a generic placeholder in
-app.pages.app_shell) because it has real content; more tabs land in later slices. Anonymous
-visitors are redirected to /login, matching the other authenticated pages.
+R7 (docs/platform-restructure/WBS/slice-R7.md): the Host still renders the Settings *shell*
+(tab-bar chrome, from the app-registry's settings_tabs — organizeme_chrome.registry), but no
+longer owns any tab's *content*. Storage config (issue #46) and Notifications (issue #88) have
+moved to the independent event-creator service, which now declares those tabs (plus a new stub
+Preferences tab) via its own app-registry entry and serves their content as HTML fragments at
+`GET /settings/event-creator/{storage,notifications,preferences}`. This page fetches each tab's
+fragment via HTMX rather than rendering it inline; since both services sit behind the same load
+balancer origin, these are same-origin requests and the `organizeme_auth` cookie flows
+automatically (no cross-origin auth wiring needed).
+
+Anonymous visitors are redirected to /login, matching the other authenticated pages.
 """
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from organizeme_chrome.registry import get_app
 
-from app.api.v1.storage_config import get_user_storage_config
 from app.auth.users import current_active_user_optional
 from app.core.templating import templates
-from app.db.session import get_db
-from app.models.storage_config import StorageProviderType
 from app.models.user import User
-from app.services.user_settings import get_or_create_user_settings
 
 router = APIRouter(tags=["pages"])
+
+# The event-creator app-registry entry (organizeme_chrome.registry) is the single source of truth
+# for which Settings tabs exist and their labels; this page just needs its tab ids to build each
+# tab's HTMX fragment URL (GET /settings/event-creator/{tab.id}).
+_EVENT_CREATOR_APP = get_app("event-creator")
 
 
 @router.get("/settings", response_model=None)
 async def settings_page(
     request: Request,
     user: User | None = Depends(current_active_user_optional),
-    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse | RedirectResponse:
     if user is None:
         return RedirectResponse("/login", status_code=302)
-    config = await get_user_storage_config(db, user.id)
-    # Prefill from any saved config; default to Google Drive with an empty folder for a fresh user
-    # (Drive is the only provider actually wired up in this slice).
-    storage_data = {
-        "provider": (
-            config.provider.value if config is not None else StorageProviderType.GOOGLE_DRIVE.value
-        ),
-        "folder_path": config.folder_path if config is not None else "",
-        # Whether Drive is authenticated (a token is stored) - drives the connected/disconnected
-        # state of the tab's Connect/Disconnect controls (#47).
-        "is_connected": config.oauth_access_token is not None if config is not None else False,
-        # Whether a config row exists at all: Connect can only run once a folder path is saved
-        # (the tokens attach to that row), so the button is gated on this.
-        "has_config": config is not None,
-    }
-    user_settings = await get_or_create_user_settings(db, user.id)
-    notifications_data = {
-        "notification_email": user_settings.notification_email,
-        "notification_sms": user_settings.notification_sms,
-        "email": user.email,
-        "phone_number": user.phone_number or "",
-    }
     return templates.TemplateResponse(
         request,
         "settings.html",
         {
             "user": user,
             "dark_mode": user.dark_mode,
-            "storage_data": storage_data,
-            "notifications_data": notifications_data,
+            # Explicitly the event-creator entry's tabs, not the `settings_tabs` global that
+            # register_chrome() scopes to this page's own app_service_name ("organizeme") — the
+            # Host no longer owns any tab's content, so that global is empty (see
+            # packages/chrome/src/organizeme_chrome/templating.py). Jinja2 template context takes
+            # precedence over environment globals of the same name, so this overrides it for this
+            # page only.
+            "settings_tabs": _EVENT_CREATOR_APP.settings_tabs,
         },
     )

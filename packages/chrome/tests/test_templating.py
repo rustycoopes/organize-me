@@ -20,6 +20,20 @@ def test_nav_items_are_merged_across_all_registered_apps() -> None:
 def test_settings_tabs_are_scoped_to_the_callers_own_app() -> None:
     env = Environment()
 
-    register_chrome(env, app_service_name="event-creator")
+    # R7: Storage/Notifications/Preferences moved to "event-creator" — "organizeme" (the caller
+    # here) no longer owns any Settings tab's content, though it still renders the Settings shell
+    # itself (app/pages/settings.py passes event-creator's tabs into the template context
+    # explicitly for that purpose, rather than relying on this scoped-to-caller global).
+    register_chrome(env, app_service_name="organizeme")
 
     assert env.globals["settings_tabs"] == []
+
+
+def test_settings_tabs_scoped_to_event_creator_include_its_own_tabs() -> None:
+    env = Environment()
+
+    register_chrome(env, app_service_name="event-creator")
+
+    settings_tabs = env.globals["settings_tabs"]
+    assert isinstance(settings_tabs, list)
+    assert [tab.id for tab in settings_tabs] == ["storage", "notifications", "preferences"]

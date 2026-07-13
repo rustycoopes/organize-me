@@ -34,6 +34,20 @@ class PathRule:
     paths: list[str] = field(default_factory=list)
 
 
+def _prefix_patterns(prefix: str) -> list[str]:
+    """Renders an `api_prefixes` entry as `gcloud compute url-maps import` path patterns.
+
+    GCP's `/*` wildcard suffix (https://cloud.google.com/load-balancing/docs/url-map-concepts
+    #wildcards) only matches paths with *something* after the trailing `/` — it does NOT also
+    match the bare prefix string itself. Several of this slice's endpoints are hit at exactly the
+    bare path (e.g. `GET/PUT /api/v1/storage-config`, `GET/PATCH /api/v1/user-settings`), so both
+    the exact path and its `/*` wildcard must be emitted, or those bare-path requests silently
+    fall through to defaultService (the Host) — caught in review before this shipped.
+    """
+    bare = prefix.rstrip("/")
+    return [bare, f"{bare}/*"]
+
+
 def generate_path_rules(apps: list[AppEntry] | None = None) -> list[PathRule]:
     if apps is None:
         apps = list_apps()
@@ -54,6 +68,20 @@ def generate_path_rules(apps: list[AppEntry] | None = None) -> list[PathRule]:
                 )
             seen_paths[item.path] = service
             app_paths.append(item.path)
+        # R7 (#178): an app's route surface isn't just its nav — its own API/fragment routes
+        # (declared via api_prefixes) need path rules too, or the LB falls through to
+        # defaultService (the Host) for everything else the app actually serves.
+        for prefix in app.api_prefixes:
+            for pattern in _prefix_patterns(prefix):
+                owner = seen_paths.get(pattern)
+                if owner is not None:
+                    raise ValueError(
+                        f"Path {pattern!r} is claimed by both {owner!r} and {service!r} — "
+                        "the app-registry must not assign the same api_prefixes entry to two "
+                        "different apps."
+                    )
+                seen_paths[pattern] = service
+                app_paths.append(pattern)
         if app_paths:
             rules.append(PathRule(service=service, paths=app_paths))
     return rules

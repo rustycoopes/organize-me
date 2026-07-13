@@ -96,6 +96,69 @@ def test_two_non_host_apps_claiming_the_same_path_is_rejected() -> None:
         generate_path_rules(apps=apps)
 
 
+def test_app_api_prefixes_produce_a_wildcard_path_rule_for_that_apps_backend() -> None:
+    # R7 (#178): the generator must route an app's own API/fragment routes (declared via
+    # api_prefixes), not just its nav pages — else the LB falls through to the Host default for
+    # everything else the app actually serves.
+    apps = [
+        AppEntry(
+            service_name="event-creator",
+            nav=[AppNavItem("/dashboard", "Dashboard")],
+            settings_tabs=[],
+            api_prefixes=["/api/v1/storage-config", "/settings/event-creator"],
+        )
+    ]
+
+    rules = generate_path_rules(apps=apps)
+
+    app_rule = next(r for r in rules if r.service == "event-creator-backend")
+    assert "/dashboard" in app_rule.paths
+    # Bare-prefix requests (e.g. GET/PUT /api/v1/storage-config with nothing after it) must be
+    # covered too — GCP's `/*` wildcard only matches paths with something after the trailing `/`,
+    # never the bare prefix itself. A regression here silently misroutes those to the Host.
+    assert "/api/v1/storage-config" in app_rule.paths
+    assert "/api/v1/storage-config/*" in app_rule.paths
+    assert "/settings/event-creator" in app_rule.paths
+    assert "/settings/event-creator/*" in app_rule.paths
+
+
+def test_app_api_prefixes_do_not_collide_with_the_hosts_fixed_auth_routes() -> None:
+    # The Host's own fixed HOST_PATHS list (auth pages, etc.) and an app's api_prefixes describe
+    # disjoint path spaces (exact paths vs. wildcard prefixes); an app declaring an api_prefix must
+    # never be silently swallowed by / conflict with the Host's own rule.
+    apps = [
+        AppEntry(
+            service_name="event-creator",
+            nav=[],
+            settings_tabs=[],
+            api_prefixes=["/api/v1/storage-config"],
+        )
+    ]
+
+    rules = generate_path_rules(apps=apps)
+
+    host_rule = next(r for r in rules if r.service == "host-backend")
+    app_rule = next(r for r in rules if r.service == "event-creator-backend")
+    assert not set(host_rule.paths) & set(app_rule.paths)
+    assert "/api/v1/storage-config" in app_rule.paths
+    assert "/api/v1/storage-config/*" in app_rule.paths
+    assert set(host_rule.paths) == set(HOST_PATHS)
+
+
+def test_two_apps_claiming_the_same_api_prefix_is_rejected() -> None:
+    apps = [
+        AppEntry(
+            service_name="organizeme", nav=[], settings_tabs=[], api_prefixes=["/api/v1/shared"]
+        ),
+        AppEntry(
+            service_name="event-creator", nav=[], settings_tabs=[], api_prefixes=["/api/v1/shared"]
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="/api/v1/shared"):
+        generate_path_rules(apps=apps)
+
+
 def test_url_map_yaml_references_backend_services_by_full_resource_path() -> None:
     # Bare service names are silently misresolved by `gcloud compute url-maps import` — the
     # schema expects a resource path (or self-link), not a short name.
