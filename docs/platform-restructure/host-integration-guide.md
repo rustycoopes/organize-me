@@ -225,11 +225,49 @@ still pending.
     (`--timeout=3600` here) — the default is far too short for a connection meant to stay open for
     the life of a background job.
 
-## Slices R9–R13 — not yet landed
+## Slice R9 — Parity 3: Dashboard + Events + Prompt
 
-Per `docs/project-status.md`, R8 is the most recently completed slice. R9–R13 exist as WBS docs
-under `docs/platform-restructure/WBS/slice-R{9..13}.md` but haven't been implemented — check those
-files and `docs/project-status.md` before relying on anything past R8 as current state. Known
+- **Infra:** None new — the Dashboard/Events/Prompt surfaces are additional routes on the existing
+  `event-creator-{qa,prod}` Cloud Run services, already provisioned by R5/R6.
+- **Routing:** None new. `/dashboard` was already routed to `event-creator` since the R6 tracer
+  bullet — this slice replaces its placeholder body with the real events table, so the change goes
+  live the moment it's deployed. `/prompt` is a genuinely new route added to `event-creator`, but
+  the app-registry (`packages/chrome/src/organizeme_chrome/registry.py`) still lists it under the
+  Host's own `AppNavItem` list, same as `/upload`/`/processing`/`/logs` since R8 — full-page-route
+  cutover for these paths is deliberately deferred to the **R11 QA Cutover** slice, not done
+  incrementally per parity slice (unlike R7's Settings-tab fragments, which don't need an LB path
+  change since the Host keeps rendering the `/settings` shell and only fetches tab content via
+  `hx-get`). Until R11 lands, the Host's own `/prompt` keeps serving live traffic; Event Creator's
+  new `/prompt` route exists and is tested but isn't reachable through the shared Load Balancer
+  yet.
+- **Secrets:** None new.
+- **Interface contract:**
+  - The `events`, `llm_prompts`, and `user_settings` tables (adopted into `event_creator`'s schema
+    since R1/R2) now have their full read/write surface in Event Creator:
+    `GET`/`DELETE`/`PATCH /api/v1/events{,/{id}}`, `GET`/`PUT /api/v1/llm-prompt` +
+    `POST /api/v1/llm-prompt/reset`. A hosted app reading/writing rows in another app's schema
+    (e.g. a future app wanting event data) must go through these endpoints, not direct DB access.
+  - The Getting Started onboarding checklist reads `event_creator.user_settings`'s three boolean
+    flags (`onboarding_storage_done`, `onboarding_notifications_done`,
+    `onboarding_first_upload_done`, all already wired by R2/R7/R8's storage-connect/notification/
+    upload write-paths) — no new flag or table was needed for this slice.
+  - Re-enabled `e2e/tests/import-pending-files.spec.ts`'s Dashboard-page case (issue #185), skipped
+    since R7 exposed that `/dashboard` had routed to Event Creator's placeholder since R6. A hosted
+    app that reuses a Host-authored partial (here, the "Import pending files" button) should keep
+    its markup (element ids in particular) identical so shared e2e coverage keeps working
+    unmodified.
+  - The post-login redirect (`GOOGLE_OAUTH_SUCCESS_REDIRECT`/`LOGIN_SUCCESS_REDIRECT` in
+    `app/api/v1/auth.py`) still targets `/profile`, not `/dashboard` — the monolith never made this
+    switch despite the Dashboard existing since R6. Left as-is here as well: repointing the
+    post-login landing page is a user-visible auth-flow change with its own risk, better done as
+    its own reviewed follow-up than folded into this slice — see the GitHub issue filed alongside
+    this slice's PR.
+
+## Slices R10–R13 — not yet landed
+
+Per `docs/project-status.md`, R9 is the most recently completed slice. R10–R13 exist as WBS docs
+under `docs/platform-restructure/WBS/slice-R{10..13}.md` but haven't been implemented — check those
+files and `docs/project-status.md` before relying on anything past R9 as current state. Known
 deferred items called out by earlier slices that a future slice will resolve:
 
 - `COOKIE_DOMAIN` and full cross-domain SSO cookie scoping — deferred to **R11**.
@@ -238,6 +276,10 @@ deferred items called out by earlier slices that a future slice will resolve:
   deferred hardening item, no slice assigned yet.
 - `DATABASE_URL` living as a GitHub Actions secret rather than GCP Secret Manager — candidate for a
   future hardening pass.
+- Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9, no slice assigned yet;
+  natural to fold into R11's cutover or R13's Host cleanup.
+- `/prompt`/`/upload`/`/processing`/`/logs` full-page-route cutover to `event-creator` in the LB
+  app-registry — deferred to **R11**, same as the Dashboard's own R6 tracer-bullet cutover pattern.
 
 ---
 

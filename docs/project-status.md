@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-13 (issue #163 — Slice R8 Parity 2: Upload + Pipeline + Processing + Logs)
+**Last updated:** 2026-07-13 (issue #164 — Slice R9 Parity 3: Dashboard + Events + Prompt)
 
 For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
 up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
@@ -423,10 +423,33 @@ Backfilled the previously-missing Slice R7 section in `host-integration-guide.md
 gone stale, still saying "R7–R13 not yet landed" after R7 had already merged) alongside the new R8
 section.
 
+**Issue #164 (Slice R9 — Parity 3: Dashboard + Events + Prompt) implemented.** Completes
+functional parity: the events dashboard (filter/sort/search/paginate, per-event Google
+Calendar/Tasks links, delete-with-confirm, a reviewed toggle, the Getting Started onboarding
+checklist) and the Prompt page (view/edit/reset, lazily seeding the factory-default prompt) moved
+from the monolith into `event-creator` (branch `restructure/r9-parity3-dashboard`), replacing the
+R6 tracer bullet's placeholder Dashboard body. `app/core/calendar_url.py`, `app/core/onboarding.py`,
+`app/core/initials.py`, the `events`/`llm-prompt` API routers, and both page templates are
+near-verbatim ports adapted to this repo's Host-JWT auth (`app.core.auth.current_user_id[_optional]`
+instead of fastapi-users' `current_active_user`) rather than a rewrite. Onboarding reads the R2
+`event_creator.user_settings` flags already wired by R7/R8's storage-connect/notification/upload
+write-paths — no new column needed. Re-enabled `e2e/tests/import-pending-files.spec.ts`'s
+Dashboard-page case (issue #185), which had been skipped since R7 exposed that `/dashboard` already
+routed to Event Creator (since R6) and so had no real "Import pending files" button to click until
+now. `/prompt` is a genuinely new Event Creator route, but — unlike `/dashboard`'s R6 tracer-bullet
+cutover — its LB app-registry entry stays under the Host for now; full-page-route cutover for
+`/prompt`/`/upload`/`/processing`/`/logs` is deliberately deferred to the R11 QA Cutover slice, so
+the Host's own `/prompt` keeps serving live traffic until then. The monolith's post-login redirect
+still hardcodes `/profile` rather than `/dashboard` (a pre-existing gap this slice's WBS flagged,
+not something R9 introduced) — left as a follow-up rather than folded into this slice, since
+repointing it is a user-visible auth-flow change with its own risk profile. `mypy --strict` clean
+across the full repo.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-13 | Issue #164 (Slice R9 — Parity 3: Dashboard + Events + Prompt) implemented: the events dashboard (filter/sort/search/paginate, Calendar/Tasks links, delete, reviewed toggle, Getting Started onboarding checklist) and the Prompt page (view/edit/reset) migrated from the Host monolith into `event-creator`, replacing R6's placeholder Dashboard body and completing functional parity. Re-enabled `e2e/tests/import-pending-files.spec.ts`'s Dashboard-page case (issue #185). `/prompt`'s LB app-registry cutover deferred to R11, same as `/upload`/`/processing`/`/logs` |
 | 2026-07-13 | Issue #163 (Slice R8 — Parity 2: Upload + Pipeline + Processing + Logs) implemented: upload, the 7-step extraction pipeline, live SSE progress, processing history/logs, and notification dispatch migrated from the Host monolith into `event-creator`, plus a **real** Celery worker replacing the monolith's never-deployed stub — new `app/worker.py` async-to-sync task bridge, `redis-url-{qa,prod}` Secret Manager secrets, supervisord running `[program:web]`+`[program:worker]`, `--timeout=3600` for SSE. LLM-failure and zero-new-events paths verified at parity via ported integration tests. Backfilled the stale Slice R7 section in `host-integration-guide.md` |
 | 2026-07-13 | Issue #162 (Slice R7 — Parity 1: Storage + Settings Tabs) implemented: Storage/Notifications/Preferences Settings tabs and storage-provider OAuth connect/disconnect (Google Drive/Dropbox; S3 stub) migrated from the Host monolith into `event-creator`, with the Host reduced to the Settings shell chrome + `hx-get` fragment wiring. New `AppEntry.api_prefixes` field closes #178. Found and fixed a real, previously-masked bug: E2E's `PLAYWRIGHT_BASE_URL` pointed at the Host's bare Cloud Run URL instead of the shared LB domain, so relative htmx fragment fetches never reached `event-creator` through the LB's routing at all |
 | 2026-07-13 | Issue #161 (Slice R6 — Event Creator Scaffold + SSO-Trust Tracer Bullet) implemented: new independent `rustycoopes/event-creator` repo/Cloud Run service (`GET /dashboard`, JWT trust boundary via shared `organizeme_chrome.jwt_verify`, own `event_creator` schema + Alembic history) plus Host prereqs (registry split + merged nav, LB third backend, Secret Manager for `JWT_SECRET`/`ENCRYPTION_KEY`, request-based billing confirmed on both repos). Caught and fixed a stale chrome dependency pin on the Host's own `pyproject.toml` that silently kept the live URL map on the pre-split registry. `COOKIE_DOMAIN` and full cross-domain SSO deferred to Slice R11 |
