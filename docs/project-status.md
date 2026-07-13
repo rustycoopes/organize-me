@@ -1,6 +1,10 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-13 (issue #161 — Slice R6 Event Creator Scaffold + SSO-Trust Tracer Bullet)
+**Last updated:** 2026-07-13 (issue #162 — Slice R7 Parity 1: Storage + Settings Tabs)
+
+For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
+up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
+[`docs/platform-restructure/host-integration-guide.md`](platform-restructure/host-integration-guide.md).
 
 ---
 
@@ -360,12 +364,43 @@ generated URL map silently kept routing `/dashboard` to `organizeme-backend` —
 Host's own pin, re-locking, redeploying, and re-running `provision.sh`. Two lower-priority findings
 deferred as `modelsuggested` Intake issues: #181 (Alembic adoption has no safety net for fresh
 environments) and #182 (non-root Docker user + pin chrome to a commit SHA). See `docs/changelog.md`
-for full detail.
+for full detail. R0–R6's infra/routing/secrets/interface requirements are now consolidated per
+slice in `docs/platform-restructure/host-integration-guide.md` — keep it updated alongside every
+future R-slice.
+
+**Issue #162 (Slice R7 — Parity 1: Storage + Settings Tabs) implemented.** Storage-connection
+(Google Drive / Dropbox / S3) and the Settings tab content (Storage / Notifications /
+Preferences) migrated from the monolith into `event-creator` (branch
+`restructure/r7-parity1-event-creator`, PR #3), with the Host (branch
+`restructure/r7-parity1-host`, PR #184) rendering only the Settings-page shell chrome and
+fetching each tab's content via `hx-get` fragments — closes #178 (`AppEntry.api_prefixes` so the
+LB's URL-map generator routes an app's own API surface, not just nav paths); `organizeme-chrome`
+bumped to `chrome-v0.3.0`. The QA Load Balancer's URL map was re-provisioned to pick up the new
+routes. Multiple bugs caught and fixed post-merge-attempt while chasing CI failures: the GCP
+URL-map `/*` wildcard doesn't match the bare prefix path (both now emitted); htmx only swaps 2xx
+responses, so the "please log back in" fragment moved from 401 to 200; `HostUser` needed to share
+Alembic's `target_metadata` (via an `include_object` filter) rather than a separate
+`DeclarativeBase` for FK resolution; `AppNavItem`/`SettingsTab`/`AppEntry` converted from
+`NamedTuple` to frozen dataclasses (a shared-mutable-default bug on `api_prefixes`); and, found only
+by directly inspecting a Playwright trace's network log, `e2e/playwright.config.ts`/`ci.yml` had
+`PLAYWRIGHT_BASE_URL` pointed at the Host's bare Cloud Run URL instead of the shared LB domain —
+relative `hx-get` fragments resolve against whatever origin the page loaded from, so this silently
+skipped the LB's routing entirely and had been doing so since before R7 (masked until R7 was the
+first slice with e2e coverage that actually exercises cross-service routing). Also found:
+`event-creator`'s `tests/conftest.py` was missing `COOKIE_SECURE=false` (present in the Host's own
+conftest, missed on port), so Secure-flagged CSRF cookies were never resent by httpx's cookie jar
+in tests, failing every OAuth connect/disconnect test. Deferred: #183 (live verification of the
+URL-map wildcard fix) and #185 (Dashboard's "Import pending files" e2e test, skipped until R9 gives
+`event-creator`'s Dashboard real content — it predates R6 and was silently broken since then,
+masked by the same `PLAYWRIGHT_BASE_URL` bug). Both prod deploys succeeded; prod isn't behind the
+shared LB yet (that cutover is R11/R12), so prod-side cross-service Settings routing isn't expected
+to work until then. See `docs/changelog.md` for full detail.
 
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-13 | Issue #162 (Slice R7 — Parity 1: Storage + Settings Tabs) implemented: Storage/Notifications/Preferences Settings tabs and storage-provider OAuth connect/disconnect (Google Drive/Dropbox; S3 stub) migrated from the Host monolith into `event-creator`, with the Host reduced to the Settings shell chrome + `hx-get` fragment wiring. New `AppEntry.api_prefixes` field closes #178. Found and fixed a real, previously-masked bug: E2E's `PLAYWRIGHT_BASE_URL` pointed at the Host's bare Cloud Run URL instead of the shared LB domain, so relative htmx fragment fetches never reached `event-creator` through the LB's routing at all |
 | 2026-07-13 | Issue #161 (Slice R6 — Event Creator Scaffold + SSO-Trust Tracer Bullet) implemented: new independent `rustycoopes/event-creator` repo/Cloud Run service (`GET /dashboard`, JWT trust boundary via shared `organizeme_chrome.jwt_verify`, own `event_creator` schema + Alembic history) plus Host prereqs (registry split + merged nav, LB third backend, Secret Manager for `JWT_SECRET`/`ENCRYPTION_KEY`, request-based billing confirmed on both repos). Caught and fixed a stale chrome dependency pin on the Host's own `pyproject.toml` that silently kept the live URL map on the pre-split registry. `COOKIE_DOMAIN` and full cross-domain SSO deferred to Slice R11 |
 | 2026-07-12 | Issue #159 (Slice R5 — GCP HTTPS Load Balancer + Path Routing + Managed SSL) implemented on branch `restructure/r5-load-balancer`, in an isolated worktree. New `infra/gcp_lb/generate_url_map.py` (pure function, 7 TDD tests in `tests/test_url_map_generator.py`) generates URL-map path rules from the R3 app-registry (`organizeme_chrome.registry`) — Host's fixed auth routes (`/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/profile`) plus each app's nav paths, deduplicated so Host always wins a collision, with a cross-app collision guard (two non-host apps can't claim the same path) and tests parsing the rendered YAML end-to-end. IaC tooling decision (open item in the WBS spec): a `gcloud` shell script (`infra/gcp_lb/provision.sh`), idempotent (existence-checked before each create), matching the existing plain-`gcloud` pattern in `ci.yml`/`deploy.yml` rather than introducing Terraform. Provisions two global static IPs (v4+v6), Cloud DNS A/AAAA records in the `russcoopersoftware-com` zone (R0), a Google-managed SSL cert, a Serverless NEG against `organizeme-qa`, two backend services (`host-backend` + `organizeme-backend`) sharing that NEG until R6 splits Event Creator into its own Cloud Run service, the generated URL map, a target-HTTPS-proxy, and global forwarding rules. **Deliberately not run as part of this PR/CI** — real billable GCP resources plus a managed cert that can take up to ~24h to validate once DNS propagates; `infra/gcp_lb/README.md` documents the manual `provision.sh` run and verification steps, mirroring R0's/R4's manual-operator precedent. `code-review-master` caught and fixed 3 pre-merge bugs (a bash `errexit`-exemption cascade masking a failed `add-backend`, a missing forwarding-rule `--load-balancing-scheme`, bare vs. full-resource-path backend-service references in the generated YAML); one lower-priority finding (generator covers nav paths only, not an app's full route surface) deferred to issue #178 (`modelsuggested`). Full-repo `mypy --strict` clean; `code-quality-guardian` returned no changes requested |
 | 2026-07-12 | Issue #160 (Slice R4 — Domain-Scoped SSO Cookie + Secret Manager) implemented on branch `restructure/r4-domain-cookie-secret-manager`, in an isolated worktree, ahead of R0/R5 landing per an explicit user decision. `app/auth/backend.py` gains a `COOKIE_DOMAIN` env var (mirrors `COOKIE_SECURE`'s import-time-`os.environ` pattern) wired into `CookieTransport(cookie_domain=...)`; blank/unset collapses to `None`, verified byte-for-byte identical to omitting the parameter against the `fastapi_users`/Starlette source. Deliberately left unset in `ci.yml`/`deploy.yml` — QA/prod still serve on `*.run.app` hosts, not the eventual shared-origin hostnames, so setting it now would break login before DNS (R0) + Load Balancer (R5) land; flipping it on later is a one-line env var change, no code change. New `tests/test_auth_backend_cookie_domain.py` (3 tests, `importlib.reload` under patched env vars — confirmed by review not to leak into other test files since every consumer imports `auth_backend`/`cookie_transport` by value). The three "cookie issuance sites" the WBS names (`auth.py`, `storage_google_drive.py`, `storage_dropbox.py`) needed no changes — they set unrelated OAuth CSRF cookies; the real auth cookie flows through the shared `cookie_transport` automatically. Also wires the JWT signing secret via GCP Secret Manager on Cloud Run (`--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest`, replacing the plaintext env-vars-file entry). **Human setup required:** create the `jwt-secret-qa`/`jwt-secret-prod` secrets (seeded with the existing `JWT_SECRET_QA`/`JWT_SECRET_PROD` values) and grant the Cloud Run runtime service account (`170051512639-compute@developer.gserviceaccount.com`) `roles/secretmanager.secretAccessor` on each — `deploy-qa`/`deploy-prod` will fail at the `--set-secrets` step until then. Full suite (488 tests) + `packages/chrome` suite (9 tests) + `mypy --strict` clean; both `code-review-master` and `code-quality-guardian` returned no changes requested |

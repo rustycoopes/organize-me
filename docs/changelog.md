@@ -10,6 +10,32 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #162 implemented — Slice R7: Parity 1 (Storage + Settings Tabs).** Migrates
+  storage-connection (Google Drive / Dropbox / S3) and the Settings tab content (Storage /
+  Notifications / Preferences) from the monolith into `event-creator` (branch
+  `restructure/r7-parity1-event-creator`, PR #3), with the Host (branch
+  `restructure/r7-parity1-host`, PR #184) rendering only the Settings-page shell chrome and
+  fetching each tab's content via `hx-get` fragments. Preferences is a stub tab (no functionality
+  ever existed for it in the monolith); S3 stays a "coming soon" stub (matches the monolith's own
+  never-built write endpoint); Dropbox gets a full Connect/Disconnect UI that the monolith's
+  backend always had but never wired up. The full `StorageProvider` runtime (base/factory/
+  google_drive/dropbox/s3/ephemeral/fake) was ported in this slice, ahead of anything calling it.
+  `AppEntry` gained an `api_prefixes: list[str]` field so the LB's URL-map generator can route an
+  app's own `/api/v1/*` surface, not just its nav pages (closes #178); `organizeme-chrome` bumped
+  to `chrome-v0.3.0`. The QA Load Balancer's URL map was re-provisioned to pick up the new routes.
+  Several bugs were caught and fixed along the way: the GCP URL-map `/*` wildcard doesn't match
+  the bare prefix path (both are now emitted); htmx only swaps 2xx responses, so the "please log
+  back in" fragment moved from 401 to 200; `HostUser` needs to share Alembic's `target_metadata`
+  (via an `include_object` filter) for FK resolution rather than a separate `DeclarativeBase`;
+  `AppNavItem`/`SettingsTab`/`AppEntry` converted from `NamedTuple` to frozen dataclasses to fix a
+  shared-mutable-default bug on `api_prefixes`; `event-creator`'s test suite was missing
+  `COOKIE_SECURE=false` in `tests/conftest.py` (present in the Host's own conftest, missed on
+  port), so Secure-flagged CSRF cookies were never resent by httpx's cookie jar in tests; and
+  `e2e/playwright.config.ts`/`ci.yml` pointed E2E at the Host's bare Cloud Run URL instead of the
+  shared LB domain, so relative `hx-get` fragments never reached `event-creator` at all in CI.
+  Deferred: #183 (live verification of the URL-map wildcard fix) and #185 (Dashboard's "Import
+  pending files" e2e test, skipped until R9 gives `event-creator`'s Dashboard real content — it
+  predates R6 and was silently broken since then).
 - **Issue #161 implemented — Slice R6: Event Creator Scaffold + SSO-Trust Tracer Bullet.**
   Stands up the platform's second Cloud Run service in its own new repo,
   [`rustycoopes/event-creator`](https://github.com/rustycoopes/event-creator), proving the
