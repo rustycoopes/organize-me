@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-12 (issue #159 — Slice R5 GCP HTTPS Load Balancer + Path Routing + Managed SSL)
+**Last updated:** 2026-07-13 (issue #161 — Slice R6 Event Creator Scaffold + SSO-Trust Tracer Bullet)
 
 ---
 
@@ -333,10 +333,40 @@ guard; one lower-priority finding (the generator only covers each app's nav path
 route surface) deferred to issue #178 (`modelsuggested`). Full-repo `mypy --strict` clean; 7 tests
 pass. See `docs/changelog.md` for full detail.
 
+**Slice R6 (Event Creator Scaffold + SSO-Trust Tracer Bullet) implemented.** Issue #161 is
+implemented across two repos: Host prereqs on branch `restructure/r6-host-prereqs` (PR #180,
+merged into `main`), and the new independent
+[`rustycoopes/event-creator`](https://github.com/rustycoopes/event-creator) repo (scaffold on
+`main`, PR #2 merged) — the platform's first second Cloud Run service. `GET /dashboard` on Event
+Creator verifies the Host-issued JWT from the shared `organizeme_auth` cookie
+(`organizeme_chrome.jwt_verify`, same `JWT_SECRET`) and renders the shared chrome, with no call
+back to the Host and no login/session code of its own. Host prereqs: `organizeme_chrome.registry`
+now gives `/dashboard` its own `event-creator` `AppEntry`, `register_chrome()` merges `nav_items`
+across all registered apps so the sidebar stays unified, and `provision.sh`/`.ps1` gained
+`event-creator-backend`/its own Serverless NEG, re-pointing the LB's `/dashboard` URL-map rule at
+it. Event Creator owns the `event_creator` Postgres schema (tables already moved there by R1) with
+its own independent Alembic history, adopted via a no-op baseline migration. Both services'
+`JWT_SECRET`/`ENCRYPTION_KEY` now come from the same GCP Secret Manager secrets, read
+independently with zero network call between them — see
+`docs/platform-restructure/secrets-and-accounts.md` for the full account/secrets flow diagram.
+Confirmed both repos' `deploy.yml`/`ci.yml` use request-based Cloud Run billing (no
+`--no-cpu-throttling`), per an explicit user ask made mid-slice. `COOKIE_DOMAIN` stays unset on
+both services for now — wiring it prematurely broke all 16 login-dependent E2E tests since E2E
+hits the raw `*.run.app` host, not the LB's custom domain; full cross-domain SSO cutover is Slice
+R11's job. A genuine deploy-blocking bug was caught only by verifying the *live* URL map rather
+than trusting a clean `provision.sh` exit: the Host's own `pyproject.toml` was still pinned to
+`organizeme-chrome@chrome-v0.1.1` (only Event Creator's pin had been bumped to v0.2.0), so the
+generated URL map silently kept routing `/dashboard` to `organizeme-backend` — fixed by bumping the
+Host's own pin, re-locking, redeploying, and re-running `provision.sh`. Two lower-priority findings
+deferred as `modelsuggested` Intake issues: #181 (Alembic adoption has no safety net for fresh
+environments) and #182 (non-root Docker user + pin chrome to a commit SHA). See `docs/changelog.md`
+for full detail.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-13 | Issue #161 (Slice R6 — Event Creator Scaffold + SSO-Trust Tracer Bullet) implemented: new independent `rustycoopes/event-creator` repo/Cloud Run service (`GET /dashboard`, JWT trust boundary via shared `organizeme_chrome.jwt_verify`, own `event_creator` schema + Alembic history) plus Host prereqs (registry split + merged nav, LB third backend, Secret Manager for `JWT_SECRET`/`ENCRYPTION_KEY`, request-based billing confirmed on both repos). Caught and fixed a stale chrome dependency pin on the Host's own `pyproject.toml` that silently kept the live URL map on the pre-split registry. `COOKIE_DOMAIN` and full cross-domain SSO deferred to Slice R11 |
 | 2026-07-12 | Issue #159 (Slice R5 — GCP HTTPS Load Balancer + Path Routing + Managed SSL) implemented on branch `restructure/r5-load-balancer`, in an isolated worktree. New `infra/gcp_lb/generate_url_map.py` (pure function, 7 TDD tests in `tests/test_url_map_generator.py`) generates URL-map path rules from the R3 app-registry (`organizeme_chrome.registry`) — Host's fixed auth routes (`/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/profile`) plus each app's nav paths, deduplicated so Host always wins a collision, with a cross-app collision guard (two non-host apps can't claim the same path) and tests parsing the rendered YAML end-to-end. IaC tooling decision (open item in the WBS spec): a `gcloud` shell script (`infra/gcp_lb/provision.sh`), idempotent (existence-checked before each create), matching the existing plain-`gcloud` pattern in `ci.yml`/`deploy.yml` rather than introducing Terraform. Provisions two global static IPs (v4+v6), Cloud DNS A/AAAA records in the `russcoopersoftware-com` zone (R0), a Google-managed SSL cert, a Serverless NEG against `organizeme-qa`, two backend services (`host-backend` + `organizeme-backend`) sharing that NEG until R6 splits Event Creator into its own Cloud Run service, the generated URL map, a target-HTTPS-proxy, and global forwarding rules. **Deliberately not run as part of this PR/CI** — real billable GCP resources plus a managed cert that can take up to ~24h to validate once DNS propagates; `infra/gcp_lb/README.md` documents the manual `provision.sh` run and verification steps, mirroring R0's/R4's manual-operator precedent. `code-review-master` caught and fixed 3 pre-merge bugs (a bash `errexit`-exemption cascade masking a failed `add-backend`, a missing forwarding-rule `--load-balancing-scheme`, bare vs. full-resource-path backend-service references in the generated YAML); one lower-priority finding (generator covers nav paths only, not an app's full route surface) deferred to issue #178 (`modelsuggested`). Full-repo `mypy --strict` clean; `code-quality-guardian` returned no changes requested |
 | 2026-07-12 | Issue #160 (Slice R4 — Domain-Scoped SSO Cookie + Secret Manager) implemented on branch `restructure/r4-domain-cookie-secret-manager`, in an isolated worktree, ahead of R0/R5 landing per an explicit user decision. `app/auth/backend.py` gains a `COOKIE_DOMAIN` env var (mirrors `COOKIE_SECURE`'s import-time-`os.environ` pattern) wired into `CookieTransport(cookie_domain=...)`; blank/unset collapses to `None`, verified byte-for-byte identical to omitting the parameter against the `fastapi_users`/Starlette source. Deliberately left unset in `ci.yml`/`deploy.yml` — QA/prod still serve on `*.run.app` hosts, not the eventual shared-origin hostnames, so setting it now would break login before DNS (R0) + Load Balancer (R5) land; flipping it on later is a one-line env var change, no code change. New `tests/test_auth_backend_cookie_domain.py` (3 tests, `importlib.reload` under patched env vars — confirmed by review not to leak into other test files since every consumer imports `auth_backend`/`cookie_transport` by value). The three "cookie issuance sites" the WBS names (`auth.py`, `storage_google_drive.py`, `storage_dropbox.py`) needed no changes — they set unrelated OAuth CSRF cookies; the real auth cookie flows through the shared `cookie_transport` automatically. Also wires the JWT signing secret via GCP Secret Manager on Cloud Run (`--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest`, replacing the plaintext env-vars-file entry). **Human setup required:** create the `jwt-secret-qa`/`jwt-secret-prod` secrets (seeded with the existing `JWT_SECRET_QA`/`JWT_SECRET_PROD` values) and grant the Cloud Run runtime service account (`170051512639-compute@developer.gserviceaccount.com`) `roles/secretmanager.secretAccessor` on each — `deploy-qa`/`deploy-prod` will fail at the `--set-secrets` step until then. Full suite (488 tests) + `packages/chrome` suite (9 tests) + `mypy --strict` clean; both `code-review-master` and `code-quality-guardian` returned no changes requested |
 | 2026-07-12 | Issue #157 (Slice R3 — Extract Shared Chrome/Theme Package + App-Registry) implemented on branch `feature/restructure-r3-chrome-package`, in an isolated worktree. New `packages/chrome/` package (`organizeme-chrome`, own `pyproject.toml`/pytest/`mypy --strict`) owns the sidebar/header/Settings-tab-bar Jinja templates (moved verbatim), the Tailwind/DaisyUI theme strings, the app-registry (nav items + Settings tabs per hosted app, replacing `app/pages/nav.py`), and a standalone PyJWT-based JWT-verify helper (signature + expiry + audience only — no fastapi-users import, no network call) for a future hosted app to depend on for identity. The Settings tab-bar was generalized from hardcoded Storage/Notifications markup into a data-driven `settings_tab_bar(tabs)` macro. Host wires up via `organizeme_chrome.register_chrome()` in `app/core/templating.py`; every page template now extends the package's `chrome_base.html`/`chrome_authenticated_base.html`. Host pins the package as a git-tag dependency (not GitHub's beta PyPI registry, to avoid extra auth-token plumbing); new `.github/workflows/publish-chrome.yml` publishes a versioned wheel/sdist to a GitHub Release on `chrome-v*` tag push. `tests/test_sidebar.py` (unchanged) remains the byte-for-byte render-parity check; new `tests/test_chrome_jwt_interop.py` proves a real Host-issued cookie verifies via the package helper. `mypy --strict` clean across both the Host and the package. Local CI was initially blocked by Slice R2 (#158, below) stamping the shared QA database ahead of this branch's own migration history mid-flight; resolved by merging `main` (with R2 merged) into this branch |

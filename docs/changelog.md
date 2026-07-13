@@ -10,6 +10,41 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #161 implemented — Slice R6: Event Creator Scaffold + SSO-Trust Tracer Bullet.**
+  Stands up the platform's second Cloud Run service in its own new repo,
+  [`rustycoopes/event-creator`](https://github.com/rustycoopes/event-creator), proving the
+  Host↔Event Creator trust boundary end-to-end: `GET /dashboard` verifies the Host-issued JWT
+  (`organizeme_chrome.jwt_verify`, HS256, shared `JWT_SECRET`) from the `organizeme_auth` cookie
+  and renders the shared chrome + a placeholder Dashboard body, with **no** call back to the Host
+  and no login/session code of its own. Three prerequisite gaps in the Host repo were closed as
+  part of this slice (branch `restructure/r6-host-prereqs`, PR #180): the app-registry
+  (`organizeme_chrome.registry`) now has a dedicated `event-creator` `AppEntry` owning
+  `/dashboard`, `register_chrome()` merges `nav_items` across **all** registered apps (not just
+  the caller's own) so every service still renders the identical unified sidebar, and
+  `infra/gcp_lb/provision.sh`/`.ps1` gained a third backend service (`event-creator-backend`) wired
+  to a new Serverless NEG — turning the LB URL map's `/dashboard` rule from `organizeme-backend`
+  over to Event Creator's own service. Event Creator owns the `event_creator` Postgres schema
+  (tables already moved there by the Host's R1 migration) with its own independent Alembic history
+  (`event_creator.alembic_version`), adopted via a deliberate no-op baseline migration. Both repos'
+  `JWT_SECRET` and `ENCRYPTION_KEY` now come from the same GCP Secret Manager secrets
+  (`jwt-secret-{qa,prod}` / `encryption-key-{qa,prod}`) via `--set-secrets`, read independently by
+  each service with zero network call between them — documented in full, with a mermaid diagram of
+  the secrets/accounts/request flow, in `docs/platform-restructure/secrets-and-accounts.md`. Per an
+  explicit user ask made mid-slice, both repos' `deploy.yml`/`ci.yml` were also audited to confirm
+  neither uses `--no-cpu-throttling` on `gcloud run deploy` (instance-based billing) — Cloud Run
+  billing for both services is request-based only. `COOKIE_DOMAIN` was deliberately **not** wired
+  into either service yet: an early attempt broke all 16 login-dependent E2E tests, since E2E hits
+  the raw `*.run.app` host rather than the LB's custom domain and a domain-scoped cookie never
+  reaches it — full cross-domain SSO cutover (custom-domain E2E, `COOKIE_DOMAIN` live) is Slice
+  R11's job, not this tracer bullet's. A genuine deploy-blocking bug was caught and fixed during
+  first-deploy troubleshooting: the Host's own `pyproject.toml` was still pinned to
+  `organizeme-chrome@chrome-v0.1.1` (only Event Creator's pin had been bumped to v0.2.0), so
+  `infra/gcp_lb/generate_url_map.py` silently generated the URL map from the stale pre-split
+  registry even after `provision.sh` ran successfully — caught by verifying the *live* URL map
+  content rather than trusting a clean script exit, fixed by bumping the Host's own pin, re-locking,
+  and re-running `provision.sh`. Two lower-priority findings deferred as `modelsuggested` Intake
+  issues: #181 (Alembic adoption has no safety net for fresh environments) and #182 (non-root
+  Docker user + pin chrome to a commit SHA rather than a mutable tag).
 - **Issue #159 implemented — Slice R5: GCP HTTPS Load Balancer + Path Routing + Managed SSL**
   (branch `restructure/r5-load-balancer`). Provisions the shared External HTTPS Load Balancer that
   will front `organizeme.qa.russcoopersoftware.com`. New `infra/gcp_lb/generate_url_map.py` is a
