@@ -134,9 +134,10 @@ jobs:
     needs: deploy-qa
     runs-on: ubuntu-latest
     env:
-      # The QA Cloud Run URL the freshly-deployed revision now serves. Kept in sync with the
-      # GOOGLE_OAUTH_REDIRECT_URI host above and e2e/playwright.config.ts's fallback.
-      PLAYWRIGHT_BASE_URL: https://organizeme-qa-170051512639.northamerica-northeast1.run.app
+      # The shared Load Balancer's QA custom domain, not the Host's Cloud Run URL directly - see
+      # e2e/playwright.config.ts's docstring for why (R7's cross-service htmx fragments need the
+      # LB's URL-map routing, which the bare Cloud Run URL bypasses entirely).
+      PLAYWRIGHT_BASE_URL: https://organizeme.qa.russcoopersoftware.com
     defaults:
       run:
         working-directory: e2e
