@@ -19,7 +19,7 @@ jobs:
       JWT_SECRET: ${{ secrets.JWT_SECRET_QA }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
+      GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/auth/google/callback
       # Dropbox OAuth app (Slice 8.1, #93). Tests never call out to Dropbox (fakes/dependency
       # overrides), so these have no effect on pass/fail - set for parity with the other providers
       # once a Dropbox app is registered (see .env.local.example).
@@ -85,7 +85,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-qa-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
+          GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/auth/google/callback
           DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
           DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
