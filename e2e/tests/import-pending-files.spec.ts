@@ -24,13 +24,10 @@ test.describe('Import pending files', () => {
     await expect(page.getByText('No pending files found in your storage watch folder.')).toBeVisible();
   });
 
-  // Skipped since Slice R6: /dashboard now routes to Event Creator's own placeholder page (real
-  // Dashboard content, including this button, lands in the R9 parity slice - see
-  // app/pages/dashboard.py in the event-creator repo). This only started actually failing once
-  // e2e's PLAYWRIGHT_BASE_URL was fixed (R7) to go through the shared LB instead of hitting the
-  // Host's Cloud Run URL directly, which had been masking the routing change. Re-enable once R9
-  // gives event-creator's Dashboard this button - see issue #185.
-  test.skip('is enabled and reports no pending files on the Dashboard page', async ({ page }) => {
+  // Re-enabled in Slice R9 (#164/#185): /dashboard now serves Event Creator's real Dashboard,
+  // including the "Import pending files" button (app/pages/dashboard.py + partials/
+  // import_pending_button.html in the event-creator repo).
+  test('is enabled and reports no pending files on the Dashboard page', async ({ page }) => {
     await registerNewUser(page, 'import-pending-dashboard');
     await page.goto('/dashboard');
 

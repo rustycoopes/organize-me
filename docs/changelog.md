@@ -10,6 +10,31 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #164 implemented — Slice R9: Parity 3 (Dashboard + Events + Prompt).** Completes
+  functional parity: the events dashboard (type/date-range/free-text filters, sort toggle,
+  pagination, per-event Google Calendar/Tasks quick-add links, delete-with-confirm, a reviewed
+  toggle, and the three-step Getting Started onboarding checklist) and the Prompt page
+  (view/edit/reset, lazily seeding the factory-default extraction prompt) move from the monolith
+  into `event-creator` (branch `restructure/r9-parity3-dashboard`), replacing the R6 tracer
+  bullet's placeholder `/dashboard` body. Ported near-verbatim: `app/core/calendar_url.py`
+  (Google Calendar's `render?action=TEMPLATE` convention; Tasks has no documented URL scheme, so
+  that link is best-effort), `app/core/onboarding.py`, `app/core/initials.py` (agreed-by initials
+  chips), the `events`/`llm-prompt` API routers, and both page templates — adapted to this repo's
+  Host-JWT auth (`app.core.auth.current_user_id[_optional]`) instead of a fastapi-users
+  `current_active_user` rewrite. The onboarding checklist reads the R2 `event_creator.
+  user_settings` flags that R7/R8's storage-connect/notification/upload write-paths already flip —
+  no new column needed. Also wired the "Import pending files" button onto the real Dashboard (its
+  API endpoint has existed since R8 with no UI entry point until now) and re-enabled
+  `e2e/tests/import-pending-files.spec.ts`'s Dashboard-page case (issue #185), skipped since R7
+  exposed that `/dashboard` had routed to Event Creator since R6 with no real button to click.
+  `/prompt` is a genuinely new Event Creator route, but unlike `/dashboard`'s R6 tracer-bullet
+  cutover, its Load-Balancer app-registry entry stays under the Host for now — full-page-route
+  cutover for `/prompt`/`/upload`/`/processing`/`/logs` is deliberately deferred to the **R11 QA
+  Cutover** slice, so the Host's own `/prompt` keeps serving live traffic until then. The
+  monolith's post-login redirect still hardcodes `/profile` rather than `/dashboard` — a
+  pre-existing gap the WBS flagged, not something this slice introduced; left as its own follow-up
+  (filed as a GitHub issue) rather than folded in here, since repointing it is a user-visible
+  auth-flow change with its own risk profile. `mypy --strict` clean across the full repo.
 - **Issue #163 implemented — Slice R8: Parity 2 (Upload + Pipeline + Processing + Logs).**
   Migrates the heaviest feature area — file intake, the 7-step extraction pipeline, live SSE
   progress, processing history/logs, and notification dispatch — from the monolith into
