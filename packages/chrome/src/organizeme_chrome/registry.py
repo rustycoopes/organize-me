@@ -45,8 +45,9 @@ class AppEntry:
 APPS: list[AppEntry] = [
     # R6: /dashboard is now served by the independent event-creator service (the Host↔Event
     # Creator boundary tracer bullet). Listed first so the merged sidebar nav (see
-    # templating.register_chrome) keeps Dashboard in its original position, ahead of the
-    # still-Host-served pages below.
+    # templating.register_chrome) keeps Dashboard in its original position. R11 below moved the
+    # rest of this app's nav here too, so as of that slice every entry in this list is
+    # event-creator-served, not just Dashboard.
     AppEntry(
         service_name="event-creator",
         nav=[
@@ -78,12 +79,14 @@ APPS: list[AppEntry] = [
         # (GET /settings/event-creator/{storage,notifications,preferences}) the Host's Settings
         # shell fetches via HTMX (see app/pages/settings.py).
         #
-        # R11: the API/fragment surface behind Upload/Processing/Logs/Prompt above - "/processing-
-        # runs" (bare) covers both the page route GET /processing-runs/{id} and the API router's
-        # own /api/v1/processing-runs* endpoints share that same leading segment, so one prefix
-        # entry (plus its /* wildcard, added automatically - see generate_url_map.py's
-        # _prefix_patterns) covers both; "/api/html/processing-runs" is the HTMX log-partial
-        # fragment route the Processing detail page fetches (app/pages/processing.py in
+        # R11: the API/fragment surface behind Upload/Processing/Logs/Prompt above. "/api/v1/
+        # processing-runs" and "/processing-runs" are two separate entries (each also gets its own
+        # "/*" wildcard - see generate_url_map.py's _prefix_patterns) because prefix matching is an
+        # exact string match, not path-segment-aware: "/processing-runs" does NOT match "/api/v1/
+        # processing-runs" (it doesn't start with that string), so the page route (GET
+        # /processing-runs/{id}) and the API router's own /api/v1/processing-runs* endpoints each
+        # need their own entry - neither is redundant. "/api/html/processing-runs" is the HTMX
+        # log-partial fragment route the Processing detail page fetches (app/pages/processing.py in
         # event-creator, not under /api/v1).
         api_prefixes=[
             "/api/v1/storage-config",

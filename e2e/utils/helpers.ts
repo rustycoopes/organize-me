@@ -50,6 +50,37 @@ export async function logout(page: Page): Promise<void> {
 }
 
 /**
+ * Upload a file through the real Upload page and wait for the redirect to the live progress page.
+ * Doesn't wait for a terminal state - callers that need to assert on the run's outcome should use
+ * `uploadFileAndWaitForCompletion` below, or (like processing.spec.ts) interleave their own
+ * mid-flight assertions between this and a terminal-state wait.
+ */
+export async function uploadFile(page: Page, filename: string, content: string): Promise<void> {
+  await page.goto('/upload');
+  await page.locator('#file-input').setInputFiles({
+    name: filename,
+    mimeType: 'text/plain',
+    buffer: Buffer.from(content),
+  });
+  await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
+}
+
+/**
+ * Upload a file and wait for the pipeline to reach a successful terminal state, via the upload ->
+ * /processing?run= -> SSE-success pattern proven by processing.spec.ts. E2E_TEST_MODE's fake
+ * Gemini client deterministically extracts 2 events for any input, so every run started this way
+ * succeeds.
+ */
+export async function uploadFileAndWaitForCompletion(
+  page: Page,
+  filename: string,
+  content: string,
+): Promise<void> {
+  await uploadFile(page, filename, content);
+  await expect(page.locator('[data-run-status="success"]')).toBeVisible({ timeout: 45_000 });
+}
+
+/**
  * Fetch a currently-valid password-reset token for an email via the test-only backend endpoint
  * (gated behind E2E_TEST_MODE on QA). Replaces reading a real inbox.
  */

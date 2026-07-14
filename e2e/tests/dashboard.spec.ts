@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { registerNewUser } from '../utils/helpers';
+import { registerNewUser, uploadFileAndWaitForCompletion } from '../utils/helpers';
 
 /**
  * Slice R11 (#166) — the events dashboard had no dedicated e2e coverage (only backend/httpx
@@ -11,23 +11,13 @@ import { registerNewUser } from '../utils/helpers';
  * "E2E test — swim meet." (Activity), see app.services.llm.gemini.E2E_FAKE_EXTRACTION_PAYLOAD in
  * the event-creator repo - deterministic events to assert against, no need to fabricate fixture
  * data directly against the DB) and waits for the pipeline to finish, matching
- * processing.spec.ts's proven pattern, then exercises the dashboard's table/filter/sort/delete.
+ * processing.spec.ts's proven pattern (via e2e/utils/helpers.ts), then exercises the dashboard's
+ * table/filter/sort/delete.
  */
-async function uploadAndWaitForCompletion(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/upload');
-  await page.locator('#file-input').setInputFiles({
-    name: 'chat.txt',
-    mimeType: 'text/plain',
-    buffer: Buffer.from('E2E dashboard test conversation.\n'),
-  });
-  await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
-  await expect(page.locator('[data-run-status="success"]')).toBeVisible({ timeout: 45_000 });
-}
-
 test.describe('Events dashboard', () => {
   test('shows extracted events with calendar/tasks links and initials chips', async ({ page }) => {
     await registerNewUser(page, 'dashboard-table');
-    await uploadAndWaitForCompletion(page);
+    await uploadFileAndWaitForCompletion(page, 'chat.txt', 'E2E dashboard test conversation.\n');
 
     await page.goto('/dashboard');
 
@@ -50,7 +40,7 @@ test.describe('Events dashboard', () => {
 
   test('type filter narrows the table without a full page reload', async ({ page }) => {
     await registerNewUser(page, 'dashboard-filter');
-    await uploadAndWaitForCompletion(page);
+    await uploadFileAndWaitForCompletion(page, 'chat.txt', 'E2E dashboard test conversation.\n');
     await page.goto('/dashboard');
 
     await page.locator('#filter-type').selectOption('School');
@@ -63,7 +53,7 @@ test.describe('Events dashboard', () => {
 
   test('sort toggle reverses the events order', async ({ page }) => {
     await registerNewUser(page, 'dashboard-sort');
-    await uploadAndWaitForCompletion(page);
+    await uploadFileAndWaitForCompletion(page, 'chat.txt', 'E2E dashboard test conversation.\n');
     await page.goto('/dashboard');
 
     await expect(page.locator('#events-table tbody tr').first()).toContainText('swim meet');
@@ -78,7 +68,7 @@ test.describe('Events dashboard', () => {
 
   test('delete removes an event behind a confirm dialog', async ({ page }) => {
     await registerNewUser(page, 'dashboard-delete');
-    await uploadAndWaitForCompletion(page);
+    await uploadFileAndWaitForCompletion(page, 'chat.txt', 'E2E dashboard test conversation.\n');
     await page.goto('/dashboard');
 
     const row = page.locator('#events-table tbody tr', { hasText: 'swim meet' });

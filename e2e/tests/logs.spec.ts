@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { registerNewUser } from '../utils/helpers';
+import { registerNewUser, uploadFileAndWaitForCompletion } from '../utils/helpers';
 
 /**
  * Slice R11 (#166) — the Processing History / Logs grid had no dedicated e2e coverage. Added
@@ -12,15 +12,7 @@ import { registerNewUser } from '../utils/helpers';
 test.describe('Logs (processing history)', () => {
   test('lists a completed run in the grid with its status and event count', async ({ page }) => {
     await registerNewUser(page, 'logs-grid');
-
-    await page.goto('/upload');
-    await page.locator('#file-input').setInputFiles({
-      name: 'chat.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('E2E logs test conversation.\n'),
-    });
-    await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
-    await expect(page.locator('[data-run-status="success"]')).toBeVisible({ timeout: 45_000 });
+    await uploadFileAndWaitForCompletion(page, 'chat.txt', 'E2E logs test conversation.\n');
 
     await page.goto('/logs');
 
@@ -34,15 +26,7 @@ test.describe('Logs (processing history)', () => {
     page,
   }) => {
     await registerNewUser(page, 'logs-detail');
-
-    await page.goto('/upload');
-    await page.locator('#file-input').setInputFiles({
-      name: 'detail-chat.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('E2E logs detail test conversation.\n'),
-    });
-    await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
-    await expect(page.locator('[data-run-status="success"]')).toBeVisible({ timeout: 45_000 });
+    await uploadFileAndWaitForCompletion(page, 'detail-chat.txt', 'E2E logs detail test conversation.\n');
 
     await page.goto('/logs');
     await page.locator('#logs-grid tbody tr', { hasText: 'detail-chat.txt' }).click();
@@ -57,15 +41,7 @@ test.describe('Logs (processing history)', () => {
 
   test('status filter narrows the grid to matching runs', async ({ page }) => {
     await registerNewUser(page, 'logs-filter');
-
-    await page.goto('/upload');
-    await page.locator('#file-input').setInputFiles({
-      name: 'filter-chat.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('E2E logs filter test conversation.\n'),
-    });
-    await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
-    await expect(page.locator('[data-run-status="success"]')).toBeVisible({ timeout: 45_000 });
+    await uploadFileAndWaitForCompletion(page, 'filter-chat.txt', 'E2E logs filter test conversation.\n');
 
     await page.goto('/logs');
     await page.locator('#filter-status').selectOption('success');
