@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-13 (issue #164 — Slice R9 Parity 3: Dashboard + Events + Prompt)
+**Last updated:** 2026-07-14 (issue #166 — Slice R11 QA Cutover + Full Verification)
 
 For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
 up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
@@ -445,10 +445,36 @@ not something R9 introduced) — left as a follow-up rather than folded into thi
 repointing it is a user-visible auth-flow change with its own risk profile. `mypy --strict` clean
 across the full repo.
 
+**Issue #165 (Slice R10 — Host↔Event Creator Boundary E2E Test Suite) implemented.** New
+`e2e/tests/host-event-creator-boundary.spec.ts` proves the seams the platform split created still
+hold: logout at the Host clears the cookie Event Creator relies on for auth, and Event Creator's
+JWT trust rejects a garbage cookie value and a tampered-signature token (forged with a throwaway
+secret via a new `e2e/utils/jwt.ts` helper — never touches the real signing key). Login-once SSO
+and no-cookie rejection were already covered by `sidebar.spec.ts`; the Host-Profile-field →
+Event-Creator-dependency criterion was already covered by `notifications.spec.ts` — documented in
+the new spec rather than duplicated. Event Creator's own CI gained a new `e2e-boundary-qa` job
+running this same spec against live QA. Account-deletion cascade to Event Creator's own schema
+was asserted directly at the DB level (a cascade test per `event_creator` table FK'd to
+`host.users`), since it isn't observable over Event Creator's stateless JWT trust boundary.
+
+**Issue #166 (Slice R11 — QA Cutover + Full Verification, P0 Gate) implemented.** The actual
+routing cutover: `/upload`, `/processing`, `/logs`, `/prompt` (plus their API/fragment surfaces)
+moved from the Host to `event-creator` in the app-registry, the QA Load Balancer's URL map was
+regenerated and re-imported live, and the full verification battery ran green. Caught two
+previously-undetected gaps during the "compare against acceptance criteria" pass: Event Creator
+never got an `/upload` **page** (only the API, from R8 — backfilled here), and Event Creator's own
+`organizeme-chrome` pin had silently drifted to `chrome-v0.2.0` (two versions stale, zero observed
+effect purely by coincidence — see `host-integration-guide.md`'s R11 section for why). Closed the
+PRD-story-13–52 e2e coverage gap with three new routing-agnostic specs (`dashboard.spec.ts`,
+`logs.spec.ts`, `upload.spec.ts`) that pass whether Host or Event Creator serves the request —
+proving behavioural parity was the actual point. `organizeme-chrome` bumped to `chrome-v0.4.0`.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-14 | Issue #166 (Slice R11 — QA Cutover + Full Verification, P0 Gate) implemented: `/upload`/`/processing`/`/logs`/`/prompt` routing cut over from the Host to `event-creator` in the app-registry and the live QA Load Balancer URL map; backfilled a missing `/upload` page in `event-creator` and fixed its stale `organizeme-chrome` pin (chrome-v0.2.0 → v0.4.0); closed the PRD-story-13–52 e2e coverage gap with `dashboard.spec.ts`/`logs.spec.ts`/`upload.spec.ts` |
+| 2026-07-14 | Issue #165 (Slice R10 — Host↔Event Creator Boundary E2E Test Suite) implemented: `host-event-creator-boundary.spec.ts` (logout propagation, garbage-cookie/tampered-token rejection) plus DB-level account-deletion-cascade tests in `event-creator`; new `e2e-boundary-qa` job in `event-creator`'s own CI |
 | 2026-07-13 | Issue #164 (Slice R9 — Parity 3: Dashboard + Events + Prompt) implemented: the events dashboard (filter/sort/search/paginate, Calendar/Tasks links, delete, reviewed toggle, Getting Started onboarding checklist) and the Prompt page (view/edit/reset) migrated from the Host monolith into `event-creator`, replacing R6's placeholder Dashboard body and completing functional parity. Re-enabled `e2e/tests/import-pending-files.spec.ts`'s Dashboard-page case (issue #185). `/prompt`'s LB app-registry cutover deferred to R11, same as `/upload`/`/processing`/`/logs` |
 | 2026-07-13 | Issue #163 (Slice R8 — Parity 2: Upload + Pipeline + Processing + Logs) implemented: upload, the 7-step extraction pipeline, live SSE progress, processing history/logs, and notification dispatch migrated from the Host monolith into `event-creator`, plus a **real** Celery worker replacing the monolith's never-deployed stub — new `app/worker.py` async-to-sync task bridge, `redis-url-{qa,prod}` Secret Manager secrets, supervisord running `[program:web]`+`[program:worker]`, `--timeout=3600` for SSE. LLM-failure and zero-new-events paths verified at parity via ported integration tests. Backfilled the stale Slice R7 section in `host-integration-guide.md` |
 | 2026-07-13 | Issue #162 (Slice R7 — Parity 1: Storage + Settings Tabs) implemented: Storage/Notifications/Preferences Settings tabs and storage-provider OAuth connect/disconnect (Google Drive/Dropbox; S3 stub) migrated from the Host monolith into `event-creator`, with the Host reduced to the Settings shell chrome + `hx-get` fragment wiring. New `AppEntry.api_prefixes` field closes #178. Found and fixed a real, previously-masked bug: E2E's `PLAYWRIGHT_BASE_URL` pointed at the Host's bare Cloud Run URL instead of the shared LB domain, so relative htmx fragment fetches never reached `event-creator` through the LB's routing at all |

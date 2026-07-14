@@ -45,12 +45,23 @@ class AppEntry:
 APPS: list[AppEntry] = [
     # R6: /dashboard is now served by the independent event-creator service (the Host↔Event
     # Creator boundary tracer bullet). Listed first so the merged sidebar nav (see
-    # templating.register_chrome) keeps Dashboard in its original position, ahead of the
-    # still-Host-served pages below.
+    # templating.register_chrome) keeps Dashboard in its original position. R11 below moved the
+    # rest of this app's nav here too, so as of that slice every entry in this list is
+    # event-creator-served, not just Dashboard.
     AppEntry(
         service_name="event-creator",
         nav=[
             AppNavItem("/dashboard", "Dashboard"),
+            # R11 (QA cutover, #166): Upload/Processing/Logs/Prompt move here from "organizeme" -
+            # R7-R9 built full parity implementations of each in Event Creator, but deliberately
+            # kept the Host as the live-routed owner until this slice's full verification battery
+            # (docs/prd.md stories 13-52, the R10 boundary suite) could run green. The Host's own
+            # copies of these pages/endpoints are now unreachable through the LB but are left in
+            # place (not deleted) - that cleanup is R13's job, not this one's.
+            AppNavItem("/upload", "Upload"),
+            AppNavItem("/processing", "Processing"),
+            AppNavItem("/logs", "Logs"),
+            AppNavItem("/prompt", "Prompt"),
         ],
         # R7: Storage + Notifications move here from "organizeme" — the storage-connection and
         # settings functionality migrated into Event Creator (docs/platform-restructure/WBS/
@@ -67,19 +78,32 @@ APPS: list[AppEntry] = [
         # (GET/PATCH /api/v1/user-settings), and the Settings tab-content fragment routes
         # (GET /settings/event-creator/{storage,notifications,preferences}) the Host's Settings
         # shell fetches via HTMX (see app/pages/settings.py).
+        #
+        # R11: the API/fragment surface behind Upload/Processing/Logs/Prompt above. "/api/v1/
+        # processing-runs" and "/processing-runs" are two separate entries (each also gets its own
+        # "/*" wildcard - see generate_url_map.py's _prefix_patterns) because prefix matching is an
+        # exact string match, not path-segment-aware: "/processing-runs" does NOT match "/api/v1/
+        # processing-runs" (it doesn't start with that string), so the page route (GET
+        # /processing-runs/{id}) and the API router's own /api/v1/processing-runs* endpoints each
+        # need their own entry - neither is redundant. "/api/html/processing-runs" is the HTMX
+        # log-partial fragment route the Processing detail page fetches (app/pages/processing.py in
+        # event-creator, not under /api/v1).
         api_prefixes=[
             "/api/v1/storage-config",
             "/api/v1/user-settings",
             "/settings/event-creator",
+            "/api/v1/events",
+            "/api/v1/llm-prompt",
+            "/api/v1/upload",
+            "/api/v1/import-pending-files",
+            "/api/v1/processing-runs",
+            "/processing-runs",
+            "/api/html/processing-runs",
         ],
     ),
     AppEntry(
         service_name="organizeme",
         nav=[
-            AppNavItem("/upload", "Upload"),
-            AppNavItem("/processing", "Processing"),
-            AppNavItem("/logs", "Logs"),
-            AppNavItem("/prompt", "Prompt"),
             AppNavItem("/settings", "Settings"),
             AppNavItem("/profile", "Profile"),
         ],

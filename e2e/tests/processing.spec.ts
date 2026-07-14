@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { registerNewUser } from '../utils/helpers';
+import { registerNewUser, uploadFile } from '../utils/helpers';
 
 /**
  * Slice 4.2 (#53) — live pipeline progress.
@@ -18,15 +18,8 @@ test.describe('Processing progress page', () => {
 
     // Upload a small conversation. Under E2E_TEST_MODE the dropzone is enabled without a real
     // Drive connection, and the hidden file input feeds the same submit path as drag-and-drop.
-    await page.goto('/upload');
-    await page.locator('#file-input').setInputFiles({
-      name: 'chat.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('E2E processing test conversation.\n'),
-    });
-
     // The upload page follows the run to the live progress page.
-    await expect(page).toHaveURL(/\/processing\?run=/, { timeout: 30_000 });
+    await uploadFile(page, 'chat.txt', 'E2E processing test conversation.\n');
 
     // The 7 step indicators render...
     for (let n = 1; n <= 7; n++) {
