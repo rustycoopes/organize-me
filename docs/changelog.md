@@ -10,6 +10,38 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #166 implemented — Slice R11: QA Cutover + Full Verification (P0 Gate).** The routing
+  cutover the R6-R9 parity slices deferred: `packages/chrome/src/organizeme_chrome/registry.py`'s
+  `event-creator` entry gains `/upload`, `/processing`, `/logs`, `/prompt` and their API/fragment
+  `api_prefixes` (moved off the Host's own entry); the QA Load Balancer's URL map was regenerated
+  from the updated registry and re-imported live. The Host's own copies of these pages/endpoints
+  are left in place, now simply unreachable — removal is R13's job. Two previously-undetected gaps
+  surfaced during this slice's "compare against acceptance criteria" pass, both fixed before
+  cutover: Event Creator never got an `/upload` **page** (only the `POST /api/v1/upload` API,
+  ported in R8 — R8's own tests only needed the API, so the missing page went unnoticed until R11
+  tried to route real browser traffic at it); and Event Creator's own `organizeme-chrome` pin had
+  silently drifted to `chrome-v0.2.0` (two versions stale) with zero observed effect, purely by
+  coincidence — see `docs/platform-restructure/host-integration-guide.md`'s R11 section for the
+  full explanation. `organizeme-chrome` bumped to `chrome-v0.4.0`; both this repo's and
+  `event-creator`'s pins updated. Closed the PRD-story-13–52 e2e coverage gap (upload, the events
+  dashboard, and processing-history logs previously had no browser-level tests) with three new
+  specs — `dashboard.spec.ts`, `logs.spec.ts`, `upload.spec.ts` — all deliberately routing-agnostic
+  (asserting observable page behaviour, not which backend served the request), so they pass
+  whether Host or Event Creator answers, proving behavioural parity was the point. Independent-
+  deploy proof: already naturally demonstrated by R6-R10's git/CI history (each repo deployed
+  repeatedly without touching the other's build).
+- **Issue #165 implemented — Slice R10: Host↔Event Creator Boundary E2E Test Suite.** New
+  `e2e/tests/host-event-creator-boundary.spec.ts` proves the seams the platform split created
+  still hold: logout at the Host clears the cookie Event Creator relies on for auth, and Event
+  Creator's JWT trust rejects a garbage cookie value and a tampered-signature token (forged with a
+  throwaway secret via new `e2e/utils/jwt.ts` — never touches the real signing key). Login-once
+  SSO and no-cookie rejection were already covered by `sidebar.spec.ts`; the Host-Profile-field →
+  Event-Creator-dependency criterion was already covered by `notifications.spec.ts` — documented
+  in the new spec rather than duplicated. `event-creator`'s own CI gained a new `e2e-boundary-qa`
+  job running this same spec against live QA after `deploy-qa`. Account-deletion cascade to Event
+  Creator's own schema was asserted directly at the DB level (a cascade test per `event_creator`
+  table with a direct FK to `host.users`), since it isn't observable over Event Creator's
+  stateless JWT trust boundary (it never queries the Host's `users` table at all).
 - **Issue #164 implemented — Slice R9: Parity 3 (Dashboard + Events + Prompt).** Completes
   functional parity: the events dashboard (type/date-range/free-text filters, sort toggle,
   pagination, per-event Google Calendar/Tasks quick-add links, delete-with-confirm, a reviewed

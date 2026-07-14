@@ -263,23 +263,106 @@ still pending.
     its own reviewed follow-up than folded into this slice — see the GitHub issue filed alongside
     this slice's PR.
 
-## Slices R10–R13 — not yet landed
+## Slice R10 — Host↔Event Creator boundary E2E test suite
 
-Per `docs/project-status.md`, R9 is the most recently completed slice. R10–R13 exist as WBS docs
-under `docs/platform-restructure/WBS/slice-R{10..13}.md` but haven't been implemented — check those
-files and `docs/project-status.md` before relying on anything past R9 as current state. Known
+> Backfilled here after being missed when R10 shipped — see R11's section below for how this gap
+> was caught (during R11's own "compare against acceptance criteria" pass).
+
+- **Infra:** None new.
+- **Routing:** None new — the boundary suite drives the existing shared QA Load Balancer domain.
+- **Secrets:** None new.
+- **Interface contract:**
+  - New `e2e/tests/host-event-creator-boundary.spec.ts` (organize-me) proves the seams the R6-R9
+    split created still hold: logout at the Host clears the cookie Event Creator relies on for
+    auth, and Event Creator's JWT trust (`app.core.auth.current_user_id_optional` in the
+    event-creator repo) rejects a garbage cookie value and a tampered-signature token. Login-once
+    SSO and no-cookie rejection were already covered by `sidebar.spec.ts`; a Host Profile field
+    reaching an Event-Creator-owned dependency was already covered by `notifications.spec.ts`.
+  - `event-creator`'s own CI gained a new `e2e-boundary-qa` job (checks out organize-me's `main`,
+    runs only the boundary spec against live QA after `deploy-qa`) — a hosted app that wants its
+    own CI to catch a boundary regression, not just the Host's, can follow this same pattern:
+    checkout the Host repo at a fixed ref, run only the specific spec(s) relevant to that app.
+  - Account-deletion cascade to an independent microservice's own schema isn't observable over
+    HTTP (a stateless JWT-trust boundary never queries the Host's `users` table), so it's asserted
+    directly against the schema instead: one DB-level cascade test per `event_creator` table with
+    a direct `ON DELETE CASCADE` FK to `host.users` (`test_user_settings_model.py`,
+    `test_storage_config_model.py`, `test_llm_prompt_model.py`, `test_event_model.py` in the
+    event-creator repo).
+
+## Slice R11 — QA cutover + full verification (P0 gate)
+
+- **Infra:** None new — reuses the `event-creator-{qa,prod}` Cloud Run services and the shared LB
+  provisioned by R5/R6.
+- **Routing:** The actual cutover. `packages/chrome/src/organizeme_chrome/registry.py`'s
+  `event-creator` `AppEntry` gains `/upload`, `/processing`, `/logs`, `/prompt` (moved off the
+  Host's own entry), plus the API/fragment `api_prefixes` behind them (`/api/v1/events`,
+  `/api/v1/llm-prompt`, `/api/v1/upload`, `/api/v1/import-pending-files`,
+  `/api/v1/processing-runs`, the bare `/processing-runs` page-detail prefix, and
+  `/api/html/processing-runs` for the log-partial fragment). The QA Load Balancer's URL map was
+  regenerated from the updated registry (`uv run python -m infra.gcp_lb.generate_url_map`) and
+  re-imported live (`gcloud compute url-maps import organizeme-qa-url-map ...` — the same
+  idempotent step `infra/gcp_lb/provision.sh` already performs, re-run standalone rather than the
+  whole script since every other resource already existed). The Host's own copies of these
+  pages/endpoints are left in place, now simply unreachable through the LB — removing them is
+  R13's job, not this one's.
+  - **A hosted app that wants its nav paths cut over from the Host must publish this timing
+    explicitly**: R7-R9 built full parity for these four pages but deliberately deferred their LB
+    routing until this dedicated verification slice, rather than flipping traffic incrementally
+    per parity slice (unlike Settings-tab fragments, which never needed an LB change at all — see
+    R7's section above). Follow that same pattern for any future hosted-app page migration: build
+    and test parity first, cut routing over as its own reviewed, verified step.
+- **Secrets:** None new.
+- **Interface contract:**
+  - `organizeme-chrome` bumped to `chrome-v0.4.0` (registry-only change; both this repo's own pin
+    and `event-creator`'s were bumped and redeployed before the live URL-map import, so both
+    services render sidebar/Settings-tab chrome from the same registry snapshot the moment
+    routing flips).
+  - A previously-undetected gap surfaced by this slice's "compare against acceptance criteria"
+    pass: Event Creator never got its own `/upload` **page** (only the `POST /api/v1/upload` API,
+    ported in R8) — R8's own tests never exercised the page because they only needed the API.
+    Backfilled here (`app/pages/upload.py` + `app/templates/pages/upload.html` in the
+    event-creator repo, near-verbatim port of the Host's own `app/pages/upload.py`/
+    `templates/upload.html`) before cutting `/upload`'s routing over — a lesson for any future
+    slice that assumes "the API exists" implies "the page exists": verify both independently
+    before routing a nav path to a service.
+  - New e2e specs closing the PRD-story-13–52 verification gap that had no prior browser-level
+    coverage: `dashboard.spec.ts`, `logs.spec.ts`, `upload.spec.ts` (organize-me `e2e/tests/`).
+    All three are routing-agnostic (they assert observable page behaviour, not which backend
+    served the request), so they were written and could pass *before* the cutover too — proving
+    Host and Event Creator's parity implementations are behaviourally equivalent was exactly the
+    point.
+  - Event-Creator's own `organizeme-chrome` pin had silently drifted to `chrome-v0.2.0` (missing
+    R7's `api_prefixes` field and Settings-tab ownership move) with zero observable effect, purely
+    by coincidence: nav *paths* never changed between v0.2.0 and v0.3.0, and the Host's own
+    `/settings` shell reads Event Creator's tab list via an explicit `get_app("event-creator")`
+    call (`app/pages/settings.py`), never through Event Creator's own (stale) `register_chrome`
+    global. Fixed alongside the R11 pin bump. **Lesson for future slices:** a hosted app's own
+    chrome pin can go stale without any CI or runtime signal if nothing it renders happens to
+    depend on the changed fields — don't assume "no visible bug" means "the pin is current."
+
+## Slices R12–R13 — not yet landed
+
+Per `docs/project-status.md`, R11 is the most recently completed slice. R12–R13 exist as WBS docs
+under `docs/platform-restructure/WBS/slice-R{12..13}.md` but haven't been implemented — check those
+files and `docs/project-status.md` before relying on anything past R11 as current state. Known
 deferred items called out by earlier slices that a future slice will resolve:
 
-- `COOKIE_DOMAIN` and full cross-domain SSO cookie scoping — deferred to **R11**.
+- `COOKIE_DOMAIN` and full cross-domain SSO cookie scoping — still unresolved, no slice assigned.
+  R11's cutover didn't touch this: SSO across Host/Event Creator already works today without it,
+  since both services sit behind the *same hostname* via the shared LB, so a host-only cookie (no
+  explicit `Domain` attribute) is already sent on every request to that hostname regardless of
+  which backend answers. `COOKIE_DOMAIN` only matters if Event Creator (or a future hosted app)
+  ever needs a genuinely different domain/subdomain than the Host — not a current need.
 - Per-schema DB connection identity (`host_app`/`event_creator_app` roles exist but neither app
   actually connects as them yet; both still use the shared admin `DATABASE_URL`) — flagged as a
   deferred hardening item, no slice assigned yet.
 - `DATABASE_URL` living as a GitHub Actions secret rather than GCP Secret Manager — candidate for a
   future hardening pass.
-- Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9, no slice assigned yet;
-  natural to fold into R11's cutover or R13's Host cleanup.
-- `/prompt`/`/upload`/`/processing`/`/logs` full-page-route cutover to `event-creator` in the LB
-  app-registry — deferred to **R11**, same as the Dashboard's own R6 tracer-bullet cutover pattern.
+- Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9 (issue #189), still
+  unresolved; R11 didn't touch it either. No slice assigned yet — a natural fit for R13's Host
+  cleanup, since it's Host-only code.
+- Hardcoded QA Load Balancer domain duplicated across `organize-me`'s and `event-creator`'s CI
+  configs (issue #191, flagged in R10) — still unresolved, low-priority.
 
 ---
 
