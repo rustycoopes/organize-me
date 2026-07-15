@@ -181,6 +181,15 @@ still pending.
   - OAuth callback redirect URIs for a hosted app's own connect flow are *additional* authorized
     redirect URIs added to the Host's existing Google/Dropbox OAuth app consoles (client id/secret
     are shared with the Host, not a separate registered app per hosted service).
+  - **Gotcha found in issue #200 (fixed 2026-07-15):** build that redirect_uri from a fixed,
+    per-environment setting (e.g. `GOOGLE_DRIVE_REDIRECT_URI`), never from the incoming request's
+    Host header (`request.base_url`). Google matches redirect URIs as an exact string, and a
+    dynamically-derived value silently tracks whatever domain/service happens to receive the
+    request — it only works by coincidence until the next load-balancer or service-boundary
+    change (exactly what broke Drive-connect in QA after Storage moved behind the LB in this
+    slice). Whenever a hosted app's own domain/routing changes, re-register the exact new
+    redirect URI on the OAuth client in Google Cloud Console — this is a manual, outside-repo step
+    the code cannot perform or detect.
   - **Gotcha hit during this slice:** `HostUser` (the SELECT-ONLY cross-schema mapping a hosted app
     uses to read Host fields like `email`/`phone_number`) must be registered on the **same**
     `Base`/`MetaData` as the hosted app's own models, not a separate `DeclarativeBase` — otherwise
@@ -412,6 +421,11 @@ deferred items called out by earlier slices that a future slice will resolve:
 - Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9 (issue #189), still
   unresolved; R11 didn't touch it either. No slice assigned yet — a natural fit for R13's Host
   cleanup, since it's Host-only code.
+- **R12 must flip both repos' prod `GOOGLE_DRIVE_REDIRECT_URI`** (fixed in issue #200) from the raw
+  Cloud Run URL to `https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback`
+  once prod cuts over to the LB domain — mirroring the same env-var flip `GOOGLE_OAUTH_REDIRECT_URI`
+  will need for login. Both need the new URL registered on the Google OAuth client in Google Cloud
+  Console *before* the flip goes live, or Drive-connect breaks in prod the same way it did in QA.
 - Hardcoded QA Load Balancer domain duplicated across `organize-me`'s and `event-creator`'s CI
   configs (issue #191, flagged in R10) — still unresolved, low-priority.
 

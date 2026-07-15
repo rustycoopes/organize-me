@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     google_oauth_client_id: str
     google_oauth_client_secret: str
     google_oauth_redirect_uri: str
+    # The Google Drive OAuth callback's absolute redirect_uri (issue #200), fixed per environment
+    # rather than derived from the incoming request's Host header. Google rejects a redirect_uri
+    # that doesn't exactly match one registered on the OAuth client with
+    # `Error 400: redirect_uri_mismatch` - deriving it from request.base_url meant the value
+    # silently tracked whatever domain happened to receive the request instead of one fixed value
+    # an operator could register in Google Cloud Console. Empty default (mirrors
+    # ENCRYPTION_KEY/GEMINI_API_KEY above) - /auth fails fast with a clear error if it's actually
+    # used while unset.
+    google_drive_redirect_uri: str = ""
     # Dropbox OAuth app credentials (Slice 8.1). Empty defaults (like the Resend/Gemini/Twilio
     # keys above) so deploys/CI that don't set them yet don't fail Settings construction -
     # get_dropbox_oauth_client() only needs real values once a user actually connects Dropbox.

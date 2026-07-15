@@ -20,6 +20,11 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/auth/google/callback
+      # Fixed per-environment value (issue #200), not a secret - must match what's registered on
+      # the Google OAuth client in Google Cloud Console. This Host copy of the Drive-connect flow
+      # is unreachable in QA (Slice R7 moved it to event-creator behind the LB), but the setting
+      # is still wired here for parity/CI coverage of this file.
+      GOOGLE_DRIVE_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/storage-config/google-drive/callback
       # Dropbox OAuth app (Slice 8.1, #93). Tests never call out to Dropbox (fakes/dependency
       # overrides), so these have no effect on pass/fail - set for parity with the other providers
       # once a Dropbox app is registered (see .env.local.example).
@@ -99,6 +104,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
+          GOOGLE_DRIVE_REDIRECT_URI: "https://organizeme.qa.russcoopersoftware.com/api/v1/storage-config/google-drive/callback"
           DROPBOX_OAUTH_CLIENT_ID: "${DROPBOX_OAUTH_CLIENT_ID}"
           DROPBOX_OAUTH_CLIENT_SECRET: "${DROPBOX_OAUTH_CLIENT_SECRET}"
           E2E_TEST_MODE: "true"

@@ -184,6 +184,54 @@ async def test_auth_returns_google_consent_url_with_correct_params(client: Async
     )
 
 
+async def test_auth_builds_redirect_uri_from_configured_setting_not_request_host(
+    client: AsyncClient,
+) -> None:
+    """Regression test for issue #200: Google rejects a redirect_uri with
+    `Error 400: redirect_uri_mismatch` whenever it doesn't exactly match a URI registered on the
+    OAuth client. Deriving it from the incoming request's Host header (`request.base_url`) meant
+    the value silently changed whenever the domain fronting this service changed - the fix is to
+    build it from the fixed, per-environment `GOOGLE_DRIVE_REDIRECT_URI` setting instead, which
+    matches whatever was actually registered in Google Cloud Console."""
+    from app.main import app
+
+    await _register_login_with_config(client)
+
+    app.dependency_overrides[get_cipher_factory] = lambda: (lambda: _CIPHER)
+    try:
+        response = await client.post("/api/v1/storage-config/google-drive/auth")
+    finally:
+        app.dependency_overrides.pop(get_cipher_factory, None)
+
+    assert response.status_code == 200
+    url = response.json()["authorization_url"]
+    query = parse_qs(urlparse(url).query)
+    settings = get_settings()
+    assert query["redirect_uri"][0] == settings.google_drive_redirect_uri
+
+
+async def test_auth_fails_fast_when_redirect_uri_not_configured(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test: a missing GOOGLE_DRIVE_REDIRECT_URI should be caught in /auth, before
+    sending the user through the whole Google consent flow only to have Google reject it."""
+    from app.main import app
+
+    await _register_login_with_config(client)
+
+    app.dependency_overrides[get_cipher_factory] = lambda: (lambda: _CIPHER)
+    monkeypatch.setenv("GOOGLE_DRIVE_REDIRECT_URI", "")
+    get_settings.cache_clear()
+    try:
+        response = await client.post("/api/v1/storage-config/google-drive/auth")
+    finally:
+        app.dependency_overrides.pop(get_cipher_factory, None)
+        get_settings.cache_clear()
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "storage_not_configured"
+
+
 async def test_auth_requires_a_saved_config_first(client: AsyncClient) -> None:
     email = unique_email()
     password = "correct-horse-battery"

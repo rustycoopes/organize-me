@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-14 (ADR-0001 resolved — Event Creator Celery/Redis replaced with Cloud Tasks)
+**Last updated:** 2026-07-15 (Issue #200 fixed — Google Drive connect redirect_uri_mismatch)
 
 For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
 up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
@@ -492,6 +492,7 @@ interface contract this establishes for future background-work needs on Cloud Ru
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-15 | Issue #200 fixed: Google Drive connect failed with `Error 400: redirect_uri_mismatch` in QA. Both the Host's and `event-creator`'s copies of the Drive-connect OAuth flow built `redirect_uri` dynamically from the request's Host header instead of a fixed setting; the LB-domain variant was never registered on the Google OAuth client. Added a `GOOGLE_DRIVE_REDIRECT_URI` setting (mirrors the login-OAuth fix in `da9515b`) to both repos; prod stays pinned to the already-registered raw Cloud Run URL until R12 cuts it to the LB domain |
 | 2026-07-14 | ADR-0001 resolved: Event Creator's Celery/Redis pipeline dispatch (crash-looping under Cloud Run's request-based CPU throttling, discovered during R11's live e2e run) replaced with Cloud Tasks push-based dispatch (`POST /internal/pipeline/run`, OIDC-verified); `app/worker.py`/supervisord/Redis removed; QA's `--no-cpu-throttling` experiment reverted |
 | 2026-07-14 | Issue #166 (Slice R11 — QA Cutover + Full Verification, P0 Gate) implemented: `/upload`/`/processing`/`/logs`/`/prompt` routing cut over from the Host to `event-creator` in the app-registry and the live QA Load Balancer URL map; backfilled a missing `/upload` page in `event-creator` and fixed its stale `organizeme-chrome` pin (chrome-v0.2.0 → v0.4.0); closed the PRD-story-13–52 e2e coverage gap with `dashboard.spec.ts`/`logs.spec.ts`/`upload.spec.ts` |
 | 2026-07-14 | Issue #165 (Slice R10 — Host↔Event Creator Boundary E2E Test Suite) implemented: `host-event-creator-boundary.spec.ts` (logout propagation, garbage-cookie/tampered-token rejection) plus DB-level account-deletion-cascade tests in `event-creator`; new `e2e-boundary-qa` job in `event-creator`'s own CI |

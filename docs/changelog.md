@@ -9,6 +9,24 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Issue #200 — Google Drive connect failed with `Error 400: redirect_uri_mismatch`.** Both the
+  Host's (this repo) and event-creator's copies of the Google Drive OAuth connect flow
+  (`storage_google_drive.py`) built the callback `redirect_uri` dynamically from the incoming
+  request's Host header (`request.base_url`), rather than from a fixed setting - the same
+  reasoning already fixed for *login* OAuth back when the R5 load-balancer cutover moved QA to
+  `organizeme.qa.russcoopersoftware.com` (see the `da9515b` fix). The Drive-connect flow's own
+  redirect URI silently followed suit, but the LB-domain variant of that URI was never registered
+  on the Google OAuth client, and Google rejects any redirect_uri that isn't an exact match. Fixed
+  by adding a `GOOGLE_DRIVE_REDIRECT_URI` setting (env var already documented in
+  `.env.local.example` but never wired to `app/core/config.py` until now) and building the
+  authorization/token-exchange calls from it instead of the request. Prod's value stays pinned to
+  the already-registered raw Cloud Run URL (R12, the production cutover to the LB domain, hasn't
+  landed yet); QA's and event-creator's values point at the LB domain, which needs the matching
+  redirect URI added to the Google Cloud Console OAuth client (a manual, outside-repo step - see
+  the host-integration-guide). Branch `fix/google-drive-oauth-redirect-uri-parity`
+  (event-creator: `fix/google-drive-oauth-redirect-uri`).
+
 ### Changed
 - **ADR-0001 resolved — Event Creator's Celery/Redis pipeline dispatch replaced with Cloud
   Tasks.** R11's live cutover surfaced the Celery worker crash-looping under Cloud Run's
