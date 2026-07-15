@@ -400,12 +400,42 @@ dispatch — this is a redesign within R11, not a new numbered slice.
     finishes (including on a retried/already-terminal redelivery, so the chain can resume even if
     an earlier attempt died between finishing its item and advancing the chain).
 
-## Slices R12–R13 — not yet landed
+## Slice R12 — Production cutover (in progress)
 
-Per `docs/project-status.md`, R11 is the most recently completed slice. R12–R13 exist as WBS docs
-under `docs/platform-restructure/WBS/slice-R{12..13}.md` but haven't been implemented — check those
-files and `docs/project-status.md` before relying on anything past R11 as current state. Known
-deferred items called out by earlier slices that a future slice will resolve:
+- **Infra:** Production External HTTPS Load Balancer fronting `organizeme.russcoopersoftware.com`
+  provisioned via `infra/gcp_lb/provision-prod.{sh,ps1}` — same shape as R5's QA setup, every
+  resource suffixed `-prod` instead of `-qa` (GCP global resource names can't be shared across
+  environments): two static IPs, Cloud DNS A/AAAA records, a Google-managed cert
+  (`organizeme-prod-cert`), Serverless NEGs against `organizeme-prod`/`event-creator-prod`, three
+  backend services (`host-backend-prod`, `organizeme-backend-prod`, `event-creator-backend-prod`),
+  a URL map, an HTTPS proxy, and forwarding rules. `infra/gcp_lb/generate_url_map.py` gained an
+  optional environment argument (`... generate_url_map prod`) to rename every backend consistently.
+- **Non-disruptive by design:** `organizeme.russcoopersoftware.com` was a brand-new hostname —
+  nothing pointed at it before this, since prod is reached today via the raw Cloud Run URLs. No
+  existing traffic changes until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` are
+  deliberately flipped to it in a follow-up PR.
+- **Already-satisfied prerequisites, confirmed via read-only `gcloud` checks rather than re-done:**
+  the prod Cloud Tasks queue (`event-creator-pipeline-prod`) already existed and is `RUNNING`; both
+  prod services are already on request-based billing (`run.googleapis.com/cpu-throttling: true`, no
+  `min-instances`); `E2E_TEST_MODE` is unset on both. The `host`/`event_creator` prod schema
+  separation is presumed already applied too, since `deploy.yml` runs the Alembic migration on
+  every prod deploy and prod has deployed successfully many times since R1 landed — a failing
+  migration would have failed those deploys.
+- **Still open:** the managed cert takes up to ~24h to go `ACTIVE` after DNS propagates. Once
+  active: register the new redirect URIs on the Google OAuth client in Cloud Console (manual,
+  outside-repo step — required before the redirect_uri flip below, or login/Drive-connect break);
+  verify `google-oauth-client-secret-prod` in Secret Manager actually matches the real OAuth client
+  secret (the same class of bug found in issue #203 for QA); then flip
+  `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` to the LB domain in both repos'
+  `deploy.yml` and run the post-cutover smoke tests (real login, real upload through the pipeline).
+
+## Slice R13 — not yet landed
+
+Per `docs/project-status.md`, R12 (Production Cutover) is in progress — see its section above for
+current state. R13 exists as a WBS doc under `docs/platform-restructure/WBS/slice-R13.md` but
+hasn't been started — check that file and `docs/project-status.md` before relying on anything past
+R12 as current state. Known deferred items called out by earlier slices that a future slice will
+resolve:
 
 - `COOKIE_DOMAIN` and full cross-domain SSO cookie scoping — still unresolved, no slice assigned.
   R11's cutover didn't touch this: SSO across Host/Event Creator already works today without it,
@@ -421,26 +451,6 @@ deferred items called out by earlier slices that a future slice will resolve:
 - Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9 (issue #189), still
   unresolved; R11 didn't touch it either. No slice assigned yet — a natural fit for R13's Host
   cleanup, since it's Host-only code.
-- **R12 must flip both repos' prod `GOOGLE_DRIVE_REDIRECT_URI`** (fixed in issue #200) from the raw
-  Cloud Run URL to `https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback`
-  once prod cuts over to the LB domain — mirroring the same env-var flip `GOOGLE_OAUTH_REDIRECT_URI`
-  will need for login. Both need the new URL registered on the Google OAuth client in Google Cloud
-  Console *before* the flip goes live, or Drive-connect breaks in prod the same way it did in QA.
-- **Prod `google-oauth-client-secret-prod` needs verification before Drive-connect is ever used in
-  prod (found via issue #203).** In QA, `event-creator-qa` sourced `GOOGLE_OAUTH_CLIENT_SECRET` from
-  a GCP Secret Manager secret (`google-oauth-client-secret-qa`) that was seeded with a value that did
-  not match the real Google OAuth client secret — while `organizeme-qa` had the *correct* value as a
-  plaintext env var. This caused Google's token endpoint to return `401 Unauthorized` during the
-  Drive OAuth code exchange (a client-credential rejection, not a `redirect_uri` problem — the #200
-  fix was correct and unrelated). Fixed by adding a new version to `google-oauth-client-secret-qa`
-  and forcing a new Cloud Run revision (`gcloud run services update ... --update-labels=...`) so the
-  `:latest` secret ref re-resolved — Cloud Run only resolves `secretKeyRef` at container/revision
-  startup, not per-request, so updating the secret value alone does not affect already-running
-  instances. **`event-creator-prod` has the identical structural risk**: it sources
-  `GOOGLE_OAUTH_CLIENT_SECRET` from `google-oauth-client-secret-prod` (a separate Secret Manager
-  secret from `organizeme-prod`'s plaintext value) and has never been confirmed to hold the matching
-  value. Verify/correct this — and force a new revision if it's changed — before Drive-connect is
-  exercised for real in prod, ideally as part of R12's cutover.
 - Hardcoded QA Load Balancer domain duplicated across `organize-me`'s and `event-creator`'s CI
   configs (issue #191, flagged in R10) — still unresolved, low-priority.
 

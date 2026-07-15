@@ -48,14 +48,17 @@ def _prefix_patterns(prefix: str) -> list[str]:
     return [bare, f"{bare}/*"]
 
 
-def generate_path_rules(apps: list[AppEntry] | None = None) -> list[PathRule]:
+def generate_path_rules(
+    apps: list[AppEntry] | None = None, *, backend_suffix: str = ""
+) -> list[PathRule]:
     if apps is None:
         apps = list_apps()
 
-    rules = [PathRule(service=HOST_BACKEND, paths=list(HOST_PATHS))]
-    seen_paths: dict[str, str] = {path: HOST_BACKEND for path in HOST_PATHS}
+    host_backend = f"{HOST_BACKEND}{backend_suffix}"
+    rules = [PathRule(service=host_backend, paths=list(HOST_PATHS))]
+    seen_paths: dict[str, str] = {path: host_backend for path in HOST_PATHS}
     for app in apps:
-        service = f"{app.service_name}-backend"
+        service = f"{app.service_name}-backend{backend_suffix}"
         app_paths = []
         for item in app.nav:
             if item.path in HOST_PATHS:
@@ -117,4 +120,17 @@ def to_url_map_yaml(rules: list[PathRule], *, name: str, default_service: str) -
 
 
 if __name__ == "__main__":
-    print(to_url_map_yaml(generate_path_rules(), name="organizeme-qa-url-map", default_service=HOST_BACKEND))
+    import sys
+
+    # provision.sh / provision-prod.sh select which environment's URL map to render; qa stays the
+    # default so the existing R5 call site (`uv run python -m infra.gcp_lb.generate_url_map`, no
+    # args) is unaffected.
+    env = sys.argv[1] if len(sys.argv) > 1 else "qa"
+    suffix = "" if env == "qa" else f"-{env}"
+    print(
+        to_url_map_yaml(
+            generate_path_rules(backend_suffix=suffix),
+            name=f"organizeme-{env}-url-map",
+            default_service=f"{HOST_BACKEND}{suffix}",
+        )
+    )
