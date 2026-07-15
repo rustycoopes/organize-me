@@ -19,14 +19,11 @@ jobs:
       JWT_SECRET: ${{ secrets.JWT_SECRET_PROD }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-prod-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
-      # Fixed per-environment value (issue #200), not a secret. Kept pinned to the *raw* Cloud Run
-      # URL (not the R5/R7 load-balancer domain) because prod hasn't cut over to the LB yet (R12,
-      # still open) - this Host copy of the Drive-connect flow is still the one real prod traffic
-      # hits today, and this exact URL is the one already registered on the Google OAuth client
-      # (see docs/creating-prerequisites.md). Update this alongside GOOGLE_OAUTH_REDIRECT_URI once
-      # R12 cuts prod over to organizeme.russcoopersoftware.com.
-      GOOGLE_DRIVE_REDIRECT_URI: https://organizeme-prod-170051512639.northamerica-northeast1.run.app/api/v1/storage-config/google-drive/callback
+      GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/auth/google/callback
+      # Fixed per-environment value (issue #200), not a secret. R12 cut prod over to the LB domain
+      # (organizeme.russcoopersoftware.com) - this URL is now registered on the Google OAuth client
+      # alongside GOOGLE_OAUTH_REDIRECT_URI (see docs/creating-prerequisites.md).
+      GOOGLE_DRIVE_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback
       # Dropbox OAuth app (Slice 8.1, #93). See ci.yml's identical env var for why tests pass
       # regardless of whether this is actually configured yet.
       DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
@@ -87,7 +84,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          GOOGLE_OAUTH_REDIRECT_URI: https://organizeme-prod-170051512639.northamerica-northeast1.run.app/api/v1/auth/google/callback
+          GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/auth/google/callback
           DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
           DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -101,7 +98,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
-          GOOGLE_DRIVE_REDIRECT_URI: "https://organizeme-prod-170051512639.northamerica-northeast1.run.app/api/v1/storage-config/google-drive/callback"
+          GOOGLE_DRIVE_REDIRECT_URI: "https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback"
           DROPBOX_OAUTH_CLIENT_ID: "${DROPBOX_OAUTH_CLIENT_ID}"
           DROPBOX_OAUTH_CLIENT_SECRET: "${DROPBOX_OAUTH_CLIENT_SECRET}"
           GEMINI_API_KEY: "${GEMINI_API_KEY}"
