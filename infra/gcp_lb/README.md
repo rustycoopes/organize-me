@@ -93,3 +93,27 @@ happen after merge when the operator runs `provision.sh`.
 
 Nothing here touches the existing Cloud Run service or its direct `*.run.app` URL — both continue
 to work in parallel until the QA/prod cutovers (R11/R12) flip the origin.
+
+## Production (Slice R12)
+
+`provision-prod.sh` / `provision-prod.ps1` are the prod equivalents — same steps, same idempotency
+pattern, fronting `organizeme.russcoopersoftware.com` instead. Every resource name is suffixed
+`-prod` instead of `-qa` (GCP global resource names — static IPs, backend services, NEGs, cert,
+URL map, proxy, forwarding rules — can't be shared across environments, so prod needs its own full
+set, not a reuse of QA's). `generate_url_map.py` takes an optional environment argument
+(`uv run python -m infra.gcp_lb.generate_url_map prod`) that renames every backend service in the
+generated URL map to match (`host-backend-prod`, `organizeme-backend-prod`,
+`event-creator-backend-prod`); omitting it keeps the original QA behavior (`host-backend`, etc.).
+
+```bash
+gcloud auth login
+gcloud config set project gen-lang-client-0791944342
+bash infra/gcp_lb/provision-prod.sh
+```
+
+Running this is non-disruptive: `organizeme.russcoopersoftware.com` is a brand-new hostname that
+nothing currently points at (prod is reached today via the raw Cloud Run URLs), so no existing
+traffic is affected until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` are deliberately
+flipped to it in a separate, reviewed PR — see the R12 slice doc and
+[`host-integration-guide.md`](../../docs/platform-restructure/host-integration-guide.md) for that
+follow-up.

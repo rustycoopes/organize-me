@@ -9,6 +9,26 @@
 
 ## [Unreleased]
 
+### Added
+- **Issue #167 (in progress) — Slice R12: Production Cutover, LB provisioning step.** Provisioned
+  the production External HTTPS Load Balancer fronting `organizeme.russcoopersoftware.com`,
+  mirroring R5's QA setup: two static IPs, Cloud DNS A/AAAA records, a Google-managed SSL cert
+  (`organizeme-prod-cert`, provisioning — can take up to ~24h to validate), Serverless NEGs against
+  `organizeme-prod`/`event-creator-prod`, three backend services (`host-backend-prod`,
+  `organizeme-backend-prod`, `event-creator-backend-prod`), a URL map generated from the R3
+  app-registry, an HTTPS proxy, and forwarding rules. New scripts
+  `infra/gcp_lb/provision-prod.{sh,ps1}` (idempotent, mirror `provision.sh`/`provision.ps1`).
+  `infra/gcp_lb/generate_url_map.py` gained an optional environment argument
+  (`... generate_url_map prod`) that renames every backend service consistently
+  (`host-backend-prod`, etc.) so prod's URL map doesn't collide with QA's identically-named global
+  resources; omitting the argument keeps the original QA behavior unchanged. This step is
+  deliberately non-disruptive: `organizeme.russcoopersoftware.com` is a brand-new hostname nothing
+  currently points at (prod is reached today via the raw Cloud Run URLs), so no existing traffic is
+  affected until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` are deliberately flipped to
+  it in a follow-up PR — pending the cert going `ACTIVE` and the new redirect URIs being registered
+  on the Google OAuth client in Cloud Console (manual, outside-repo step). Branch
+  `restructure/r12-prod-cutover`.
+
 ### Fixed
 - **Issue #200 — Google Drive connect failed with `Error 400: redirect_uri_mismatch`.** Both the
   Host's (this repo) and event-creator's copies of the Google Drive OAuth connect flow

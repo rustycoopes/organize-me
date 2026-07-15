@@ -159,6 +159,20 @@ def test_two_apps_claiming_the_same_api_prefix_is_rejected() -> None:
         generate_path_rules(apps=apps)
 
 
+def test_backend_suffix_renames_every_backend_for_a_second_environment() -> None:
+    # R12: prod needs its own distinctly-named backend services/NEGs (GCP resource names are
+    # global, and QA already owns the unsuffixed ones) without duplicating the generator.
+    apps = [
+        AppEntry(service_name="organizeme", nav=[AppNavItem("/dashboard", "Dashboard")], settings_tabs=[]),
+        AppEntry(service_name="event-creator", nav=[AppNavItem("/events", "Events")], settings_tabs=[]),
+    ]
+
+    rules = generate_path_rules(apps=apps, backend_suffix="-prod")
+
+    services = {r.service for r in rules}
+    assert services == {"host-backend-prod", "organizeme-backend-prod", "event-creator-backend-prod"}
+
+
 def test_url_map_yaml_references_backend_services_by_full_resource_path() -> None:
     # Bare service names are silently misresolved by `gcloud compute url-maps import` — the
     # schema expects a resource path (or self-link), not a short name.
