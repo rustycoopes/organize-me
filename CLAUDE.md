@@ -58,6 +58,8 @@ This repository is currently empty. Update this file as the project is built out
 
 \- \[Project Status] (docs/project-status.md)
 
+\- \[Host Integration Guide] (docs/platform-restructure/host-integration-guide.md) — what other components (e.g. `event-creator`, future hosted apps) must set up (infra, routing, secrets, interfaces) to plug into organize-me; add a new section here for every Platform Restructure slice.
+
 \- Update the files in the docs folder after any  changes, updates or milestones.
 
 

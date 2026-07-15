@@ -26,6 +26,24 @@
   redirect URI added to the Google Cloud Console OAuth client (a manual, outside-repo step - see
   the host-integration-guide). Branch `fix/google-drive-oauth-redirect-uri-parity`
   (event-creator: `fix/google-drive-oauth-redirect-uri`).
+- **Issue #203 — Google Drive connect still failed after #200, with a generic "connection
+  failed" banner.** The OAuth callback (`event-creator`'s `storage_google_drive.py`) had several
+  distinct silent-failure branches collapsed into one banner, making the real cause invisible
+  without a production debugging round-trip. Added a `logger.warning(...)` to each branch
+  (Google-returned error, missing code/state, state-JWT decode failure, CSRF mismatch, and
+  `GetAccessTokenError` from the token exchange) - no secrets or attacker-controlled values logged.
+  Deployed to QA and used to capture the real failure: Google's token endpoint returned `401
+  Unauthorized` during the code exchange - a client-credential rejection, not a redirect_uri
+  problem. Root cause: `event-creator-qa`'s `GOOGLE_OAUTH_CLIENT_SECRET` is sourced from GCP Secret
+  Manager (`google-oauth-client-secret-qa`), and the value stored there did not match the real
+  Google OAuth client secret - `organizeme-qa`'s plaintext copy of the same secret was correct.
+  Fixed by adding a new Secret Manager version with the correct value and forcing a new Cloud Run
+  revision (secret refs are resolved at container startup, not per-request, so the fix didn't take
+  effect until a fresh revision rolled out). No application code change was required for the actual
+  fix - only the diagnostic logging (branch `fix/drive-callback-diagnostic-logging`, event-creator
+  PR #13) plus the infra-level secret correction. `event-creator-prod` has the identical
+  structural risk (separate Secret Manager secret from `organizeme-prod`'s known-good value,
+  unverified) - flagged in the host-integration-guide as a pre-R12 checklist item.
 
 ### Changed
 - **ADR-0001 resolved — Event Creator's Celery/Redis pipeline dispatch replaced with Cloud

@@ -426,6 +426,21 @@ deferred items called out by earlier slices that a future slice will resolve:
   once prod cuts over to the LB domain — mirroring the same env-var flip `GOOGLE_OAUTH_REDIRECT_URI`
   will need for login. Both need the new URL registered on the Google OAuth client in Google Cloud
   Console *before* the flip goes live, or Drive-connect breaks in prod the same way it did in QA.
+- **Prod `google-oauth-client-secret-prod` needs verification before Drive-connect is ever used in
+  prod (found via issue #203).** In QA, `event-creator-qa` sourced `GOOGLE_OAUTH_CLIENT_SECRET` from
+  a GCP Secret Manager secret (`google-oauth-client-secret-qa`) that was seeded with a value that did
+  not match the real Google OAuth client secret — while `organizeme-qa` had the *correct* value as a
+  plaintext env var. This caused Google's token endpoint to return `401 Unauthorized` during the
+  Drive OAuth code exchange (a client-credential rejection, not a `redirect_uri` problem — the #200
+  fix was correct and unrelated). Fixed by adding a new version to `google-oauth-client-secret-qa`
+  and forcing a new Cloud Run revision (`gcloud run services update ... --update-labels=...`) so the
+  `:latest` secret ref re-resolved — Cloud Run only resolves `secretKeyRef` at container/revision
+  startup, not per-request, so updating the secret value alone does not affect already-running
+  instances. **`event-creator-prod` has the identical structural risk**: it sources
+  `GOOGLE_OAUTH_CLIENT_SECRET` from `google-oauth-client-secret-prod` (a separate Secret Manager
+  secret from `organizeme-prod`'s plaintext value) and has never been confirmed to hold the matching
+  value. Verify/correct this — and force a new revision if it's changed — before Drive-connect is
+  exercised for real in prod, ideally as part of R12's cutover.
 - Hardcoded QA Load Balancer domain duplicated across `organize-me`'s and `event-creator`'s CI
   configs (issue #191, flagged in R10) — still unresolved, low-priority.
 
