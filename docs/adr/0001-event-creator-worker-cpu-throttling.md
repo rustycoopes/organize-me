@@ -1,9 +1,11 @@
 # ADR-0001: Event Creator's Celery worker needs CPU-always-allocated on Cloud Run
 
-**Status:** Proposed — `--no-cpu-throttling` applied to QA only, as a validation experiment. Not
-applied to prod. Pending design review before any further rollout decision.
+**Status:** Resolved — option 3 (below) implemented: Celery/Redis replaced with Cloud Tasks
+push-based dispatch. QA's `--no-cpu-throttling` experiment reverted; both QA and prod stay on
+request-based billing. `event-creator`'s `app.worker` (Celery) removed entirely, replaced by
+`app.services.pipeline.dispatch` + `POST /internal/pipeline/run`.
 
-**Date:** 2026-07-14
+**Date:** 2026-07-14 (opened) / 2026-07-14 (resolved, same design-review pass)
 
 **Context:** Slice R11 (QA Cutover + Full Verification, issue #166)
 
@@ -116,3 +118,45 @@ Apply `--no-cpu-throttling` to `event-creator-qa` **only**, as a validation expe
   be resolved one way or another).
 - This is tracked as an open decision, not a closed one — options 3–5 remain on the table pending
   review.
+
+## Resolution
+
+**Option 3 chosen: Cloud Tasks push-based dispatch**, replacing Celery/Redis entirely rather than
+tuning the CPU-throttling flag. `event-creator`'s `POST /api/v1/upload` and
+`/api/v1/import-pending-files` now enqueue a Cloud Tasks task targeting a new
+`POST /internal/pipeline/run` endpoint on the same service, OIDC-verified. Each pipeline run is
+therefore a genuine inbound HTTP request, so Cloud Run allocates CPU for exactly its duration —
+true pay-per-run under request-based billing, no idle cost, no `min-instances`. Full design in
+`docs/platform-restructure/host-integration-guide.md`'s Cloud Tasks section; implementation in the
+`event-creator` repo (`app/services/pipeline/dispatch.py`, `app/api/v1/internal_pipeline.py`,
+`infra/cloud_tasks/provision.{sh,ps1}`).
+
+**A design-review correction worth recording**: the initial instinct was option 5 (revert to the
+monolith's in-process `asyncio.create_task()`, no Celery/Redis at all). That turned out to *not*
+actually solve the cost problem — the monolith's own `BackgroundPipelineScheduler` required
+`--no-cpu-throttling` too (see `app/api/v1/upload.py`'s `BackgroundPipelineScheduler` docstring
+and PR #80 in this repo), and that flag was only removed during R6's tracer bullet per an explicit
+ask to keep both services request-based-only. Plain in-process asyncio has the identical root
+issue Celery does — detached background work with no HTTP request of its own to justify CPU
+allocation — it just hadn't been load-tested since R6. Cloud Tasks avoids this because it's not
+background work at all from Cloud Run's perspective: it's a normal request.
+
+QA's `--no-cpu-throttling` experiment (this ADR's short-term validation) is reverted as part of
+this change — nothing on either service needs CPU-always-allocated anymore.
+
+**A code-review pass before merge caught real correctness gaps in the first implementation**,
+fixed before this branch was committed: (1) the idempotency guard was a plain `SELECT`-then-act
+check with a real TOCTOU race under Cloud Tasks' at-least-once delivery — closed by making the
+run-pickup step an atomic `UPDATE ... WHERE status = 'pending'` (`dispatch._claim_run`); (2) the
+initial design assumed a batch's strict "sequential, in order" requirement (#110) fell out of the
+queue's `max-concurrent-dispatches=1` setting, which is false — Cloud Tasks only guarantees
+non-concurrency, not order — fixed via explicit chaining (each item's payload carries the rest of
+the batch, and the push endpoint enqueues the next item itself); (3) `verify_oauth2_token` was
+re-fetching Google's public certs on every single push with no caching — fixed with a
+`cachecontrol`-wrapped session; (4) a Cloud Tasks enqueue failure after the `processing_runs` row
+was already committed left it orphaned at `PENDING` forever with nothing to recover it — fixed by
+catching that failure and marking the run(s) `FAILED`. A fifth finding — the OIDC push
+authentication only proves the request came from the shared default compute service account every
+Cloud Run service in this GCP project already runs as, not specifically from Cloud Tasks — was
+judged a pre-existing platform-wide identity decision this change inherits rather than introduces,
+and is tracked as a follow-up rather than blocking this branch.

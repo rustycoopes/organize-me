@@ -1,6 +1,6 @@
 # OrganizeMe — Project Status
 
-**Last updated:** 2026-07-14 (issue #166 — Slice R11 QA Cutover + Full Verification)
+**Last updated:** 2026-07-14 (ADR-0001 resolved — Event Creator Celery/Redis replaced with Cloud Tasks)
 
 For what any component other than the Host (e.g. `event-creator`, future hosted apps) needs to set
 up — infra, routing, secrets, interfaces — per Platform Restructure slice, see
@@ -469,10 +469,30 @@ PRD-story-13–52 e2e coverage gap with three new routing-agnostic specs (`dashb
 `logs.spec.ts`, `upload.spec.ts`) that pass whether Host or Event Creator serves the request —
 proving behavioural parity was the actual point. `organizeme-chrome` bumped to `chrome-v0.4.0`.
 
+**ADR-0001 resolved — Event Creator's Celery/Redis pipeline dispatch replaced with Cloud Tasks.**
+R11's live e2e run then surfaced a real blocker: the R8 Celery worker crash-loops under Cloud
+Run's request-based CPU throttling (a separate always-on process has no HTTP request of its own
+to justify CPU allocation — full root-cause in `docs/adr/0001-event-creator-worker-cpu-throttling.md`).
+The obvious fix (`--no-cpu-throttling`) trades into instance-based billing, which the user has hit
+~$70/month on before. Design review initially favored reverting to the monolith's in-process
+`asyncio.create_task()` approach; that turned out to need the same CPU-always-allocated flag the
+monolith itself required (`BackgroundPipelineScheduler`'s own docstring, PR #80) — it relocates
+the cost problem rather than solving it. Replaced Celery/Redis entirely with Cloud Tasks
+push-based dispatch in the `event-creator` repo instead: `POST /api/v1/upload` and
+`/api/v1/import-pending-files` now enqueue a Cloud Tasks task targeting a new, OIDC-verified
+`POST /internal/pipeline/run` on the same service, so each pipeline run is a genuine inbound HTTP
+request and Cloud Run allocates CPU for exactly its duration. `app/worker.py` removed, replaced by
+`app/services/pipeline/dispatch.py`; `supervisord`/the two-program container reverted to a single
+`uvicorn` process; new `infra/cloud_tasks/provision.{sh,ps1}`. QA's `--no-cpu-throttling`
+experiment reverted — both QA and prod stay on request-based billing. See
+`docs/platform-restructure/host-integration-guide.md`'s R11-redesign subsection for the full
+interface contract this establishes for future background-work needs on Cloud Run.
+
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-07-14 | ADR-0001 resolved: Event Creator's Celery/Redis pipeline dispatch (crash-looping under Cloud Run's request-based CPU throttling, discovered during R11's live e2e run) replaced with Cloud Tasks push-based dispatch (`POST /internal/pipeline/run`, OIDC-verified); `app/worker.py`/supervisord/Redis removed; QA's `--no-cpu-throttling` experiment reverted |
 | 2026-07-14 | Issue #166 (Slice R11 — QA Cutover + Full Verification, P0 Gate) implemented: `/upload`/`/processing`/`/logs`/`/prompt` routing cut over from the Host to `event-creator` in the app-registry and the live QA Load Balancer URL map; backfilled a missing `/upload` page in `event-creator` and fixed its stale `organizeme-chrome` pin (chrome-v0.2.0 → v0.4.0); closed the PRD-story-13–52 e2e coverage gap with `dashboard.spec.ts`/`logs.spec.ts`/`upload.spec.ts` |
 | 2026-07-14 | Issue #165 (Slice R10 — Host↔Event Creator Boundary E2E Test Suite) implemented: `host-event-creator-boundary.spec.ts` (logout propagation, garbage-cookie/tampered-token rejection) plus DB-level account-deletion-cascade tests in `event-creator`; new `e2e-boundary-qa` job in `event-creator`'s own CI |
 | 2026-07-13 | Issue #164 (Slice R9 — Parity 3: Dashboard + Events + Prompt) implemented: the events dashboard (filter/sort/search/paginate, Calendar/Tasks links, delete, reviewed toggle, Getting Started onboarding checklist) and the Prompt page (view/edit/reset) migrated from the Host monolith into `event-creator`, replacing R6's placeholder Dashboard body and completing functional parity. Re-enabled `e2e/tests/import-pending-files.spec.ts`'s Dashboard-page case (issue #185). `/prompt`'s LB app-registry cutover deferred to R11, same as `/upload`/`/processing`/`/logs` |

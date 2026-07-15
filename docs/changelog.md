@@ -9,6 +9,28 @@
 
 ## [Unreleased]
 
+### Changed
+- **ADR-0001 resolved — Event Creator's Celery/Redis pipeline dispatch replaced with Cloud
+  Tasks.** R11's live cutover surfaced the Celery worker crash-looping under Cloud Run's
+  request-based CPU throttling (a separate always-on process has no HTTP request of its own to
+  justify CPU allocation — see `docs/adr/0001-event-creator-worker-cpu-throttling.md`). The
+  obvious fix (`--no-cpu-throttling`) trades into instance-based billing, which the user has hit
+  ~$70/month on before and wants to avoid. Design review initially favored reverting to the
+  monolith's in-process `asyncio.create_task()` approach, but that turned out to need the same
+  CPU-always-allocated flag the monolith itself required — it doesn't actually solve the cost
+  problem, just relocates it. Replaced Celery/Redis entirely with Cloud Tasks push-based
+  dispatch instead (in the `event-creator` repo): `POST /api/v1/upload` and
+  `/api/v1/import-pending-files` now enqueue a Cloud Tasks task targeting a new, OIDC-verified
+  `POST /internal/pipeline/run` endpoint on the same service, so each pipeline run is a genuine
+  inbound HTTP request and Cloud Run allocates CPU for exactly its duration — true pay-per-run
+  under request-based billing (Cloud Tasks' own cost is negligible: 1M free operations/month).
+  `app/worker.py` (Celery) removed, replaced by `app/services/pipeline/dispatch.py`;
+  `supervisord`/the two-program container reverted to a single `uvicorn` process; new
+  `infra/cloud_tasks/provision.{sh,ps1}` queue-provisioning scripts. QA's `--no-cpu-throttling`
+  experiment reverted — both QA and prod stay on request-based billing. Full writeup in the ADR's
+  Resolution section and `docs/platform-restructure/host-integration-guide.md`'s new R11-redesign
+  subsection.
+
 ### Added
 - **Issue #166 implemented — Slice R11: QA Cutover + Full Verification (P0 Gate).** The routing
   cutover the R6-R9 parity slices deferred: `packages/chrome/src/organizeme_chrome/registry.py`'s

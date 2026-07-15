@@ -148,6 +148,16 @@ flowchart TB
   its deploy step (same secret name as everyone else), and — only if it needs `ENCRYPTION_KEY`
   too — the same `--set-secrets` addition. No new Secret Manager secret is needed unless that app
   introduces a genuinely new credential type.
+- **Cloud Tasks (Slice R11 redesign, event-creator only)**: pipeline dispatch replaced Celery/Redis
+  with Cloud Tasks push tasks (see `docs/adr/0001-event-creator-worker-cpu-throttling.md`). No new
+  secret — the deploy SA (`170051512639-compute@developer.gserviceaccount.com`, the same shared
+  identity as everywhere else in this doc) is granted `roles/cloudtasks.enqueuer` on the
+  `event-creator-pipeline-{qa,prod}` queues and `roles/run.invoker` on `event-creator-{qa,prod}`
+  itself (provisioned by `event-creator`'s `infra/cloud_tasks/provision.sh`), reused both to
+  enqueue tasks and as the OIDC identity Cloud Tasks presents when it pushes back into the
+  service. `GCP_PROJECT_ID`/`CLOUD_TASKS_LOCATION`/`CLOUD_TASKS_QUEUE`/
+  `PIPELINE_INVOKER_SERVICE_ACCOUNT`/`PIPELINE_ENDPOINT_URL` are plaintext Cloud Run env vars
+  (non-sensitive), same treatment as `DATABASE_URL` above.
 
 ## Related docs
 

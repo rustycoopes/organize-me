@@ -340,6 +340,57 @@ still pending.
     chrome pin can go stale without any CI or runtime signal if nothing it renders happens to
     depend on the changed fields — don't assume "no visible bug" means "the pin is current."
 
+### R11 redesign — Celery/Redis replaced with Cloud Tasks (post-cutover fix)
+
+R11's live cutover surfaced a blocker documented in full in
+`docs/adr/0001-event-creator-worker-cpu-throttling.md`: the R8 Celery worker crash-loops under
+Cloud Run's request-based CPU throttling (a separate always-on process has no HTTP request of its
+own to justify CPU allocation). Resolved by replacing Celery/Redis with Cloud Tasks push-based
+dispatch — this is a redesign within R11, not a new numbered slice.
+
+- **Infra:** New Cloud Tasks queues, `event-creator-pipeline-{qa,prod}`
+  (`max-concurrent-dispatches=1`, `max-attempts=3`), provisioned via `event-creator`'s
+  `infra/cloud_tasks/provision.{sh,ps1}` (mirrors `infra/gcp_lb/provision.sh`'s idempotent,
+  manual-operator-run pattern). The Celery worker process is gone entirely — `event-creator`'s
+  `supervisord`/two-program container from R8 reverted to a single plain `uvicorn` process
+  (`app.worker`, `supervisord.conf` removed). QA's `--no-cpu-throttling` experiment (the ADR's
+  short-term validation) is reverted; both QA and prod stay on request-based billing throughout.
+- **Routing:** New internal endpoint `POST /internal/pipeline/run` on the existing
+  `event-creator-{qa,prod}` services — not part of the app-registry/Load-Balancer routing (it's
+  never reached via the shared LB; Cloud Tasks pushes directly to the service's own
+  `https://*.run.app` URL, bypassing the LB).
+- **Secrets:** `redis-url-{qa,prod}` no longer read (Redis/Upstash dependency removed). New
+  plaintext (non-Secret-Manager) env vars: `GCP_PROJECT_ID`, `CLOUD_TASKS_LOCATION`,
+  `CLOUD_TASKS_QUEUE`, `PIPELINE_INVOKER_SERVICE_ACCOUNT`, `PIPELINE_ENDPOINT_URL` (the last one
+  self-referential — captured from `gcloud run services describe` in a follow-up deploy step,
+  since a service can't know its own URL before its first deploy). See
+  `secrets-and-accounts.md`'s Cloud Tasks entry for the IAM grants.
+- **Interface contract:**
+  - A hosted app that needs background/async work on Cloud Run **without** moving to
+    instance-based billing should push each unit of work back to itself as a genuine HTTP request
+    (Cloud Tasks push target with OIDC verification), not a separate always-on worker process —
+    Cloud Run's CPU throttling model only allocates CPU to a request it's actively handling, so
+    detached background work (a Celery worker *or* a plain `asyncio.create_task()`) needs
+    `--no-cpu-throttling` either way. This was a real design-review correction: the initial
+    instinct (revert to the monolith's in-process asyncio) turned out to need the same
+    CPU-always-allocated flag the monolith itself required (see the ADR's Resolution section) —
+    it doesn't actually avoid the cost problem.
+  - The push endpoint must self-verify the Cloud-Tasks-presented OIDC token in code (`aud` +
+    `email` claims against expected values) rather than relying on Cloud Run's own IAM gate, since
+    the service as a whole stays `--allow-unauthenticated` for its normal user-facing routes.
+  - The push handler must be idempotent (check the target resource isn't already in a terminal
+    state before processing) — Cloud Tasks retries are a real possibility (lost response, queue
+    retry policy), and a task queue offers no exactly-once guarantee.
+  - "Sequential, not concurrent" batch processing (the same requirement R8's Celery `chain` met)
+    is **not** guaranteed by a queue's `max-concurrent-dispatches=1` setting alone — that only
+    bounds concurrency, not dispatch *order* (Cloud Tasks documents order as best-effort by
+    schedule time, and a retry on an earlier item can let a later item's task become eligible
+    first). A code-review pass caught this before it shipped: strict ordering is met by explicit
+    chaining instead — only the batch's first item is enqueued directly; each payload carries the
+    rest of the batch, and the push endpoint enqueues the next item itself once the current one
+    finishes (including on a retried/already-terminal redelivery, so the chain can resume even if
+    an earlier attempt died between finishing its item and advancing the chain).
+
 ## Slices R12–R13 — not yet landed
 
 Per `docs/project-status.md`, R11 is the most recently completed slice. R12–R13 exist as WBS docs
