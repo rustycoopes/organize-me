@@ -410,10 +410,6 @@ dispatch — this is a redesign within R11, not a new numbered slice.
   backend services (`host-backend-prod`, `organizeme-backend-prod`, `event-creator-backend-prod`),
   a URL map, an HTTPS proxy, and forwarding rules. `infra/gcp_lb/generate_url_map.py` gained an
   optional environment argument (`... generate_url_map prod`) to rename every backend consistently.
-- **Non-disruptive by design:** `organizeme.russcoopersoftware.com` was a brand-new hostname —
-  nothing pointed at it before this, since prod is reached today via the raw Cloud Run URLs. No
-  existing traffic changes until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` are
-  deliberately flipped to it in a follow-up PR.
 - **Already-satisfied prerequisites, confirmed via read-only `gcloud` checks rather than re-done:**
   the prod Cloud Tasks queue (`event-creator-pipeline-prod`) already existed and is `RUNNING`; both
   prod services are already on request-based billing (`run.googleapis.com/cpu-throttling: true`, no
@@ -421,13 +417,17 @@ dispatch — this is a redesign within R11, not a new numbered slice.
   separation is presumed already applied too, since `deploy.yml` runs the Alembic migration on
   every prod deploy and prod has deployed successfully many times since R1 landed — a failing
   migration would have failed those deploys.
-- **Still open:** the managed cert takes up to ~24h to go `ACTIVE` after DNS propagates. Once
-  active: register the new redirect URIs on the Google OAuth client in Cloud Console (manual,
-  outside-repo step — required before the redirect_uri flip below, or login/Drive-connect break);
-  verify `google-oauth-client-secret-prod` in Secret Manager actually matches the real OAuth client
-  secret (the same class of bug found in issue #203 for QA); then flip
-  `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` to the LB domain in both repos'
-  `deploy.yml` and run the post-cutover smoke tests (real login, real upload through the pipeline).
+- **Cutover completed:** the managed cert went `ACTIVE` (faster than the ~24h estimate); routing
+  verified directly against the LB IP with the prod Host header (`/login` → Host backend `200`,
+  `/dashboard` → Event Creator backend `302`, the expected unauthenticated redirect). The user
+  registered the new redirect URIs on the Google OAuth client in Cloud Console and confirmed
+  `google-oauth-client-secret-prod` matches the real client secret (the same class of bug found in
+  issue #203 for QA). `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` flipped to the LB
+  domain in `organize-me`'s `deploy.yml`; `event-creator`'s prod `GOOGLE_DRIVE_REDIRECT_URI` was
+  already pointed there (set proactively during #200, since event-creator-prod wasn't yet receiving
+  real traffic), so no change was needed there.
+- **Still open:** post-cutover smoke tests (real login with a pre-existing account confirming
+  existing data is intact; a real upload run through the pipeline to completion).
 
 ## Slice R13 — not yet landed
 

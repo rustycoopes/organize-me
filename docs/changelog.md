@@ -28,6 +28,15 @@
   it in a follow-up PR — pending the cert going `ACTIVE` and the new redirect URIs being registered
   on the Google OAuth client in Cloud Console (manual, outside-repo step). Branch
   `restructure/r12-prod-cutover`.
+- **Issue #167 (in progress) — Slice R12: prod redirect_uri cutover.** The LB cert went `ACTIVE`
+  faster than the ~24h estimate and routing was verified (`/login` → Host, `/dashboard` →
+  Event Creator, both via the LB IP with the prod Host header). User registered the new redirect
+  URIs on the Google OAuth client in Cloud Console and confirmed `google-oauth-client-secret-prod`
+  matches the real client secret. Flipped `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` in
+  `deploy.yml` from the raw Cloud Run URL to `https://organizeme.russcoopersoftware.com/...` —
+  `event-creator`'s prod `GOOGLE_DRIVE_REDIRECT_URI` already pointed at the LB domain (set
+  proactively during #200, since event-creator-prod wasn't yet receiving real traffic), so no
+  change was needed there. Branch `restructure/r12-flip-prod-redirect-uris`.
 
 ### Fixed
 - **Issue #200 — Google Drive connect failed with `Error 400: redirect_uri_mismatch`.** Both the
