@@ -22,7 +22,11 @@ If you're standing up app #3 (or later) from scratch, you need, at minimum:
 1. Its own git repo with independent CI/CD (build → test → deploy) — never a Host build/redeploy.
 2. A `<app>-qa` / `<app>-prod` Cloud Run service pair.
 3. A pinned dependency on the Host's published `organizeme-chrome` package (chrome/theme templates
-   + JWT-verify helper + app-registry data).
+   + JWT-verify helper + app-registry data). Every page's template context must pass the Host's
+   `dark_mode` preference (read via the `HostUser` cross-schema mapping — see R7 below) into
+   `chrome_base.html`'s `theme_attr()` call, on every route, not just the ones you remember to
+   check first — a page that forgets always renders light-only regardless of the user's Host
+   Profile setting (see the R7 gotcha and issue #207).
 4. An entry in the Host-authored app-registry (`packages/chrome/src/organizeme_chrome/registry.py`)
    describing its nav items and Settings tabs — this is the single source of truth for both what
    renders in the sidebar *and* what the Load Balancer routes to your service.
@@ -197,6 +201,21 @@ still pending.
     (`NoReferencedTableError`). Safety from Alembic ever trying to *manage* that table instead comes
     from `migrations/env.py`'s `include_object` filter (excluding the `host` schema outright), not
     from keeping it off the shared metadata.
+  - **Theme sync (fixed in issue #207, not caught until R9/R11 pages had already shipped):**
+    `HostUser` also carries `dark_mode` — the Host Profile's light/dark preference — for the exact
+    same reason it carries `email`/`phone_number`: it's a Host-owned field a hosted app needs to
+    render correctly but never owns or writes. Every page route must call a `get_dark_mode(db,
+    user_id)` helper (a thin wrapper over `get_host_user()` that defaults to `False` when the row
+    is missing — see `app/services/host_user.py` in `event-creator`) and pass the result as
+    `dark_mode` in its template context, the same context key `chrome_base.html`'s `theme_attr()`
+    reads. R8/R9's initial page ports (`dashboard.py`, `processing.py`, `prompt.py`, `logs.py`,
+    `upload.py`) each hardcoded `"dark_mode": False` instead, deferring the lookup as "out of
+    scope" — the Settings > Notifications fragment (this slice) had already wired the identical
+    `get_host_user()` call for `email`/`phone_number`, so the fix was reusing an existing, already-
+    proven pattern, not building a new one. **Lesson for future hosted-app pages:** any new page
+    route that renders the shared chrome needs this wiring from day one; it's easy to ship a page
+    that "looks right" in light mode and only surfaces the gap when a user with `dark_mode=true`
+    visits it.
 
 ## Slice R8 — Parity 2: Upload + Pipeline + Processing + Logs
 
