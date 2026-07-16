@@ -10,7 +10,26 @@
 ## [Unreleased]
 
 ### Added
-- **Issue #167 (in progress) — Slice R12: Production Cutover, LB provisioning step.** Provisioned
+- **Issue #167 (done) — Slice R12: Production Cutover.** Post-cutover smoke testing (real login,
+  real upload) surfaced two live bugs the routing/redirect_uri work couldn't catch on its own,
+  both now fixed:
+  - **Stale Google Drive OAuth token.** `event-creator-prod` failed every upload/import with a
+    Fernet `InvalidSignature` decrypting the stored `oauth_access_token` — the token had been
+    encrypted before `ENCRYPTION_KEY` moved to GCP Secret Manager, under a different key value than
+    what's there now. Not an R12 regression — this was already broken for any real Drive-connected
+    upload in prod, it just hadn't been exercised until this smoke test. Fixed by reconnecting
+    Google Drive in prod Settings, which re-encrypts the token under the current key; no code
+    change needed.
+  - **Missing `GEMINI_API_KEY` in event-creator.** R11 moved the Gemini-calling pipeline
+    (upload/import-pending-files) to `event-creator`, but `GEMINI_API_KEY` was only ever wired into
+    `organize-me`'s `ci.yml`/`deploy.yml` — invisible to CI since tests mock the Gemini client.
+    Failed live as `Gemini call failed: GEMINI_API_KEY is not set`. Fixed in
+    `event-creator` PR #14 (branch `fix/wire-gemini-api-key`): added the GitHub secret and wired it
+    into both QA and prod Cloud Run env, same plaintext-env-var pattern as the other non-confidential
+    config already there.
+
+  Full R12 history below (LB provisioning, then the redirect_uri flip):
+- **Issue #167 — Slice R12: Production Cutover, LB provisioning step.** Provisioned
   the production External HTTPS Load Balancer fronting `organizeme.russcoopersoftware.com`,
   mirroring R5's QA setup: two static IPs, Cloud DNS A/AAAA records, a Google-managed SSL cert
   (`organizeme-prod-cert`, provisioning — can take up to ~24h to validate), Serverless NEGs against
@@ -28,7 +47,7 @@
   it in a follow-up PR — pending the cert going `ACTIVE` and the new redirect URIs being registered
   on the Google OAuth client in Cloud Console (manual, outside-repo step). Branch
   `restructure/r12-prod-cutover`.
-- **Issue #167 (in progress) — Slice R12: prod redirect_uri cutover.** The LB cert went `ACTIVE`
+- **Issue #167 — Slice R12: prod redirect_uri cutover.** The LB cert went `ACTIVE`
   faster than the ~24h estimate and routing was verified (`/login` → Host, `/dashboard` →
   Event Creator, both via the LB IP with the prod Host header). User registered the new redirect
   URIs on the Google OAuth client in Cloud Console and confirmed `google-oauth-client-secret-prod`
