@@ -15,8 +15,10 @@ slice** (`docs/features/platform-restructure/WBS/slice-R*.md`), whether or not t
 repo directly. Each slice gets its own `## Slice R<n> — <name>` section below, added in order.
 
 For the full architecture rationale, see
-[`platform-restructure-design.md`](platform-restructure-design.md) (design) and
-[`platform-restructure-prd.md`](platform-restructure-prd.md) (product intent). For the
+[`platform-restructure-design.md`](features/platform-restructure/platform-restructure-design.md)
+(design) and
+[`platform-restructure-prd.md`](features/platform-restructure/platform-restructure-prd.md)
+(product intent). For the
 credential/secret journey in detail, see [`secrets-and-accounts.md`](secrets-and-accounts.md) —
 this doc summarizes the actionable subset; that one is the full reference.
 

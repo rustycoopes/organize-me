@@ -42,11 +42,11 @@
   Plus one Host-only DB-schema regression test
   (`test_host_users_no_longer_has_moved_columns`) moved from the deleted
   `test_user_settings_model.py` into `tests/test_schema_separation.py`, its natural home. Wrote
-  [`docs/features/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md),
+  [`docs/how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md),
   the condensed playbook for a future app #3, validated against `event-creator`'s real
   app-registry entry, `organizeme_chrome.jwt_verify` usage, and LB URL-map regeneration. Updated
   README/technical-approach to describe the Host-only surface (auth/profile/settings-shell/
-  nav-shell) and added this slice's section to `host-integration-guide.md`.
+  nav-shell) and added this slice's section to `docs/host-integration-guide.md`.
 
   A code-review pass caught dead code the mechanical deletion sweep missed — nothing mypy/pytest
   could catch since it was still syntactically valid, just orphaned: `app/core/security.py`
@@ -163,7 +163,7 @@
   `supervisord`/the two-program container reverted to a single `uvicorn` process; new
   `infra/cloud_tasks/provision.{sh,ps1}` queue-provisioning scripts. QA's `--no-cpu-throttling`
   experiment reverted — both QA and prod stay on request-based billing. Full writeup in the ADR's
-  Resolution section and `docs/features/platform-restructure/host-integration-guide.md`'s new R11-redesign
+  Resolution section and `docs/host-integration-guide.md`'s new R11-redesign
   subsection.
 
 ### Added
@@ -178,7 +178,7 @@
   ported in R8 — R8's own tests only needed the API, so the missing page went unnoticed until R11
   tried to route real browser traffic at it); and Event Creator's own `organizeme-chrome` pin had
   silently drifted to `chrome-v0.2.0` (two versions stale) with zero observed effect, purely by
-  coincidence — see `docs/features/platform-restructure/host-integration-guide.md`'s R11 section for the
+  coincidence — see `docs/host-integration-guide.md`'s R11 section for the
   full explanation. `organizeme-chrome` bumped to `chrome-v0.4.0`; both this repo's and
   `event-creator`'s pins updated. Closed the PRD-story-13–52 e2e coverage gap (upload, the events
   dashboard, and processing-history logs previously had no browser-level tests) with three new
@@ -255,7 +255,7 @@
   test pattern — LLM-failure (fail immediately, no retry, file → `failed/`, failure notification)
   and zero-new-events (success, file → `processed/`, "0 new events" notification) paths verified
   at parity. `mypy --strict` clean across the full repo (98 source files). Backfilled the
-  previously-missing Slice R7 section in `docs/features/platform-restructure/host-integration-guide.md`
+  previously-missing Slice R7 section in `docs/host-integration-guide.md`
   (the doc had gone stale, still claiming "R7–R13 not yet landed" after R7 had already merged)
   alongside the new R8 section.
 - **Issue #162 implemented — Slice R7: Parity 1 (Storage + Settings Tabs).** Migrates
@@ -303,7 +303,7 @@
   `JWT_SECRET` and `ENCRYPTION_KEY` now come from the same GCP Secret Manager secrets
   (`jwt-secret-{qa,prod}` / `encryption-key-{qa,prod}`) via `--set-secrets`, read independently by
   each service with zero network call between them — documented in full, with a mermaid diagram of
-  the secrets/accounts/request flow, in `docs/features/platform-restructure/secrets-and-accounts.md`. Per an
+  the secrets/accounts/request flow, in `docs/secrets-and-accounts.md`. Per an
   explicit user ask made mid-slice, both repos' `deploy.yml`/`ci.yml` were also audited to confirm
   neither uses `--no-cpu-throttling` on `gcloud run deploy` (instance-based billing) — Cloud Run
   billing for both services is request-based only. `COOKIE_DOMAIN` was deliberately **not** wired

@@ -34,7 +34,7 @@ integrations, and notifications now live.
 
 ## Adding a new hosted app
 
-See [`docs/features/platform-restructure/how-to-add-a-hosted-app.md`](docs/features/platform-restructure/how-to-add-a-hosted-app.md)
+See [`docs/how-to-add-a-hosted-app.md`](docs/how-to-add-a-hosted-app.md)
 for the concrete playbook (app-registry entry, LB URL-map regeneration, the `organizeme-chrome`
 shared package, and the JWT-verify pattern), validated against the real `event-creator`
 integration.
