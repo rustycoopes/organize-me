@@ -2,11 +2,36 @@
 
 **Version:** 1.0  
 **Date:** 2026-06-30  
-**Status:** Approved — implementation decisions that supersede this document are in `docs/implementation-plan.md`
+**Status:** Approved (historical) — this document originally described the pre-restructure
+monolith. As of Slice R13 (issue #168, 2026-07), `organize-me` is the **Host** app only; the
+event-extraction stack described below (storage watching, the LLM pipeline, notifications, etc.)
+has moved to the independent `event-creator` service — see
+[`docs/platform-restructure/platform-restructure-design.md`](platform-restructure/platform-restructure-design.md)
+and [`docs/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md)
+for the current architecture. The sections below are kept for historical reference on the
+original stack decisions (most still apply to `event-creator` today, since it inherited this
+design); the **Host-only stack** actually running in this repo now is:
+
+| Layer | Choice |
+|---|---|
+| Backend | Python 3.12 + FastAPI |
+| Validation / typing | Pydantic v2 + mypy strict |
+| Frontend rendering | Jinja2 templates + HTMX + Tailwind CSS + Alpine.js (shared chrome via `organizeme-chrome`) |
+| Database | PostgreSQL via Supabase — `host` schema only; `event_creator` schema belongs to that service |
+| ORM / migrations | SQLAlchemy 2.0 async + Alembic |
+| Auth | FastAPI-Users (email/password + Google OAuth), JWT in an HTTPOnly cookie trusted by every hosted app |
+| Email notifications | Resend (password-reset emails only — event/pipeline notifications are `event-creator`'s) |
+| Testing | pytest + httpx + pytest-asyncio (backend); Playwright (E2E UX, against deployed QA) |
+| Containerisation | Dockerfile + supervisord (single `app` process — no worker process) |
+| CI/CD | GitHub Actions |
+| Deployment | GCP Cloud Run |
+| Secrets | GCP Secret Manager |
+| Container registry | GCP Artifact Registry |
+| Logging | structlog → GCP Cloud Logging (automatic from Cloud Run) |
 
 ---
 
-## Recommended Stack (Headline)
+## Recommended Stack (Headline, historical/monolith-era)
 
 | Layer | Choice |
 |---|---|
@@ -30,6 +55,9 @@
 | Secrets | GCP Secret Manager |
 | Container registry | GCP Artifact Registry |
 | Logging | structlog → GCP Cloud Logging (automatic from Cloud Run) |
+
+*(Everything above the Host-only table now describes `event-creator`, not this repo — kept here
+only as the historical record of the decisions it inherited.)*
 
 ---
 

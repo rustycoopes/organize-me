@@ -20,19 +20,6 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/auth/google/callback
-      # Fixed per-environment value (issue #200), not a secret - must match what's registered on
-      # the Google OAuth client in Google Cloud Console. This Host copy of the Drive-connect flow
-      # is unreachable in QA (Slice R7 moved it to event-creator behind the LB), but the setting
-      # is still wired here for parity/CI coverage of this file.
-      GOOGLE_DRIVE_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/storage-config/google-drive/callback
-      # Dropbox OAuth app (Slice 8.1, #93). Tests never call out to Dropbox (fakes/dependency
-      # overrides), so these have no effect on pass/fail - set for parity with the other providers
-      # once a Dropbox app is registered (see .env.local.example).
-      DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
-      DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
-      # Storage-credential encryption key (issue #45). Set on the repo since #78; the tests inject
-      # their own keys regardless, so they pass either way.
-      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,10 +67,13 @@ jobs:
       # NOTE: E2E_TEST_MODE=true is written here for QA ONLY. It enables the test-only
       # /api/v1/internal/e2e/* helper endpoints (issue #23). It must never appear in prod's
       # deploy (deploy.yml) - those routes return 404 wherever the flag is unset.
-      # JWT_SECRET and ENCRYPTION_KEY are intentionally absent here (Slice R4 / R6): both are
-      # wired below via --set-secrets from GCP Secret Manager (`jwt-secret-qa`,
-      # `encryption-key-qa`), not this plaintext env-vars-file, so the hosted-app side (R6,
-      # event-creator) can read the same Secret Manager values without a network call to the Host.
+      # JWT_SECRET is intentionally absent here (Slice R4): wired below via --set-secrets from
+      # GCP Secret Manager (`jwt-secret-qa`), not this plaintext env-vars-file, so the hosted-app
+      # side (event-creator) can read the same Secret Manager value without a network call to the
+      # Host. R13 (#168) removed ENCRYPTION_KEY/GEMINI_API_KEY/TWILIO_*/DROPBOX_OAUTH_*/
+      # GOOGLE_DRIVE_REDIRECT_URI from here too - the Host code that read them (storage-provider
+      # credential encryption, the LLM pipeline, SMS/Dropbox notifications, the Drive-connect
+      # OAuth flow) was deleted in that slice; event-creator's own CI/CD wires its own copies.
       - name: Write Cloud Run env vars file
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_QA_URL }}
@@ -91,12 +81,6 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.qa.russcoopersoftware.com/api/v1/auth/google/callback
-          DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
-          DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
@@ -104,14 +88,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
-          GOOGLE_DRIVE_REDIRECT_URI: "https://organizeme.qa.russcoopersoftware.com/api/v1/storage-config/google-drive/callback"
-          DROPBOX_OAUTH_CLIENT_ID: "${DROPBOX_OAUTH_CLIENT_ID}"
-          DROPBOX_OAUTH_CLIENT_SECRET: "${DROPBOX_OAUTH_CLIENT_SECRET}"
           E2E_TEST_MODE: "true"
-          GEMINI_API_KEY: "${GEMINI_API_KEY}"
-          TWILIO_ACCOUNT_SID: "${TWILIO_ACCOUNT_SID}"
-          TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN}"
-          TWILIO_PHONE_NUMBER: "${TWILIO_PHONE_NUMBER}"
           EOF
 
       - name: Build image
@@ -133,7 +110,7 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
-            --set-secrets=JWT_SECRET=jwt-secret-qa:latest,ENCRYPTION_KEY=encryption-key-qa:latest \
+            --set-secrets=JWT_SECRET=jwt-secret-qa:latest \
             --quiet
 
   e2e-qa:

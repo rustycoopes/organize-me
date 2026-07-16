@@ -1,11 +1,14 @@
 """Authenticated placeholder pages behind the sidebar shell (issue #17).
 
 Each nav route renders the shared authenticated layout with a generic placeholder body;
-real content lands in later slices. Profile (app.pages.profile), Settings (app.pages.settings),
-Prompt (app.pages.prompt), Upload (app.pages.upload), Dashboard (app.pages.dashboard),
-Processing (app.pages.processing), and Logs (app.pages.logs) are served separately as they
-already have real content. All routes redirect anonymous visitors to /login, matching the
-profile page's gating.
+real content lands in later slices. Profile (app.pages.profile) and Settings
+(app.pages.settings) are served separately as they already have real content. All routes
+redirect anonymous visitors to /login, matching the profile page's gating.
+
+R13 (#168): Upload/Dashboard/Processing/Logs/Prompt (previously served by their own routers
+here) moved to the event-creator service and were removed from the Host entirely, including
+their nav items in the app-registry (organizeme_chrome.registry) - so they no longer appear in
+`get_app("organizeme").nav` at all and don't need excluding below.
 """
 
 from fastapi import APIRouter, Depends, Request
@@ -19,16 +22,11 @@ from app.models.user import User
 router = APIRouter(tags=["pages"])
 
 # Placeholder pages are every nav destination except the ones with their own router and real
-# content (/profile, /settings, /prompt, /upload, /dashboard, /processing, /logs).
+# content (/profile, /settings).
 # Derived from the app-registry (organizeme_chrome) so paths/labels have a single source of truth.
 PAGES_WITH_OWN_ROUTER = {
     "/profile",
     "/settings",
-    "/prompt",
-    "/upload",
-    "/dashboard",
-    "/processing",
-    "/logs",
 }
 PLACEHOLDER_PAGES: list[tuple[str, str]] = [
     (item.path, item.label)

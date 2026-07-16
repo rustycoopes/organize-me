@@ -52,10 +52,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         # No eager seeding of Event-Creator data here (#158 / Slice R2): on_after_register is a
-        # pure Host action. The default LLM prompt and the notification/onboarding UserSettings
-        # row are both created lazily on first read/write instead (see
-        # app/api/v1/llm_prompt.py::get_or_create_user_prompt and
-        # app/services/user_settings.py::get_or_create_user_settings).
+        # pure Host action. Event-Creator's own per-user rows (default LLM prompt, notification
+        # prefs, onboarding progress) are entirely owned and created by event-creator now (R13 /
+        # issue #168 removed the Host's last direct reads/writes of that data).
         pass
 
     async def validate_password(self, password: str, user: schemas.UC | User) -> None:
