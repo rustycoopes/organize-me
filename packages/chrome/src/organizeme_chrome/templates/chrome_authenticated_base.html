@@ -2,9 +2,14 @@
 
 {#
   Shared layout for every authenticated page across every OrganizeMe-hosted app. Renders the
-  persistent left sidebar (from the nav_items global — see organizeme_chrome.registry) and
-  exposes a `page` block for the actual page content. The active item is derived from the
-  request path.
+  persistent left sidebar, grouped by app with independently-collapsible groups (see
+  organizeme_chrome.nav_groups), and exposes a `page` block for the actual page content. The
+  active item is derived from the request path.
+
+  Every page rendering this template must pass `nav_groups` (organizeme_chrome.nav_groups.
+  build_nav_groups) and `flat_nav_items` (organizeme_chrome.nav_groups.flat_nav_items) into its
+  own template context — see docs/adr/sidebar-nav-groups-render-boundary.md in the organize-me
+  repo for why this isn't computed here as an environment global.
 #}
 
 {% block content %}
@@ -31,16 +36,64 @@
     <label for="sidebar-drawer-toggle" class="drawer-overlay" aria-label="Close navigation"></label>
     <aside class="flex min-h-full w-64 flex-col bg-base-100 border-r border-base-300">
       <div class="px-4 py-4 text-xl font-bold">OrganizeMe</div>
-      <ul id="sidebar-nav" class="menu w-full grow gap-1 px-2" aria-label="Main navigation">
-        {% for item in nav_items %}
-        <li>
-          <a
-            href="{{ item.path }}"
-            {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
-          >{{ item.label }}</a>
-        </li>
+      <div
+        id="sidebar-nav"
+        class="menu w-full grow gap-1 px-2"
+        aria-label="Main navigation"
+        x-data="{ collapsed: {{ nav_collapsed_json | tojson }} }"
+      >
+        {% for group in nav_groups %}
+        <div class="mb-1">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-block justify-between px-2 text-xs font-semibold uppercase tracking-wide"
+            aria-expanded="{{ 'false' if group.collapsed else 'true' }}"
+            :aria-expanded="(!collapsed['{{ group.service_name }}']).toString()"
+            aria-controls="nav-group-{{ group.service_name }}"
+            @click="collapsed['{{ group.service_name }}'] = !collapsed['{{ group.service_name }}']; fetch('/api/v1/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nav_collapsed_groups: collapsed }) })"
+          >
+            <span>{{ group.label }}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4 shrink-0 transition-transform"
+              :class="{ '-rotate-90': collapsed['{{ group.service_name }}'] }"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <ul
+            id="nav-group-{{ group.service_name }}"
+            class="menu w-full gap-1"
+            x-show="!collapsed['{{ group.service_name }}']"
+            {% if group.collapsed %}style="display:none"{% endif %}
+          >
+            {% for item in group.nav %}
+            <li>
+              <a
+                href="{{ item.path }}"
+                {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
+              >{{ item.label }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
         {% endfor %}
-      </ul>
+
+        <ul class="menu w-full gap-1 px-0 mt-auto">
+          {% for item in flat_nav_items %}
+          <li>
+            <a
+              href="{{ item.path }}"
+              {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
+            >{{ item.label }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
       <div class="border-t border-base-300 p-2" x-data="{ loggingOut: false }">
         <button
           type="button"
