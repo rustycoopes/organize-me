@@ -13,6 +13,10 @@ def test_tojson_filter_is_registered_and_produces_safe_markup() -> None:
     assert isinstance(result, Markup)
     assert "event-creator" in result
     assert "true" in result
+    # Must not contain a literal, unescaped `"` — this is embedded inside a double-quoted HTML
+    # attribute (x-data="...") in chrome_authenticated_base.html; an unescaped quote there
+    # truncates the attribute value at the first key/value pair on every render.
+    assert '"' not in result
 
 
 def test_settings_tabs_are_scoped_to_the_callers_own_app() -> None:

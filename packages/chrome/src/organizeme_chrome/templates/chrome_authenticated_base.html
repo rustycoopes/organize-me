@@ -6,10 +6,14 @@
   organizeme_chrome.nav_groups), and exposes a `page` block for the actual page content. The
   active item is derived from the request path.
 
-  Every page rendering this template must pass `nav_groups` (organizeme_chrome.nav_groups.
-  build_nav_groups) and `flat_nav_items` (organizeme_chrome.nav_groups.flat_nav_items) into its
-  own template context — see docs/adr/sidebar-nav-groups-render-boundary.md in the organize-me
-  repo for why this isn't computed here as an environment global.
+  Every page rendering this template must merge `app.core.nav.sidebar_nav_context()`'s return
+  value into its own template context — see docs/adr/sidebar-nav-groups-render-boundary.md in the
+  organize-me repo for why this isn't computed here as an environment global. That context
+  provides `nav_groups`, `flat_nav_items`, and two collapsed-state maps keyed by service_name:
+  `nav_collapsed_json` (what's displayed, including the current-page force-open override) and
+  `nav_stored_collapsed_json` (the user's real stored preference, minus that override) — the
+  toggle below PATCHes the latter, never the former, so clicking one group can never overwrite
+  another group's real stored preference just because it happened to be force-open for this page.
 #}
 
 {% block content %}
@@ -40,7 +44,19 @@
         id="sidebar-nav"
         class="menu w-full grow gap-1 px-2"
         aria-label="Main navigation"
-        x-data="{ collapsed: {{ nav_collapsed_json | tojson }} }"
+        x-data="{
+          collapsed: {{ nav_collapsed_json | tojson }},
+          storedCollapsed: {{ nav_stored_collapsed_json | tojson }},
+          toggle(serviceName) {
+            this.collapsed[serviceName] = !this.collapsed[serviceName];
+            this.storedCollapsed[serviceName] = this.collapsed[serviceName];
+            fetch('/api/v1/users/me', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nav_collapsed_groups: this.storedCollapsed }),
+            });
+          },
+        }"
       >
         {% for group in nav_groups %}
         <div class="mb-1">
@@ -50,7 +66,7 @@
             aria-expanded="{{ 'false' if group.collapsed else 'true' }}"
             :aria-expanded="(!collapsed['{{ group.service_name }}']).toString()"
             aria-controls="nav-group-{{ group.service_name }}"
-            @click="collapsed['{{ group.service_name }}'] = !collapsed['{{ group.service_name }}']; fetch('/api/v1/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nav_collapsed_groups: collapsed }) })"
+            @click="toggle('{{ group.service_name }}')"
           >
             <span>{{ group.label }}</span>
             <svg
