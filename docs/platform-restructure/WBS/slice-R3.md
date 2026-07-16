@@ -22,7 +22,9 @@ without any runtime call between services. Prove it by making the Host consume t
 render byte-for-byte the same UI.
 
 ## Includes
-- New package (recommend publishing to **GitHub Packages**, matching the GitHub-hosted repos)
+- New package (recommend publishing to **GitHub Packages**, matching the GitHub-hosted repos —
+  **as built:** a GitHub Release wheel/sdist on `chrome-v*` tag push, consumed as a pinned git-tag
+  pip dependency instead; see Design notes below)
   containing:
   1. Jinja macros/templates for sidebar, header, Settings tab-bar (from `authenticated_base.html`,
      `base.html`, `macros/ui.html`).
@@ -51,7 +53,12 @@ render byte-for-byte the same UI.
   *routing* (the LB URL map in R5). Author it once, here.
 - The verify helper must be usable with **no** fastapi-users dependency and **no** network call —
   Event Creator (R6) will depend only on this helper for identity.
-- Registry choice (GitHub Packages) is a recommendation; confirm during this slice.
+- **Registry choice, as built:** GitHub Packages (the original recommendation) was not used.
+  `packages/chrome` is published as a GitHub Release (wheel + sdist) on `chrome-v*` tag push
+  (`.github/workflows/publish-chrome.yml`), and every consumer pins it as a git-tag pip dependency
+  (`organizeme-chrome @ git+https://github.com/rustycoopes/organize-me@chrome-vX.Y.Z#subdirectory=packages/chrome`)
+  rather than a floating registry version — simpler to stand up than a private package registry,
+  and the pin is still an explicit, deliberate action per consumer.
 
 ## Blocked by
 - None — can run in parallel with R1/R2.
