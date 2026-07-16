@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Slice R5 — provisions the shared External HTTPS Load Balancer that fronts
-# organizeme.qa.russcoopersoftware.com for QA. See docs/platform-restructure/WBS/slice-R5.md.
+# organizeme.qa.russcoopersoftware.com for QA. See docs/features/platform-restructure/WBS/slice-R5.md.
 #
 # This is a manual, one-time (re-runnable) operator script — not part of CI/CD. It creates real,
 # billable GCP resources and a managed SSL cert whose validation can take up to ~24h once the

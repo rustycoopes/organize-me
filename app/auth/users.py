@@ -17,7 +17,7 @@ from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.services.notifications.email import EmailSender, ResendEmailSender
 
-# fastapi-users defaults to Argon2 for newly-hashed passwords; docs/technical-approach.md and
+# fastapi-users defaults to Argon2 for newly-hashed passwords; docs/features/original-organize-me/technical-approach.md and
 # issue #12 both specify bcrypt, so this app is pinned to a bcrypt-only PasswordHash.
 bcrypt_password_helper = PasswordHelper(PasswordHash((BcryptHasher(),)))
 

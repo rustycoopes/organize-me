@@ -41,14 +41,14 @@ Note this is **cleanup, not repo retirement** — `organize-me` *is* the Host go
 - Keep in the Host: auth, profile, settings-shell, nav-shell, JWT issuance, app-registry authoring,
   shared-chrome-package publishing — and their existing tests, unaffected.
 - Write the **"How to add a hosted app" playbook**
-  ([`how-to-add-a-hosted-app.md`](../how-to-add-a-hosted-app.md)): the Host app-registry entry (nav
+  ([`how-to-add-a-hosted-app.md`](../../../how-to-add-a-hosted-app.md)): the Host app-registry entry (nav
   heading/items + settings tabs + service name), the LB URL-map regeneration, the shared-chrome-
   package dependency, and the JWT-verify-helper usage — i.e. "new repo + Host config change" only.
   Include the test-ownership rule (unit + e2e tests live with the code they exercise; only
   cross-repo boundary tests stay in the Host) as part of the repeatable pattern, not a one-off
   cleanup note.
 - Update Host repo docs (README, technical-approach) to reflect the Host-only surface, and add this
-  slice's section to `host-integration-guide.md`.
+  slice's section to `docs/host-integration-guide.md`.
 
 ## Design notes
 - Sequence after R12 so nothing is removed from the Host until Event Creator is proven in prod —
@@ -91,5 +91,5 @@ Also removed one item not anticipated above: a Host-only DB-schema regression te
 rather than deleted, since it exercises the Host's own schema, not event-extraction code.
 `notifications.spec.ts` was found missing from the original test-removal list during review and
 ported to `event-creator` (PR #17) before its Host copy was deleted. See
-`docs/platform-restructure/host-integration-guide.md`'s R13 section and `docs/project-status.md`
-(2026-07-16 entry) for the full account.
+`docs/host-integration-guide.md`'s R13 section for the integrator-facing
+summary.

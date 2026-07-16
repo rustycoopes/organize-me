@@ -1,6 +1,6 @@
 """The authenticated Settings page (issue #46).
 
-R7 (docs/platform-restructure/WBS/slice-R7.md): the Host still renders the Settings *shell*
+R7 (docs/features/platform-restructure/WBS/slice-R7.md): the Host still renders the Settings *shell*
 (tab-bar chrome, from the app-registry's settings_tabs — organizeme_chrome.registry), but no
 longer owns any tab's *content*. Storage config (issue #46) and Notifications (issue #88) have
 moved to the independent event-creator service, which now declares those tabs (plus a new stub
@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from organizeme_chrome.registry import get_app
 
 from app.auth.users import current_active_user_optional
+from app.core.nav import sidebar_nav_context
 from app.core.templating import templates
 from app.models.user import User
 
@@ -49,5 +50,6 @@ async def settings_page(
             # precedence over environment globals of the same name, so this overrides it for this
             # page only.
             "settings_tabs": _EVENT_CREATOR_APP.settings_tabs,
+            **sidebar_nav_context(user, request),
         },
     )

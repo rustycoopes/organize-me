@@ -1,15 +1,26 @@
 # OrganizeMe — Changelog
 
-> Long-form implementation notes for completed issues live in
-> [`changelog-archive.md`](changelog-archive.md). Keep this file lean: a short entry per change,
-> with a pointer to the archive for full detail. Append new entries here; move them to the archive
-> once they grow long or the issue is merged.
+> This is the single source of truth for "what shipped." As of 2026-07-16, new entries are
+> **one line per merged issue**, linking to where the full detail actually lives:
+> - For a feature built via the `docs/features/<feature-slug>/` workflow (or the legacy
+>   `docs/features/platform-restructure/`), link to that slice's WBS file — `/to-implementation` appends a
+>   **Delivered** section there (issue #, branch, outcome) when the work lands.
+> - For a small change filed straight to a GitHub issue with no WBS slice, link to the issue/PR
+>   itself.
+>
+> Example: `- 2026-07-16 — #168 Slice R13: Host Cleanup + Hosted-App Playbook — [details](platform-restructure/WBS/slice-R13.md)`
+>
+> `docs/project-status.md` has been removed — this index plus each WBS slice's own status *is* the
+> project-status view now. Entries written before this policy took effect remain in their original
+> long form below (and in [`changelog-archive.md`](changelog-archive.md)); only new entries follow
+> the one-liner format.
 
 ---
 
 ## [Unreleased]
 
 ### Added
+- 2026-07-16 — #212 Slice 1: Grouped, collapsible sidebar in organize-me (Host) — [details](features/sidebar-nav-groups/WBS/slice-1-host-sidebar-groups.md)
 - **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
   Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
   since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API
@@ -32,11 +43,11 @@
   Plus one Host-only DB-schema regression test
   (`test_host_users_no_longer_has_moved_columns`) moved from the deleted
   `test_user_settings_model.py` into `tests/test_schema_separation.py`, its natural home. Wrote
-  [`docs/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md),
+  [`docs/how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md),
   the condensed playbook for a future app #3, validated against `event-creator`'s real
   app-registry entry, `organizeme_chrome.jwt_verify` usage, and LB URL-map regeneration. Updated
   README/technical-approach to describe the Host-only surface (auth/profile/settings-shell/
-  nav-shell) and added this slice's section to `host-integration-guide.md`.
+  nav-shell) and added this slice's section to `docs/host-integration-guide.md`.
 
   A code-review pass caught dead code the mechanical deletion sweep missed — nothing mypy/pytest
   could catch since it was still syntactically valid, just orphaned: `app/core/security.py`
@@ -153,7 +164,7 @@
   `supervisord`/the two-program container reverted to a single `uvicorn` process; new
   `infra/cloud_tasks/provision.{sh,ps1}` queue-provisioning scripts. QA's `--no-cpu-throttling`
   experiment reverted — both QA and prod stay on request-based billing. Full writeup in the ADR's
-  Resolution section and `docs/platform-restructure/host-integration-guide.md`'s new R11-redesign
+  Resolution section and `docs/host-integration-guide.md`'s new R11-redesign
   subsection.
 
 ### Added
@@ -168,7 +179,7 @@
   ported in R8 — R8's own tests only needed the API, so the missing page went unnoticed until R11
   tried to route real browser traffic at it); and Event Creator's own `organizeme-chrome` pin had
   silently drifted to `chrome-v0.2.0` (two versions stale) with zero observed effect, purely by
-  coincidence — see `docs/platform-restructure/host-integration-guide.md`'s R11 section for the
+  coincidence — see `docs/host-integration-guide.md`'s R11 section for the
   full explanation. `organizeme-chrome` bumped to `chrome-v0.4.0`; both this repo's and
   `event-creator`'s pins updated. Closed the PRD-story-13–52 e2e coverage gap (upload, the events
   dashboard, and processing-history logs previously had no browser-level tests) with three new
@@ -245,7 +256,7 @@
   test pattern — LLM-failure (fail immediately, no retry, file → `failed/`, failure notification)
   and zero-new-events (success, file → `processed/`, "0 new events" notification) paths verified
   at parity. `mypy --strict` clean across the full repo (98 source files). Backfilled the
-  previously-missing Slice R7 section in `docs/platform-restructure/host-integration-guide.md`
+  previously-missing Slice R7 section in `docs/host-integration-guide.md`
   (the doc had gone stale, still claiming "R7–R13 not yet landed" after R7 had already merged)
   alongside the new R8 section.
 - **Issue #162 implemented — Slice R7: Parity 1 (Storage + Settings Tabs).** Migrates
@@ -293,7 +304,7 @@
   `JWT_SECRET` and `ENCRYPTION_KEY` now come from the same GCP Secret Manager secrets
   (`jwt-secret-{qa,prod}` / `encryption-key-{qa,prod}`) via `--set-secrets`, read independently by
   each service with zero network call between them — documented in full, with a mermaid diagram of
-  the secrets/accounts/request flow, in `docs/platform-restructure/secrets-and-accounts.md`. Per an
+  the secrets/accounts/request flow, in `docs/secrets-and-accounts.md`. Per an
   explicit user ask made mid-slice, both repos' `deploy.yml`/`ci.yml` were also audited to confirm
   neither uses `--no-cpu-throttling` on `gcloud run deploy` (instance-based billing) — Cloud Run
   billing for both services is request-based only. `COOKIE_DOMAIN` was deliberately **not** wired
@@ -987,8 +998,8 @@
   account-deletion test now replays the exact pre-deletion cookie against `/api/v1/users/me` and
   asserts `401` (proving the token is dead server-side, not just dropped by the browser), and a
   pytest guard asserts `E2E_TEST_MODE` never appears in `deploy.yml` (prod). A separate
-  reset-password raw-JSON UX gap surfaced during this work is recorded in `project-status.md`
-  (Suggestions for Future Review #21) for a follow-up.
+  reset-password raw-JSON UX gap surfaced during this work was flagged for a follow-up
+  (Suggestions for Future Review #21).
 - **Issue #47** — Slice 2.2 Google Drive OAuth connect/disconnect + onboarding flag (branch
   `feature/slice-2-gdrive-oauth`). The live Drive connect/disconnect flow layered onto the Storage
   tab. New `app/api/v1/storage_google_drive.py`: `POST /auth` (same-origin fetch → returns Google's
@@ -1059,21 +1070,21 @@
   `aria-current="page"`; sidebar includes a Log out action. Sidebar is not shown on public
   (landing/login/register) pages.
 - **Docs restructure** — split `implementation-plan.md`'s 9 slice specs into self-contained
-  per-slice files under `docs/slices/`; `implementation-plan.md` is now a thin index + shared
+  per-slice files under `docs/features/original-organize-me/slices/`; `implementation-plan.md` is now a thin index + shared
   reference (stack, full schema, endpoint map, utilities, testing). Reduces per-issue context read
   during implementation.
 - **GitHub issues #10–#17** — Slice 1 (Project Scaffold + Auth + CI/CD) broken into 8 TDD-sized,
   independently-gradable vertical slices and published to the OrganizeMe project: scaffold +
   CI/CD (#10), DB foundation (#11), email/password auth (#12), Google OAuth (#13),
   forgot/reset password (#14), profile + dark mode + account deletion (#15), landing page (#16),
-  sidebar shell (#17). See `docs/slices/slice-1.md` for the source scope.
+  sidebar shell (#17). See `docs/features/original-organize-me/slices/slice-1.md` for the source scope.
 - **GitHub issue #23** — Slice 1.8: automated Playwright E2E UX tests, added at the user's request
   to validate Slice 1's overall delivery. Targets the deployed QA Cloud Run instance via a new
   `e2e-qa` CI job (runs after `deploy-qa`, becomes a required check). Google OAuth is out of scope
   for E2E (unreliable headlessly) and stays covered by #13's backend tests. Forgot/reset-password
   is tested via a debug-only `GET /api/v1/internal/e2e/last-reset-token` endpoint (gated by
   `E2E_TEST_MODE`, wired to QA env only, 404s when unset). Blocked by #15/#16/#17.
-- **`docs/implementation-plan.md`** — full implementation design spec: confirmed stack, complete
+- **`docs/features/original-organize-me/implementation-plan.md`** — full implementation design spec: confirmed stack, complete
   database schema (5 tables), API endpoint map (21 endpoints), 9 vertical implementation slices,
   key utilities, testing approach, prerequisites. Produced from a structured Q&A session.
 
@@ -1114,8 +1125,7 @@
     server-side); accepted because that same visitor's actual form submission was already broken
     without JS regardless — restoring the no-JS banner in isolation wouldn't restore a working
     no-JS auth flow, which is exactly the JSON-response problem this issue exists to fix. Flagged
-    in `docs/project-status.md`'s Suggestions for Future Review as a site-wide "does this app
-    require JavaScript" decision that's never been written down
+    as a site-wide "does this app require JavaScript" decision that's never been written down
   - Issue #27 (Google sign-in hangs on Google's own consent page after clicking "Continue") was
     also filed from the same user report but is **not** part of this fix — diagnosed via browser
     automation that the initial redirect to Google is well-formed (correct `client_id`/
@@ -1133,11 +1143,11 @@
 ## 2026-06-30
 
 ### Added
-- `docs/technical-approach.md` — full technology stack evaluation: backend framework, frontend
+- `docs/features/original-organize-me/technical-approach.md` — full technology stack evaluation: backend framework, frontend
   rendering strategy, database, background jobs, real-time pipeline progress, auth, notifications,
   deployment architecture (GCP Cloud Run), CI/CD pipeline, cost summary, and prerequisites
   checklist
-- `docs/prd.md` — full product requirements document based on 34-question grilling session
+- `docs/features/original-organize-me/prd.md` — full product requirements document based on 34-question grilling session
 - `docs/project-status.md` — current project phase, milestones, and next steps
 - `docs/changelog.md` — this file
 - `examples/example.whatsapp.txt` — canonical WhatsApp export sample (630 lines)

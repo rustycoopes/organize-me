@@ -43,9 +43,18 @@ export async function login(page: Page, email: string, password: string): Promis
   await expect(page).toHaveURL(/\/profile$/, { timeout: 30_000 });
 }
 
-/** Log out via the sidebar (the only button in the authenticated <aside>). */
+/**
+ * Log out via the sidebar. Targeted as the *last* button in <aside>, not "the only button" —
+ * the sidebar-nav-groups feature (organize-me#212) added per-app collapsible-group toggle
+ * buttons there too, which always render before the logout button in DOM order. `.last()` stays
+ * correct whether the current page came from the Host (which has those group buttons) or from
+ * event-creator (whose own chrome-package pin hasn't been bumped yet — organize-me#212's
+ * event-creator follow-up slices — so its pages still render the old single-button sidebar).
+ * A stable `#sidebar-logout-button` id exists on the Host's own template too; not used here so
+ * this helper keeps working during that cross-repo rollout window.
+ */
 export async function logout(page: Page): Promise<void> {
-  await page.locator('aside button').click();
+  await page.locator('aside button').last().click();
   await expect(page).toHaveURL(/\/login$/);
 }
 

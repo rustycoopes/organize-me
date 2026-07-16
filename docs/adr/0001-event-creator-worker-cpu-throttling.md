@@ -127,7 +127,7 @@ tuning the CPU-throttling flag. `event-creator`'s `POST /api/v1/upload` and
 `POST /internal/pipeline/run` endpoint on the same service, OIDC-verified. Each pipeline run is
 therefore a genuine inbound HTTP request, so Cloud Run allocates CPU for exactly its duration —
 true pay-per-run under request-based billing, no idle cost, no `min-instances`. Full design in
-`docs/platform-restructure/host-integration-guide.md`'s Cloud Tasks section; implementation in the
+`docs/host-integration-guide.md`'s Cloud Tasks section; implementation in the
 `event-creator` repo (`app/services/pipeline/dispatch.py`, `app/api/v1/internal_pipeline.py`,
 `infra/cloud_tasks/provision.{sh,ps1}`).
 

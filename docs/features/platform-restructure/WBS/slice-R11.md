@@ -18,7 +18,7 @@ verification battery.
   app-registry path rules.
 - Run the full verification battery in QA:
   - The R10 Host↔Event Creator boundary E2E suite (must be green).
-  - `docs/prd.md` user stories **13–52** against the new structure (functional parity).
+  - `docs/features/original-organize-me/prd.md` user stories **13–52** against the new structure (functional parity).
   - Independent-deploy proof: Event Creator builds/deploys to QA with **zero** Host
     build/redeploy (and vice versa) — a Success-Metric leading indicator.
 - Fix any regressions surfaced; re-run until fully green.
@@ -36,7 +36,7 @@ verification battery.
 ## Acceptance criteria
 - [ ] The QA LB routes to both Host and Event Creator per the app-registry path rules.
 - [ ] The R10 boundary E2E suite is green in QA.
-- [ ] 100% of `docs/prd.md` stories 13–52 pass against the new structure in QA.
+- [ ] 100% of `docs/features/original-organize-me/prd.md` stories 13–52 pass against the new structure in QA.
 - [ ] Event Creator deploys to QA with zero Host build/redeploy (and vice versa), demonstrated.
 - [ ] No open regressions against previously-working functionality.
 

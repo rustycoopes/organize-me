@@ -2,7 +2,7 @@
 
 Provisions the shared External HTTPS Load Balancer that fronts
 `organizeme.qa.russcoopersoftware.com` for QA — the single origin the platform sits behind, per
-[`docs/platform-restructure/WBS/slice-R5.md`](../../docs/platform-restructure/WBS/slice-R5.md).
+[`docs/features/platform-restructure/WBS/slice-R5.md`](../../docs/features/platform-restructure/WBS/slice-R5.md).
 
 ## IaC choice
 
@@ -115,5 +115,5 @@ Running this is non-disruptive: `organizeme.russcoopersoftware.com` is a brand-n
 nothing currently points at (prod is reached today via the raw Cloud Run URLs), so no existing
 traffic is affected until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI` are deliberately
 flipped to it in a separate, reviewed PR — see the R12 slice doc and
-[`host-integration-guide.md`](../../docs/platform-restructure/host-integration-guide.md) for that
+[`host-integration-guide.md`](../../docs/host-integration-guide.md) for that
 follow-up.

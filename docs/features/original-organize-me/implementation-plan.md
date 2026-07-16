@@ -1,7 +1,7 @@
 # OrganizeMe — Implementation Design Spec
 
 **Date:** 2026-06-30  
-**Source:** PRD (docs/prd.md) + Technical Approach (docs/technical-approach.md) + design Q&A session
+**Source:** PRD (docs/features/original-organize-me/prd.md) + Technical Approach (docs/features/original-organize-me/technical-approach.md) + design Q&A session
 
 ---
 
@@ -10,7 +10,7 @@
 This document captures all design decisions made during a structured Q&A session on top of the PRD and tech design doc. Its purpose is to provide enough detail to generate a concrete, ordered set of implementation tasks. The build strategy is **vertical slices** — each slice delivers a complete end-to-end user-facing feature (DB migration + API endpoints + Jinja2/HTMX frontend + tests) in one go.
 
 > **Per-slice specs:** Each slice now has its own self-contained file under
-> [`docs/slices/`](slices/) — see the index below. When implementing an issue, read only that
+> [`docs/features/original-organize-me/slices/`](slices/) — see the index below. When implementing an issue, read only that
 > slice's file (it embeds the relevant schema, endpoints, and utilities) rather than this whole
 > document. This document holds the shared/stable reference: stack, full schema, full endpoint
 > map, cross-slice utilities, and testing approach.
@@ -218,7 +218,7 @@ All under `/api/v1/`:
 
 ## Vertical Implementation Slices — Index
 
-Each slice is a self-contained spec under [`docs/slices/`](slices/). Read the relevant one
+Each slice is a self-contained spec under [`docs/features/original-organize-me/slices/`](slices/). Read the relevant one
 when implementing an issue; it embeds the schema tables, endpoints, and utilities that slice needs.
 
 | Slice | File | Delivers |

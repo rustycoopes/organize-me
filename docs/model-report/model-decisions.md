@@ -16,7 +16,7 @@ rather than filed as a separate `modelsuggested` issue, since it's inherent thir
 uncertainty (nothing in the codebase to "fix") rather than a code improvement.
 
 ### Improvement pass
-Compared against issue #54 + `docs/slices/slice-5.md`. All 3 slots used on implemented fixes (no
+Compared against issue #54 + `docs/features/original-organize-me/slices/slice-5.md`. All 3 slots used on implemented fixes (no
 deferred issue needed this round):
 
 1. **New migration `f6a7b8c9d0e1`** - added `ix_events_user_id_resolved_date_earliest_created_at`
@@ -87,7 +87,7 @@ polls would have discarded the seeded run).
 ## 2026-07-03 — #52 Slice 4.1 upload page + 7-step pipeline
 
 ### Execution model — followed the resolved in-process decision over the stale spec wording
-`docs/slices/slice-4.md` and the issue body still say "Celery task / `ALWAYS_EAGER`", but #52's
+`docs/features/original-organize-me/slices/slice-4.md` and the issue body still say "Celery task / `ALWAYS_EAGER`", but #52's
 resolved-decision comment (2026-07-03) is explicit: run the pipeline as an **in-process asyncio
 background task, no Celery/Redis**, state in Postgres, the background task opens its own DB session.
 Built it that way; left the dormant `app/worker.py` Celery stub unused. Recorded here because the
@@ -129,7 +129,7 @@ Same as #51: no `intake` status option exists on the board, so #68 got an **`int
 ## 2026-07-03 — #51 Slice 4.0 pipeline foundation
 
 ### Improvement pass
-Compared the work against issue #51 + `docs/slices/slice-4.md`. Outcome:
+Compared the work against issue #51 + `docs/features/original-organize-me/slices/slice-4.md`. Outcome:
 
 - **Implemented now:** a fixture-driven `date_parser` test that runs `parse_earliest_date` over
   every `resolved_date` in `examples/example.lmmoutput.txt` (all 22 real values), asserting each

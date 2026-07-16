@@ -1,10 +1,20 @@
 {% extends "chrome_base.html" %}
+{% from "macros/chrome_nav.html" import nav_link %}
 
 {#
   Shared layout for every authenticated page across every OrganizeMe-hosted app. Renders the
-  persistent left sidebar (from the nav_items global — see organizeme_chrome.registry) and
-  exposes a `page` block for the actual page content. The active item is derived from the
-  request path.
+  persistent left sidebar, grouped by app with independently-collapsible groups (see
+  organizeme_chrome.nav_groups), and exposes a `page` block for the actual page content. The
+  active item is derived from the request path.
+
+  Every page rendering this template must merge `app.core.nav.sidebar_nav_context()`'s return
+  value into its own template context — see docs/adr/sidebar-nav-groups-render-boundary.md in the
+  organize-me repo for why this isn't computed here as an environment global. That context
+  provides `nav_groups`, `flat_nav_items`, and two collapsed-state maps keyed by service_name:
+  `nav_collapsed_json` (what's displayed, including the current-page force-open override) and
+  `nav_stored_collapsed_json` (the user's real stored preference, minus that override) — the
+  toggle below PATCHes the latter, never the former, so clicking one group can never overwrite
+  another group's real stored preference just because it happened to be force-open for this page.
 #}
 
 {% block content %}
@@ -31,18 +41,75 @@
     <label for="sidebar-drawer-toggle" class="drawer-overlay" aria-label="Close navigation"></label>
     <aside class="flex min-h-full w-64 flex-col bg-base-100 border-r border-base-300">
       <div class="px-4 py-4 text-xl font-bold">OrganizeMe</div>
-      <ul id="sidebar-nav" class="menu w-full grow gap-1 px-2" aria-label="Main navigation">
-        {% for item in nav_items %}
-        <li>
-          <a
-            href="{{ item.path }}"
-            {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
-          >{{ item.label }}</a>
-        </li>
+      <div
+        id="sidebar-nav"
+        class="menu w-full grow gap-1 px-2"
+        aria-label="Main navigation"
+        x-data="{
+          collapsed: {{ nav_collapsed_json | tojson }},
+          storedCollapsed: {{ nav_stored_collapsed_json | tojson }},
+          toggle(serviceName) {
+            this.collapsed[serviceName] = !this.collapsed[serviceName];
+            this.storedCollapsed[serviceName] = this.collapsed[serviceName];
+            fetch('/api/v1/users/me', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nav_collapsed_groups: this.storedCollapsed }),
+            });
+          },
+        }"
+      >
+        {#
+          group.service_name is interpolated directly into Alpine JS string literals below
+          (collapsed['...'], toggle('...'), the #nav-group-... id) without escaping — safe only
+          because it always comes from the static, developer-controlled APPS registry
+          (organizeme_chrome.registry), never from user input or this dict's own keys.
+        #}
+        {% for group in nav_groups %}
+        <div class="mb-1">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-block justify-between px-2 text-xs font-semibold uppercase tracking-wide"
+            aria-expanded="{{ 'false' if group.collapsed else 'true' }}"
+            :aria-expanded="(!collapsed['{{ group.service_name }}']).toString()"
+            aria-controls="nav-group-{{ group.service_name }}"
+            @click="toggle('{{ group.service_name }}')"
+          >
+            <span>{{ group.label }}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4 shrink-0 transition-transform"
+              :class="{ '-rotate-90': collapsed['{{ group.service_name }}'] }"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <ul
+            id="nav-group-{{ group.service_name }}"
+            class="menu w-full gap-1"
+            x-show="!collapsed['{{ group.service_name }}']"
+            {% if group.collapsed %}style="display:none"{% endif %}
+          >
+            {% for item in group.nav %}
+            {{ nav_link(item, request) }}
+            {% endfor %}
+          </ul>
+        </div>
         {% endfor %}
-      </ul>
+
+        <ul class="menu w-full gap-1 px-0 mt-auto">
+          {% for item in flat_nav_items %}
+          {{ nav_link(item, request) }}
+          {% endfor %}
+        </ul>
+      </div>
       <div class="border-t border-base-300 p-2" x-data="{ loggingOut: false }">
         <button
+          id="sidebar-logout-button"
           type="button"
           class="btn btn-ghost btn-block justify-start"
           :disabled="loggingOut"

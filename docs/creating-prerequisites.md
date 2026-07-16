@@ -1,7 +1,7 @@
 # Creating Prerequisites — Setup Log
 
 **Date:** 2026-06-30
-**Purpose:** Record of the decisions and steps taken to satisfy the "Prerequisites Before Slice 1 Begins" checklist in `docs/implementation-plan.md`, and the related GitHub issues (#1, #2, #6).
+**Purpose:** Record of the decisions and steps taken to satisfy the "Prerequisites Before Slice 1 Begins" checklist in `docs/features/original-organize-me/implementation-plan.md`, and the related GitHub issues (#1, #2, #6).
 
 ---
 
@@ -106,7 +106,7 @@ Steps taken:
 
 ## Status of prerequisites checklist
 
-From `docs/implementation-plan.md` → "Prerequisites Before Slice 1 Begins":
+From `docs/features/original-organize-me/implementation-plan.md` → "Prerequisites Before Slice 1 Begins":
 
 - [x] GCP project created, billing linked, required APIs enabled (issue #1)
 - [x] Artifact Registry repo + two Cloud Run services (QA + prod) provisioned (issue #2)

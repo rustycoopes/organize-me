@@ -23,6 +23,7 @@ def _to_user_read(user: User) -> UserRead:
         name=user.name,
         phone_number=user.phone_number,
         dark_mode=user.dark_mode,
+        nav_collapsed_groups=user.nav_collapsed_groups,
     )
 
 

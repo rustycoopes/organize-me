@@ -11,12 +11,14 @@ way. Some of the earliest slices (R0, R1) were one-time platform setup, not part
 new app — flagged inline where that applies.
 
 It is a living document — **update it in the same PR that lands each new Platform Restructure
-slice** (`docs/platform-restructure/WBS/slice-R*.md`), whether or not that slice touches another
+slice** (`docs/features/platform-restructure/WBS/slice-R*.md`), whether or not that slice touches another
 repo directly. Each slice gets its own `## Slice R<n> — <name>` section below, added in order.
 
 For the full architecture rationale, see
-[`platform-restructure-design.md`](platform-restructure-design.md) (design) and
-[`platform-restructure-prd.md`](platform-restructure-prd.md) (product intent). For the
+[`platform-restructure-design.md`](features/platform-restructure/platform-restructure-design.md)
+(design) and
+[`platform-restructure-prd.md`](features/platform-restructure/platform-restructure-prd.md)
+(product intent). For the
 credential/secret journey in detail, see [`secrets-and-accounts.md`](secrets-and-accounts.md) —
 this doc summarizes the actionable subset; that one is the full reference.
 
@@ -575,8 +577,8 @@ When you finish implementing a slice (whether in `organize-me` or a hosted-app r
   (see R0/R1 above for the pattern) instead of leaving it ambiguous.
 
 Keep each section short and actionable. This doc is deliberately the *full* slice-by-slice history
-(that's also `docs/project-status.md`'s and the WBS files' job, in more detail) — but its purpose
-here is narrower: only the parts of each slice that another component/integrator needs to know.
+(that's also the WBS files' job, in more detail) — but its purpose here is narrower: only the parts
+of each slice that another component/integrator needs to know.
 For the condensed, forward-looking version of the same information (no slice history, just "what
 do I do today"), see [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) and update that
 doc too if a new slice changes the generic pattern (e.g. a new required registry field, a new

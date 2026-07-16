@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Slice R12 — provisions the production External HTTPS Load Balancer that fronts
-# organizeme.russcoopersoftware.com. See docs/platform-restructure/WBS/slice-R12.md.
+# organizeme.russcoopersoftware.com. See docs/features/platform-restructure/WBS/slice-R12.md.
 #
 # Mirrors infra/gcp_lb/provision.sh (R5's QA setup) exactly, with every resource name suffixed
 # `-prod` instead of `-qa` (GCP global resource names collide across environments, so QA's

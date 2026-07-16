@@ -6,7 +6,7 @@ from fastapi_users.authentication import AuthenticationBackend, CookieTransport,
 from app.core.config import get_settings
 from app.models.user import User
 
-# 7-day cookie/token lifetime per docs/implementation-plan.md.
+# 7-day cookie/token lifetime per docs/features/original-organize-me/implementation-plan.md.
 COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
 # cookie_secure defaults to True: Cloud Run terminates TLS at the edge in prod, and modern

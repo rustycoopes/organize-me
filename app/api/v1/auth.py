@@ -297,7 +297,7 @@ async def google_callback(
             # A user who already registered with email/password and then signs in with Google
             # using the same address gets the Google account linked to their existing user
             # rather than a rejected/duplicate signup - see issue #13 discussion and the
-            # Authentication section of docs/technical-approach.md.
+            # Authentication section of docs/features/original-organize-me/technical-approach.md.
             associate_by_email=True,
             # Google has already verified this email address as part of its own OAuth consent
             # flow, so there's no need to make the user re-verify it with us.

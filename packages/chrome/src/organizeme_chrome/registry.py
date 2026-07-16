@@ -55,7 +55,7 @@ APPS: list[AppEntry] = [
             # R11 (QA cutover, #166): Upload/Processing/Logs/Prompt move here from "organizeme" -
             # R7-R9 built full parity implementations of each in Event Creator, but deliberately
             # kept the Host as the live-routed owner until this slice's full verification battery
-            # (docs/prd.md stories 13-52, the R10 boundary suite) could run green. The Host's own
+            # (docs/features/original-organize-me/prd.md stories 13-52, the R10 boundary suite) could run green. The Host's own
             # copies of these pages/endpoints are now unreachable through the LB but are left in
             # place (not deleted) - that cleanup is R13's job, not this one's.
             AppNavItem("/upload", "Upload"),
@@ -64,7 +64,7 @@ APPS: list[AppEntry] = [
             AppNavItem("/prompt", "Prompt"),
         ],
         # R7: Storage + Notifications move here from "organizeme" — the storage-connection and
-        # settings functionality migrated into Event Creator (docs/platform-restructure/WBS/
+        # settings functionality migrated into Event Creator (docs/features/platform-restructure/WBS/
         # slice-R7.md). Preferences is a deliberate stub: it was never built in the monolith
         # (dark-mode lives on the Host Profile page instead), declared now so the Host Settings
         # shell shows the tab while Event Creator's fragment route serves placeholder content.

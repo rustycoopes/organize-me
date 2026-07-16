@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
 Slice R12 — provisions the production External HTTPS Load Balancer that fronts
-organizeme.russcoopersoftware.com. See docs/platform-restructure/WBS/slice-R12.md.
+organizeme.russcoopersoftware.com. See docs/features/platform-restructure/WBS/slice-R12.md.
 
 .DESCRIPTION
 Windows PowerShell equivalent of provision-prod.sh — same steps, same idempotency pattern (each

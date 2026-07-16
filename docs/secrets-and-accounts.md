@@ -161,9 +161,9 @@ flowchart TB
 
 ## Related docs
 
-- `docs/platform-restructure/WBS/slice-R4.md` — domain-scoped cookie + Secret Manager (JWT_SECRET
+- `docs/features/platform-restructure/WBS/slice-R4.md` — domain-scoped cookie + Secret Manager (JWT_SECRET
   first moved here).
-- `docs/platform-restructure/WBS/slice-R6.md` — Event Creator scaffold (this doc was written
+- `docs/features/platform-restructure/WBS/slice-R6.md` — Event Creator scaffold (this doc was written
   alongside it).
 - `infra/gcp_lb/README.md` — the Load Balancer/URL-map side of the request flow shown above.
 - `app/core/security.py` — `CredentialCipher`, the code that actually uses `ENCRYPTION_KEY`.
