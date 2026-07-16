@@ -43,9 +43,13 @@ export async function login(page: Page, email: string, password: string): Promis
   await expect(page).toHaveURL(/\/profile$/, { timeout: 30_000 });
 }
 
-/** Log out via the sidebar (the only button in the authenticated <aside>). */
+/**
+ * Log out via the sidebar. Targeted by a stable id rather than "the only button in <aside>" —
+ * the sidebar-nav-groups feature added per-app collapsible-group toggle buttons there too, so
+ * that assumption no longer holds.
+ */
 export async function logout(page: Page): Promise<void> {
-  await page.locator('aside button').click();
+  await page.locator('#sidebar-logout-button').click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
