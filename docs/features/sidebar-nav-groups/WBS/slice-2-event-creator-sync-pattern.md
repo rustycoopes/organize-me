@@ -58,3 +58,40 @@ as it behaves in organize-me.
   event-creator Dashboard page without a page-specific override.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-16, event-creator#18, branch `feature/sidebar-nav-groups-slice2`, PR event-creator#20)
+
+Shipped as designed, with a scope expansion discovered during code review: bumping
+event-creator's `organizeme-chrome` pin to `chrome-v0.5.4` changed the shared
+`chrome_authenticated_base.html` template to require `nav_groups`/`flat_nav_items`/
+`nav_collapsed_json`/`nav_stored_collapsed_json` in context on **every** page extending it — not
+just Dashboard. Every page route in event-creator extends that template (Dashboard, Logs,
+Processing, Processing run detail, Prompt, Upload), so a missing key crashes the `tojson` filter
+(`TypeError: Object of type Undefined is not JSON serializable`, confirmed empirically). Shipping
+the pin bump safely required wiring all of them in this same change, which incidentally completed
+[Slice 3](slice-3-event-creator-remaining-routes.md) (event-creator#19) as the same delivery — see
+that slice's own Delivered note.
+
+Also found and fixed during review: two pre-existing `test_settings_fragments.py` assertions
+expected raw, unescaped quotes in rendered JSON — the pin bump's `tojson` filter now HTML-entity-
+escapes quotes universally (the fix from [Slice 1](slice-1-host-sidebar-groups.md)'s `x-data`
+bug applies to every `| tojson` use in the shared package, not just the sidebar). Updated to
+expect the escaped form, verified empirically against the actual filter rather than by inspection.
+
+`get_dark_mode()` (in `app/services/host_user.py`) became dead code once every route was
+refactored to a single `get_host_user()` fetch (covering both `dark_mode` and
+`nav_collapsed_groups`) — removed it and its dedicated tests rather than leaving it unused.
+
+CI: one round of failures (2 pre-existing test assertions broken by the escaping change, caught
+by CI rather than locally — no DB credentials in the implementation sandbox), fixed and re-pushed
+to fully green (unit tests, `deploy-qa`, `e2e-boundary-qa`, `e2e-qa` all passed). Manually verified
+live on QA via browser automation: registered an account, collapsed the Event Creator group from
+organize-me's own Settings page, confirmed the Host-stored preference round-tripped correctly to
+event-creator's `/dashboard` (`storedCollapsed: {"event-creator": true}` while displayed expanded
+due to the current-page force-open rule), confirmed toggling the group *from* event-creator's own
+page correctly PATCHed back to the Host (no write-side wiring needed — the shared Load Balancer
+routes `/api/v1/users/me` to the Host regardless of which service rendered the page), and
+confirmed `/logs` — one of the routes that would have 500'd without the scope expansion — renders
+correctly.
+
+Merged to `main`, deployed to prod, `test` + `deploy-prod` jobs both green.

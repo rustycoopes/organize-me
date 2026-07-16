@@ -21,6 +21,7 @@
 
 ### Added
 - 2026-07-16 — #212 Slice 1: Grouped, collapsible sidebar in organize-me (Host) — [details](features/sidebar-nav-groups/WBS/slice-1-host-sidebar-groups.md)
+- 2026-07-16 — event-creator#18/#19 Slices 2+3: event-creator reads the Host's real per-user sidebar-group collapse state on every page — [details](features/sidebar-nav-groups/WBS/slice-2-event-creator-sync-pattern.md)
 - **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
   Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
   since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API
