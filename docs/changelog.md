@@ -1,9 +1,19 @@
 # OrganizeMe — Changelog
 
-> Long-form implementation notes for completed issues live in
-> [`changelog-archive.md`](changelog-archive.md). Keep this file lean: a short entry per change,
-> with a pointer to the archive for full detail. Append new entries here; move them to the archive
-> once they grow long or the issue is merged.
+> This is the single source of truth for "what shipped." As of 2026-07-16, new entries are
+> **one line per merged issue**, linking to where the full detail actually lives:
+> - For a feature built via the `docs/features/<feature-slug>/` workflow (or the legacy
+>   `docs/platform-restructure/`), link to that slice's WBS file — `/to-implementation` appends a
+>   **Delivered** section there (issue #, branch, outcome) when the work lands.
+> - For a small change filed straight to a GitHub issue with no WBS slice, link to the issue/PR
+>   itself.
+>
+> Example: `- 2026-07-16 — #168 Slice R13: Host Cleanup + Hosted-App Playbook — [details](platform-restructure/WBS/slice-R13.md)`
+>
+> `docs/project-status.md` has been removed — this index plus each WBS slice's own status *is* the
+> project-status view now. Entries written before this policy took effect remain in their original
+> long form below (and in [`changelog-archive.md`](changelog-archive.md)); only new entries follow
+> the one-liner format.
 
 ---
 
@@ -987,8 +997,8 @@
   account-deletion test now replays the exact pre-deletion cookie against `/api/v1/users/me` and
   asserts `401` (proving the token is dead server-side, not just dropped by the browser), and a
   pytest guard asserts `E2E_TEST_MODE` never appears in `deploy.yml` (prod). A separate
-  reset-password raw-JSON UX gap surfaced during this work is recorded in `project-status.md`
-  (Suggestions for Future Review #21) for a follow-up.
+  reset-password raw-JSON UX gap surfaced during this work was flagged for a follow-up
+  (Suggestions for Future Review #21).
 - **Issue #47** — Slice 2.2 Google Drive OAuth connect/disconnect + onboarding flag (branch
   `feature/slice-2-gdrive-oauth`). The live Drive connect/disconnect flow layered onto the Storage
   tab. New `app/api/v1/storage_google_drive.py`: `POST /auth` (same-origin fetch → returns Google's
@@ -1114,8 +1124,7 @@
     server-side); accepted because that same visitor's actual form submission was already broken
     without JS regardless — restoring the no-JS banner in isolation wouldn't restore a working
     no-JS auth flow, which is exactly the JSON-response problem this issue exists to fix. Flagged
-    in `docs/project-status.md`'s Suggestions for Future Review as a site-wide "does this app
-    require JavaScript" decision that's never been written down
+    as a site-wide "does this app require JavaScript" decision that's never been written down
   - Issue #27 (Google sign-in hangs on Google's own consent page after clicking "Continue") was
     also filed from the same user report but is **not** part of this fix — diagnosed via browser
     automation that the initial redirect to Google is well-formed (correct `client_id`/

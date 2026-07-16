@@ -1,24 +1,37 @@
 #!/usr/bin/env python3
-"""List Todo issues in the OrganizeMe project, grouped by restructure slice then priority tier.
+"""List Todo issues in the OrganizeMe project, grouped by feature track then slice then priority tier.
 
 The skill uses this to get a deterministic shortlist so it doesn't re-derive the gathering,
 slice-ordering, and tiering logic on every run. It intentionally does NOT make the final pick —
-the ordering *within* a tier is a judgment call (dependencies, what unblocks the most, what makes
-a good foundation) that the model makes after reading the candidate issue bodies.
+the ordering *within* a tier (and across tracks, if more than one has ready work) is a judgment
+call that the model makes after reading the candidate issue bodies.
 
-Scope: only issues carrying the `framework-refactor` label are considered. Among those, the slice
-is read from a `restructure-rN` label (restructure-r1, restructure-r2, …). Work is preferred by
-slice number, lowest first — earlier slices are the foundation later ones build on, so finish them
-first. Within a single slice, issues are bucketed by priority tier.
+A "track" is either:
+  - the legacy Platform Restructure track: issues carrying `framework-refactor` +
+    `restructure-rN` (restructure-r1, restructure-r2, ...) — track key "restructure".
+  - a new-style feature track (per the docs/features/<feature-slug>/ workflow): issues carrying
+    a `<feature-slug>` label plus a `slice-N` label — track key is the feature-slug.
+
+Within a track, work is preferred by slice number, lowest first — earlier slices are the
+foundation later ones build on, so finish them first. Within a single slice, issues are bucketed
+by priority tier.
 
 Usage:
-    python todo_issues.py                             # all restructure slices, ordered by number
-    python todo_issues.py --slice restructure-r2      # restrict to one slice
+    python todo_issues.py                                # every track, every slice
+    python todo_issues.py --feature restructure           # legacy track only
+    python todo_issues.py --feature prompt-versioning     # one new-style feature track
+    python todo_issues.py --feature prompt-versioning --slice 2
     python todo_issues.py --status "In Progress"
 
 Priority tiers (highest first): bug > enhancement > future-enhancement > (other/untiered)
-Output: JSON on stdout: {"status": ..., "total": ..., "slices": [ {slice, number, total, tiers}, ... ]}
-`slices` is ordered by slice number ascending. Each candidate: {"number", "title", "labels"}.
+Output: JSON on stdout:
+    {"status": ..., "total": ..., "tracks": [
+        {"feature": "restructure"|"<feature-slug>",
+         "slices": [ {"slice": ..., "number": ..., "total": ..., "tiers": {...}}, ... ]},
+        ...
+    ]}
+`tracks` and each track's `slices` are ordered lowest slice number first. Each candidate:
+{"number", "title", "labels"}.
 """
 import argparse
 import json
@@ -32,8 +45,16 @@ PROJECT_OWNER = "rustycoopes"
 # Highest priority first. An issue is placed in the first tier whose label it carries.
 TIER_ORDER = ["bug", "enhancement", "future-enhancement"]
 
-SCOPE_LABEL = "framework-refactor"
-SLICE_RE = re.compile(r"^restructure-r(\d+)$")
+RESTRUCTURE_SCOPE_LABEL = "framework-refactor"
+RESTRUCTURE_SLICE_RE = re.compile(r"^restructure-r(\d+)$")
+NEW_SLICE_RE = re.compile(r"^slice-(\d+)$")
+
+# Labels that are never a feature-slug, even though they aren't a slice/tier label either.
+NON_FEATURE_LABELS = {
+    "bug", "documentation", "duplicate", "enhancement", "good first issue", "help wanted",
+    "invalid", "question", "wontfix", "prerequisites", "future-enhancement", "russ",
+    "manual-task", "modelsuggested", "intake", RESTRUCTURE_SCOPE_LABEL,
+}
 
 
 def fetch_items():
@@ -58,22 +79,40 @@ def classify(labels):
     return "other"
 
 
-def slice_number(labels):
-    """Return the lowest restructure-rN number among an issue's labels, or None if it carries none."""
-    nums = [int(m.group(1)) for label in labels if (m := SLICE_RE.match(label))]
-    return min(nums) if nums else None
+def track_and_slice(labels):
+    """Return (track_key, slice_number) for an issue's labels, or (None, None) if it belongs to
+    no recognized track."""
+    label_set = set(labels)
+
+    if RESTRUCTURE_SCOPE_LABEL in label_set:
+        nums = [int(m.group(1)) for l in labels if (m := RESTRUCTURE_SLICE_RE.match(l))]
+        if nums:
+            return "restructure", min(nums)
+        return None, None
+
+    slice_nums = [int(m.group(1)) for l in labels if (m := NEW_SLICE_RE.match(l))]
+    if not slice_nums:
+        return None, None
+    feature_slugs = [l for l in labels if l not in NON_FEATURE_LABELS and not NEW_SLICE_RE.match(l)]
+    if len(feature_slugs) != 1:
+        # Ambiguous or missing feature-slug label — can't place it in a track.
+        return None, None
+    return feature_slugs[0], min(slice_nums)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--slice", default=None,
-                    help="restrict to a single slice label (e.g. restructure-r2); default: all slices")
+    ap.add_argument("--feature", default=None,
+                    help="restrict to one track: a feature-slug, or 'restructure' for the legacy "
+                         "track; default: all tracks")
+    ap.add_argument("--slice", type=int, default=None,
+                    help="restrict to one slice number within the selected --feature")
     ap.add_argument("--status", default="Todo",
                     help="project Status value to filter by (default: Todo)")
     args = ap.parse_args()
 
-    # slice number -> {tier: [candidates]}
-    by_slice = {}
+    # track -> slice number -> {tier: [candidates]}
+    by_track = {}
     for item in fetch_items():
         content = item.get("content") or {}
         number = content.get("number")
@@ -82,36 +121,44 @@ def main():
         if (item.get("status") or "") != args.status:
             continue
         labels = item.get("labels") or []
-        if SCOPE_LABEL not in labels:  # only the restructure/framework-refactor track
+        feature, snum = track_and_slice(labels)
+        if feature is None:
             continue
-        snum = slice_number(labels)
-        if snum is None:  # no restructure-rN label
+        if args.feature is not None and args.feature != feature:
             continue
-        if args.slice is not None and args.slice not in labels:
+        if args.slice is not None and args.slice != snum:
             continue
-        tiers = by_slice.setdefault(snum, {t: [] for t in TIER_ORDER + ["other"]})
+        tiers = by_track.setdefault(feature, {}).setdefault(snum, {t: [] for t in TIER_ORDER + ["other"]})
         tiers[classify(labels)].append({
             "number": number,
             "title": content.get("title", ""),
             "labels": labels,
         })
 
-    slices = []
-    for snum in sorted(by_slice):  # slice number ascending — earliest slice first
-        tiers = by_slice[snum]
-        for t in tiers:
-            tiers[t].sort(key=lambda c: c["number"])
-        slices.append({
-            "slice": f"restructure-r{snum}",
-            "number": snum,
-            "total": sum(len(v) for v in tiers.values()),
-            "tiers": tiers,
+    tracks = []
+    for feature in sorted(by_track):
+        slices_for_feature = by_track[feature]
+        slices = []
+        for snum in sorted(slices_for_feature):
+            tiers = slices_for_feature[snum]
+            for t in tiers:
+                tiers[t].sort(key=lambda c: c["number"])
+            slice_label = f"restructure-r{snum}" if feature == "restructure" else f"slice-{snum}"
+            slices.append({
+                "slice": slice_label,
+                "number": snum,
+                "total": sum(len(v) for v in tiers.values()),
+                "tiers": tiers,
+            })
+        tracks.append({
+            "feature": feature,
+            "slices": slices,
         })
 
     print(json.dumps({
         "status": args.status,
-        "total": sum(s["total"] for s in slices),
-        "slices": slices,
+        "total": sum(s["total"] for t in tracks for s in t["slices"]),
+        "tracks": tracks,
     }, indent=2))
 
 

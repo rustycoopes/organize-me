@@ -575,8 +575,8 @@ When you finish implementing a slice (whether in `organize-me` or a hosted-app r
   (see R0/R1 above for the pattern) instead of leaving it ambiguous.
 
 Keep each section short and actionable. This doc is deliberately the *full* slice-by-slice history
-(that's also `docs/project-status.md`'s and the WBS files' job, in more detail) — but its purpose
-here is narrower: only the parts of each slice that another component/integrator needs to know.
+(that's also the WBS files' job, in more detail) — but its purpose here is narrower: only the parts
+of each slice that another component/integrator needs to know.
 For the condensed, forward-looking version of the same information (no slice history, just "what
 do I do today"), see [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) and update that
 doc too if a new slice changes the generic pattern (e.g. a new required registry field, a new

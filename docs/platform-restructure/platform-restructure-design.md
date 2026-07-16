@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** 2026-07-10
-**Status:** Implemented — slices R0–R13 all shipped (see `docs/project-status.md`); this doc now
+**Status:** Implemented — slices R0–R13 all shipped (see `docs/changelog.md`); this doc now
 describes the architecture as built, not a proposal. Where the actual build diverged from a
 decision below, that's called out inline.
 **Implements:** [`docs/platform-restructure-prd.md`](platform-restructure-prd.md)

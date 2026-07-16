@@ -122,8 +122,7 @@ GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy -
 |----------|-------------|
 | [PRD](docs/prd.md) | Full product requirements and user stories |
 | [Technical Approach](docs/technical-approach.md) | Stack selection, infrastructure, CI/CD, cost summary, and prerequisites checklist |
-| [Changelog](docs/changelog.md) | Release history |
-| [Project Status](docs/project-status.md) | Current phase and next steps |
+| [Changelog](docs/changelog.md) | Release history — one line per merged issue, linking to full detail |
 
 ---
 
@@ -143,5 +142,5 @@ profile, settings-shell, and nav-shell, with all event-extraction functionality 
 processing pipeline, storage connections, LLM prompt config, events dashboard, logs) split out
 into the independent `event-creator` service and removed from this repo (Slice R13, issue #168).
 See [`docs/platform-restructure/`](docs/platform-restructure/) for the full restructure design
-and slice-by-slice WBS, and [Project Status](docs/project-status.md) for the complete history
-(including the pre-restructure monolith slices this repo used to carry).
+and slice-by-slice WBS, and [Changelog](docs/changelog.md) for the complete history (including the
+pre-restructure monolith slices this repo used to carry).

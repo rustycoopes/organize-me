@@ -365,8 +365,8 @@ page/template) since their file sets didn't overlap.
   it, confirming it was real). Also applied on review: merged two `except` blocks in
   `update_current_user` that raised byte-for-byte identical `HTTPException`s, and removed a
   redundant `btn-disabled` class already covered by the native `:disabled` attribute. Not
-  actioned — recorded instead in `docs/project-status.md`'s Suggestions for Future Review as a
-  second, stronger flag: the profile page repeats the same DaisyUI card/form markup already
+  actioned — flagged instead, a second and stronger time: the profile page repeats the same
+  DaisyUI card/form markup already
   duplicated four times across the auth templates, which #14's review named #15 itself as the
   right point to fix; deferred again here to avoid touching four already-shipped, tested
   templates outside this issue's scope
@@ -391,8 +391,8 @@ page/template) since their file sets didn't overlap.
 - Self-reviewed directly (no multi-agent `/code-review` dispatch) given the diff's size and
   complexity — a handful of static HTML/route lines with no business logic; nothing survived
   review
-- 5 PRD-alignment suggestions recorded in `docs/project-status.md` (not implemented, out of
-  scope): no Open Graph/social-preview meta tags, no `robots.txt`/SEO discoverability decision,
+- 5 PRD-alignment suggestions flagged (not implemented, out of scope): no Open Graph/social-preview
+  meta tags, no `robots.txt`/SEO discoverability decision,
   no footer with privacy policy/terms-of-service links, no favicon configured on `base.html`, and
   undecided behaviour for an already-authenticated visitor landing on `/` (relevant once #17+
   builds a dashboard to redirect to)

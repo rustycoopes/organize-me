@@ -3,7 +3,7 @@
 **Version:** 2.0
 **Date:** 2026-07-10
 **Status:** Implemented — all slices (R0–R13) shipped and the P0 requirements below are live in
-production; see `docs/project-status.md` for the slice-by-slice record. Retained as the structural
+production; see `docs/changelog.md` for the slice-by-slice record. Retained as the structural
 rationale/requirements record, not as a forward-looking proposal.
 
 **Relationship to other docs:** [`docs/prd.md`](prd.md) captures the *functional* requirements of the event-extraction product (dashboard, upload, processing, prompt, notifications, etc.) as it exists today. This document governs the *structural* restructuring of that same functionality into a multi-repo, multi-application platform. `docs/prd.md` doesn't change — it becomes the functional spec for the **Event Creator** application described here. `docs/technical-approach.md` remains the technical reference for today's single-repo build and will be superseded by per-repo technical-approach docs once implementation begins.

@@ -21,12 +21,12 @@ build order gives the project a solid base: finish earlier slices before later o
 broken before adding new things, land foundational pieces before the work that depends on them, and
 don't sink effort into low-priority polish while higher-value work sits waiting.
 
-**Scope: the restructure track, earliest slice first.** This skill only considers `Todo` issues
-that carry the `framework-refactor` label. Among those, the slice is read from a `restructure-rN`
-label (`restructure-r1`, `restructure-r2`, `restructure-r3`, …) — each increment is a slice. Always
-strongly prefer the lowest-numbered restructure slice that still has ready work — an earlier slice
-is the foundation later ones build on, so it gets drained before the next one starts. Only once a
-slice has no `Todo` work does selection move to the next slice up.
+**Scope: any active feature track, plus the legacy restructure track.** A "track" is either the
+legacy Platform Restructure track (`framework-refactor` + `restructure-rN` labels) or a new-style
+feature track (`docs/features/<feature-slug>/` — issues carrying a `<feature-slug>` label +
+`slice-N` label). Within a track, the slice is read from its slice label; always strongly prefer
+the lowest-numbered slice in a track that still has ready work — an earlier slice is the foundation
+later ones build on, so it gets drained before the next one starts.
 
 **Ignore `In Progress` issues completely.** An `In Progress` issue is already claimed — assume
 another worker (or a concurrent loop session) owns it. Never pick, resume, or hand off to an
@@ -38,27 +38,32 @@ do not go around that filter to look them up.
 
 ## Step 1 — Gather what's ready
 
-Run the bundled helper to get every `Todo` restructure-track issue across all slices, grouped by
-slice number and then by priority tier:
+Run the bundled helper to get every `Todo` issue across all tracks, grouped by track, then slice
+number, then priority tier:
 
 ```bash
 python .claude/skills/next-issue/scripts/todo_issues.py
 ```
 
-It reads the project board via `gh`, keeps only items whose Status is `Todo` that carry the
-`framework-refactor` label and a `restructure-rN` label, and returns a `slices` array ordered by
-slice number ascending; within each slice, issues are bucketed into `bug` → `enhancement` →
-`future-enhancement` → `other`. It deliberately does **not** pick for you — ordering *within* a
-tier is a judgment call the next steps make. (Pass `--slice restructure-r2` to restrict to a single
-slice if the user asks for one specifically.)
+It reads the project board via `gh`, keeps only items whose Status is `Todo` that belong to a
+recognized track (legacy `restructure-rN`, or a `<feature-slug>` + `slice-N` pair), and returns a
+`tracks` array (each with a `slices` array ordered by slice number ascending; within each slice,
+issues are bucketed into `bug` → `enhancement` → `future-enhancement` → `other`). It deliberately
+does **not** pick for you. Pass `--feature <feature-slug-or-restructure>` to restrict to one track,
+and `--slice <n>` to further restrict to one slice within it, if the user asks for one specifically.
 
-If the helper returns zero issues across all slices, there's nothing to start: tell the user there's
-no `Todo` restructure work and stop.
+If the helper returns zero issues across all tracks, there's nothing to start: tell the user there's
+no `Todo` work ready and stop.
 
-## Step 2 — Narrow to a slice, then to the top tier
+## Step 2 — Narrow to a track, then a slice, then the top tier
 
-First pick the **slice**: take the lowest-numbered slice in the `slices` array that has any `Todo`
-work. Everything in higher-numbered slices is out of contention for this run.
+**If only one track has ready `Todo` work, use it.** If more than one track has ready work (e.g.
+the legacy restructure track and a new feature are both mid-flight), do not silently pick between
+them — this is a strategic call, not a mechanical one. Summarize what's ready in each track and ask
+the user which to prioritize, unless they already named a feature/issue when invoking this skill.
+
+Within the chosen track, pick the **slice**: take the lowest-numbered slice that has any `Todo`
+work. Everything in higher-numbered slices of that track is out of contention for this run.
 
 Then, within that slice, priority is strict across tiers, highest first:
 
@@ -94,8 +99,8 @@ Pick exactly one. If it's a genuinely close call, say so and name your runner-up
 Before starting any implementation, tell the user:
 
 - **The pick:** issue number + title.
-- **Why:** which slice and tier it's in, what it beat, and the deciding factor (earliest slice with
-  work / unblocks X / foundational / only bug open, etc.).
+- **Why:** which track/slice and tier it's in, what it beat, and the deciding factor (earliest slice
+  with work / unblocks X / foundational / only bug open, etc.).
 - **Any caveat:** if the pick is a "decide whether…" `future-enhancement`, flag that it likely
   needs a quick decision from them first, and recommend settling that before building.
 

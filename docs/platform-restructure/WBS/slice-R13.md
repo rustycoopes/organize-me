@@ -91,5 +91,5 @@ Also removed one item not anticipated above: a Host-only DB-schema regression te
 rather than deleted, since it exercises the Host's own schema, not event-extraction code.
 `notifications.spec.ts` was found missing from the original test-removal list during review and
 ported to `event-creator` (PR #17) before its Host copy was deleted. See
-`docs/platform-restructure/host-integration-guide.md`'s R13 section and `docs/project-status.md`
-(2026-07-16 entry) for the full account.
+`docs/platform-restructure/host-integration-guide.md`'s R13 section for the integrator-facing
+summary.
