@@ -1,9 +1,14 @@
 # Host Integration Guide — What Other Components Need To Set Up
 
-This is the reference for anyone building a component *other than the Host* (e.g. the
-`event-creator` repo, or any future hosted app) that needs to plug into `organize-me`. It answers,
-per slice: what infra to provision, what routing to wire up, what secrets to read, and what
-interface/design contract the Host expects a hosted app to honor.
+**If you're standing up a brand-new hosted app right now, start with
+[`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) instead** — it's the condensed,
+generic, forward-looking playbook (`<new-app>`-style steps, with `event-creator` as a worked
+example) distilled from everything below. This doc is the **slice-by-slice historical log**: it
+answers, per Platform Restructure slice, what infra was provisioned, what routing was wired up,
+what secrets were introduced, and what interface/design contract each slice established — read it
+for the *why* behind a rule and the gotchas a future integrator would otherwise rediscover the hard
+way. Some of the earliest slices (R0, R1) were one-time platform setup, not part of onboarding a
+new app — flagged inline where that applies.
 
 It is a living document — **update it in the same PR that lands each new Platform Restructure
 slice** (`docs/platform-restructure/WBS/slice-R*.md`), whether or not that slice touches another
@@ -15,42 +20,57 @@ For the full architecture rationale, see
 credential/secret journey in detail, see [`secrets-and-accounts.md`](secrets-and-accounts.md) —
 this doc summarizes the actionable subset; that one is the full reference.
 
+## Manual steps a human must do outside the repo
+
+No amount of code or CI wiring does these — an operator has to perform them by hand, usually once
+per environment per app. Slice sections below tag the steps that correspond to one of these with
+**→ manual step**.
+
+1. **Create GCP Secret Manager secrets** (`gcloud secrets create ...`) for anything a new app's
+   deploy step references via `--set-secrets` — e.g. a new app-specific credential. Shared secrets
+   (`jwt-secret-{qa,prod}`, `encryption-key-{qa,prod}`) already exist and just need the new app's
+   deploy service account granted `roles/secretmanager.secretAccessor`, if it isn't already
+   (today, every service runs as the same shared deploy SA, so this is usually a no-op — see
+   `secrets-and-accounts.md`).
+2. **Set GitHub Actions secrets** (`GCP_SA_KEY`, `SUPABASE_QA_URL`/`SUPABASE_PROD_URL`, and any
+   app-specific ones) in the new app's own repo — never inherited from the Host's repo.
+3. **Register OAuth redirect URIs** in the Google Cloud Console (and Dropbox's app console, if
+   applicable) for any new domain/service that will receive an OAuth callback — Google/Dropbox
+   match redirect URIs as an exact string; a routing or domain change that isn't re-registered here
+   breaks the connect flow silently until someone tries it (see the R7 gotcha below).
+4. **Provision the Cloud Run service, Serverless NEG, and backend service** for a new app via
+   `infra/gcp_lb/provision.sh` (QA) / `provision-prod.sh` (prod) — idempotent `gcloud` scripts, not
+   part of CI, run once per environment before the app's registry entry means anything.
+5. **Import the regenerated Load Balancer URL map** (`gcloud compute url-maps import ...`) after
+   running `infra/gcp_lb/generate_url_map.py` — the generator only prints YAML; nothing applies it
+   automatically.
+6. **Confirm DNS is editable** for any brand-new subdomain (Cloud DNS zone / registrar nameservers)
+   before Load Balancer provisioning — a one-time platform-level step (R0), not per-app.
+
 ## Quick-start checklist for a brand-new hosted app
 
-If you're standing up app #3 (or later) from scratch, you need, at minimum:
+See [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md)'s Quick-start checklist — that's the
+single, maintained copy of this list now (this doc used to carry its own near-duplicate; folded in
+to avoid the two drifting). One item from the old copy is worth calling out here since it's easy to
+miss and isn't spelled out in the other doc's checklist itself: every page route that renders the
+shared chrome must pass the Host's `dark_mode` preference (read via the `HostUser` cross-schema
+mapping — see R7 below) into `chrome_base.html`'s `theme_attr()` call, not just the routes you
+remember to check first — a page that forgets always renders light-only regardless of the user's
+Host Profile setting (see the R7 gotcha and issue #207).
 
-1. Its own git repo with independent CI/CD (build → test → deploy) — never a Host build/redeploy.
-2. A `<app>-qa` / `<app>-prod` Cloud Run service pair.
-3. A pinned dependency on the Host's published `organizeme-chrome` package (chrome/theme templates
-   + JWT-verify helper + app-registry data). Every page's template context must pass the Host's
-   `dark_mode` preference (read via the `HostUser` cross-schema mapping — see R7 below) into
-   `chrome_base.html`'s `theme_attr()` call, on every route, not just the ones you remember to
-   check first — a page that forgets always renders light-only regardless of the user's Host
-   Profile setting (see the R7 gotcha and issue #207).
-4. An entry in the Host-authored app-registry (`packages/chrome/src/organizeme_chrome/registry.py`)
-   describing its nav items and Settings tabs — this is the single source of truth for both what
-   renders in the sidebar *and* what the Load Balancer routes to your service.
-5. Its own Postgres schema (ask for one to be added via `ALTER TABLE ... SET SCHEMA` if reusing
-   existing tables, or create fresh ones) with its **own** independent Alembic history
-   (`version_table_schema = <your_schema>`).
-6. `GCP_SA_KEY` and `SUPABASE_QA_URL`/`SUPABASE_PROD_URL` as GitHub Actions secrets in **your own**
-   repo (not shared from the Host's repo).
-7. `--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest` on your `gcloud run deploy` step — same
-   secret name/value as every other hosted app, read-only, signature-verify only.
-8. If you need `ENCRYPTION_KEY` (Fernet-encrypted credentials at rest): same pattern, add
-   `--set-secrets=ENCRYPTION_KEY=encryption-key-{qa,prod}:latest`.
-9. No login, session, registration, or password-handling code of your own, ever — identity comes
-   entirely from verifying the Host-issued JWT cookie.
-10. No server-to-server call to the Host at request time, for anything.
-
-Everything below traces exactly which slice introduced each of these requirements, and what's
-still pending.
+Everything below traces exactly which slice introduced each requirement in that checklist, and
+what's still pending.
 
 ---
 
 ## Slice R0 — DNS control for `organizeme.russcoopersoftware.com`
 
-**Type:** Manual ops, no code.
+> **One-time platform setup — already done, not part of onboarding a new app.** A new app reuses
+> the existing `organizeme(.qa).russcoopersoftware.com` origin; it never needs its own DNS zone or
+> subdomain. Kept here for historical context only.
+
+**Type:** Manual ops, no code. **→ manual step** (see the checklist above) — this whole slice was
+one.
 
 - **Infra:** New Cloud DNS public zone `russcoopersoftware-com` in GCP project
   `gen-lang-client-0791944342`; registrar (Squarespace) nameservers repointed to it.
@@ -61,6 +81,11 @@ still pending.
   R5's managed SSL cert, so no hosted app gets a stable shared-origin URL until this lands.
 
 ## Slice R1 — Database schema separation
+
+> **One-time platform setup — already done, not part of onboarding a new app.** R1 established the
+> `host`/`event_creator` split that already exists; a new app doesn't redo this, it just follows
+> the interface contract below (own schema, own Alembic history, narrow `REFERENCES`-only grant if
+> it needs a Host FK).
 
 - **Infra:** Two Postgres schemas, `host` and `event_creator`, in the existing shared Supabase
   instance. Two `NOLOGIN` roles, `host_app` and `event_creator_app`, least-privilege per schema.
@@ -119,7 +144,10 @@ still pending.
 - **Secrets:** Your `gcloud run deploy` step needs
   `--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest`. This must be the **exact same secret**,
   byte-identical, as the Host's — that identity is the entire SSO trust mechanism, not a
-  coincidence.
+  coincidence. **→ manual step** if your app introduces a genuinely new secret; granting your
+  deploy SA `secretmanager.secretAccessor` on the *existing* `jwt-secret-*`/`encryption-key-*`
+  secrets is usually a no-op today since every service shares one deploy SA (see the checklist
+  above).
 - **Interface contract:** Your app verifies the JWT's signature + expiry only. It never signs a
   JWT, never handles a password, never talks to fastapi-users.
 
@@ -129,15 +157,17 @@ still pending.
   in the R0 zone, Google-managed SSL cert, one Serverless NEG per Cloud Run service, backend
   services, URL map, target-HTTPS-proxy, global forwarding rules. Provisioned via
   `infra/gcp_lb/provision.sh` (idempotent `gcloud` script, not Terraform) — a manual operator run,
-  not part of CI.
+  not part of CI. **→ manual step** — see the checklist above.
 - **Routing:** `infra/gcp_lb/generate_url_map.py` turns the app-registry (R3) into URL-map path
   rules automatically: the Host's fixed auth routes always win a collision; two non-host apps can't
-  claim the same path (build-time guard).
+  claim the same path (build-time guard). Applying the generated map is itself a **→ manual step**
+  (`gcloud compute url-maps import`) — the generator only prints YAML.
 - **Secrets:** None new.
 - **Interface contract:** Once your app-registry entry lists your nav paths, you get routed to
   automatically the next time the URL map is regenerated — you don't hand-edit the Load Balancer
   yourself. Your Cloud Run service needs its own Serverless NEG/backend service added at this
-  layer (done for Event Creator in R6, below).
+  layer (done for Event Creator in R6, below) — provisioning that NEG/backend for a brand-new app
+  is a **→ manual step** too (same `provision.sh`/`provision-prod.sh` scripts).
 
 ## Slice R6 — Event Creator scaffold + SSO-trust tracer bullet
 
@@ -184,7 +214,8 @@ still pending.
     only tab *content* and declares its tabs via the app-registry — no hosted-app chrome code.
   - OAuth callback redirect URIs for a hosted app's own connect flow are *additional* authorized
     redirect URIs added to the Host's existing Google/Dropbox OAuth app consoles (client id/secret
-    are shared with the Host, not a separate registered app per hosted service).
+    are shared with the Host, not a separate registered app per hosted service). **→ manual step**
+    — see the checklist above.
   - **Gotcha found in issue #200 (fixed 2026-07-15):** build that redirect_uri from a fixed,
     per-environment setting (e.g. `GOOGLE_DRIVE_REDIRECT_URI`), never from the incoming request's
     Host header (`request.base_url`). Google matches redirect URIs as an exact string, and a
@@ -193,7 +224,7 @@ still pending.
     change (exactly what broke Drive-connect in QA after Storage moved behind the LB in this
     slice). Whenever a hosted app's own domain/routing changes, re-register the exact new
     redirect URI on the OAuth client in Google Cloud Console — this is a manual, outside-repo step
-    the code cannot perform or detect.
+    the code cannot perform or detect (**→ manual step**).
   - **Gotcha hit during this slice:** `HostUser` (the SELECT-ONLY cross-schema mapping a hosted app
     uses to read Host fields like `email`/`phone_number`) must be registered on the **same**
     `Base`/`MetaData` as the hosted app's own models, not a separate `DeclarativeBase` — otherwise
@@ -492,6 +523,24 @@ dispatch — this is a redesign within R11, not a new numbered slice.
   - Wrote [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md), the condensed forward-looking
     playbook for app #3+, validated against `event-creator`'s real registry entry, `jwt_verify`
     usage, and `organizeme-chrome` pin.
+  - **Test ownership, established as a repeatable rule (not just this slice's cleanup):** unit and
+    e2e tests live with the code they exercise, in the owning app's own repo. Concretely for this
+    slice: every Host-side unit test for the removed modules was deleted from `organize-me/tests/`
+    only after confirming verified-equivalent coverage already existed in `event-creator/tests/`
+    (not assumed from filename match — `notifications.spec.ts` was found missing from the original
+    removal list during review and ported to `event-creator`, PR #17, before its Host copy was
+    deleted). The event-extraction Playwright specs (`upload.spec.ts`, `processing.spec.ts`,
+    `storage.spec.ts`, `prompt.spec.ts`, `logs.spec.ts`, `import-pending-files.spec.ts`,
+    `dashboard.spec.ts`, `notifications.spec.ts`) moved into `event-creator`'s own Playwright suite,
+    which didn't exist before this slice — event-creator gained its own e2e config as part of the
+    move, not just the spec files.
+  - **Exception: `e2e/tests/host-event-creator-boundary.spec.ts` stays in the Host, permanently.**
+    It asserts the *seam* between the two apps (JWT cookie flow, logout propagation, tampered-token
+    rejection), not either app's internals — a future third app gets the same treatment: any test
+    that exercises whether the Host's auth/cookie contract still holds from another app's point of
+    view belongs in the Host as a boundary spec; everything else belongs in that app's own repo.
+    See [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md)'s "Test ownership" section for
+    the full rule.
   - **Interface contract for future slices:** removing a hosted app's leftover code from the Host
     is purely additive-safe cleanup as long as (a) the app-registry's nav for that app already
     points entirely at the other service (true here since R11), and (b) any Host-owned code that
@@ -520,6 +569,15 @@ When you finish implementing a slice (whether in `organize-me` or a hosted-app r
 - **Secrets** — what a hosted app now needs to read, from where, via what mechanism.
 - **Interface contract** — what a hosted app must now do (or must never do) to integrate
   correctly; call out any gotcha a future integrator would otherwise rediscover the hard way.
+- If a step is something an operator must do by hand outside the repo (a `gcloud`/Console action,
+  not something CI runs), add it to (or tag it back to) the "Manual steps" checklist near the top.
+- If the slice was one-time platform setup rather than a repeatable per-app step, say so explicitly
+  (see R0/R1 above for the pattern) instead of leaving it ambiguous.
 
-Keep each section short and actionable — this doc is for someone building the *next* hosted app,
-not a full slice history (that's `docs/project-status.md` and the WBS files).
+Keep each section short and actionable. This doc is deliberately the *full* slice-by-slice history
+(that's also `docs/project-status.md`'s and the WBS files' job, in more detail) — but its purpose
+here is narrower: only the parts of each slice that another component/integrator needs to know.
+For the condensed, forward-looking version of the same information (no slice history, just "what
+do I do today"), see [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) and update that
+doc too if a new slice changes the generic pattern (e.g. a new required registry field, a new
+class of secret every app needs).

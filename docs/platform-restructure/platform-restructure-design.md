@@ -2,7 +2,9 @@
 
 **Version:** 1.0
 **Date:** 2026-07-10
-**Status:** Draft
+**Status:** Implemented — slices R0–R13 all shipped (see `docs/project-status.md`); this doc now
+describes the architecture as built, not a proposal. Where the actual build diverged from a
+decision below, that's called out inline.
 **Implements:** [`docs/platform-restructure-prd.md`](platform-restructure-prd.md)
 
 This document resolves the engineering decisions the PRD deliberately left open (routing mechanism, SSO mechanism, database ownership, styling/chrome sharing) into a concrete architecture, ready for task breakdown.
@@ -102,7 +104,11 @@ Logout clears the cookie client-side, same as today's single-app behavior — th
 
 ### Shared chrome/theme package
 
-Published by the Host repo's CI on tagged release (recommend GitHub Packages, matching the existing GitHub-hosted repos). Contains:
+Published by the Host repo's CI on tagged release. **As built:** a GitHub Release (wheel + sdist
+artifacts) on `chrome-v*` tag push, consumed as a git-tag pip dependency
+(`organizeme-chrome @ git+https://github.com/rustycoopes/organize-me@chrome-vX.Y.Z#subdirectory=packages/chrome`)
+— not GitHub Packages, the option this section originally recommended (see the Open Items
+resolution below). Contains:
 
 1. Jinja macros/templates for the sidebar, header, and Settings tab-bar.
 2. The Tailwind/DaisyUI theme configuration.
@@ -190,7 +196,21 @@ apps:
 
 ## Open Items Carried Into Implementation
 
-- **Subdomain DNS readiness** (`organizeme.russcoopersoftware.com` / `organizeme.qa.russcoopersoftware.com`) — confirm editable Squarespace Custom Records before Load Balancer provisioning (blocking for cutover step 1). Resolved: use A/AAAA records, not Domain Forwarding.
-- **IaC tooling** for generating the Load Balancer URL map from the app-registry file (e.g. Terraform vs. a `gcloud` deploy script) — implementation choice, not a design decision.
-- **Private package registry** for the shared chrome/theme package — recommend GitHub Packages (matches existing GitHub-hosted repos); confirm during build.
-- **JWT signing secret rotation policy** — inherits today's approach unless a reason emerges to change it.
+All items below were resolved during R0–R13; kept here as a record of what was decided and why,
+not as open questions.
+
+- **Subdomain DNS readiness** (`organizeme.russcoopersoftware.com` / `organizeme.qa.russcoopersoftware.com`)
+  — **Resolved (R0):** the domain's authoritative nameservers turned out to be a legacy Google Domains
+  zone, not Squarespace's own DNS, so R0 created a new Cloud DNS public zone in
+  `gen-lang-client-0791944342` and repointed the registrar's nameservers to it, rather than editing
+  Squarespace's (inert, for this domain) Custom Records panel directly. A/AAAA records, not Domain
+  Forwarding, point the subdomains at the Load Balancer.
+- **IaC tooling** for generating the Load Balancer URL map from the app-registry file — **Resolved
+  (R5):** idempotent `gcloud` deploy scripts (`infra/gcp_lb/provision.sh` / `provision-prod.sh`),
+  run manually by the operator, not part of CI; not Terraform.
+- **Private package registry** for the shared chrome/theme package — **Resolved (R3), differently
+  than recommended here:** a GitHub Release (wheel + sdist) on `chrome-v*` tag push, consumed as a
+  pinned git-tag pip dependency — not GitHub Packages. See the Shared chrome/theme package section
+  above.
+- **JWT signing secret rotation policy** — inherits today's approach; no rotation policy change was
+  needed through R13.

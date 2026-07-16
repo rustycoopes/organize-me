@@ -2,7 +2,9 @@
 
 **Version:** 2.0
 **Date:** 2026-07-10
-**Status:** Draft
+**Status:** Implemented — all slices (R0–R13) shipped and the P0 requirements below are live in
+production; see `docs/project-status.md` for the slice-by-slice record. Retained as the structural
+rationale/requirements record, not as a forward-looking proposal.
 
 **Relationship to other docs:** [`docs/prd.md`](prd.md) captures the *functional* requirements of the event-extraction product (dashboard, upload, processing, prompt, notifications, etc.) as it exists today. This document governs the *structural* restructuring of that same functionality into a multi-repo, multi-application platform. `docs/prd.md` doesn't change — it becomes the functional spec for the **Event Creator** application described here. `docs/technical-approach.md` remains the technical reference for today's single-repo build and will be superseded by per-repo technical-approach docs once implementation begins.
 
@@ -104,9 +106,9 @@ These two principles apply to Event Creator now and to every future hosted app �
 
 ### Nice-to-Have (P1)
 
-- **Shared styling foundation**: Host and Event Creator (and future apps) consume one shared visual design system/theme config, rather than each repo independently maintaining its own copy that can silently drift. Event Creator can start by copying today's Tailwind/DaisyUI config; the long-term sharing mechanism is an open question (below).
-- A written "how to add a hosted app" playbook documenting the Host config steps and the sidebar/settings contribution pattern Event Creator establishes.
-- A cleanup plan for removing leftover event-extraction code from the Host (`organize-me`) repo once Event Creator is verified stable in production — not a full repo retirement, since `organize-me` *is* the Host going forward.
+- **Shared styling foundation**: Host and Event Creator (and future apps) consume one shared visual design system/theme config, rather than each repo independently maintaining its own copy that can silently drift. **Done (R3):** the `organizeme-chrome` package bundles the Tailwind/DaisyUI theme config alongside the chrome templates and app-registry, published as a pinned git-tag dependency.
+- A written "how to add a hosted app" playbook documenting the Host config steps and the sidebar/settings contribution pattern Event Creator establishes. **Done (R13):** [`host-integration-guide.md`](host-integration-guide.md) (the slice-by-slice log) and [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) (the condensed, forward-looking playbook).
+- A cleanup plan for removing leftover event-extraction code from the Host (`organize-me`) repo once Event Creator is verified stable in production — not a full repo retirement, since `organize-me` *is* the Host going forward. **Done (R13, issue #168).**
 
 ### Future Considerations (P2)
 
@@ -128,7 +130,7 @@ These two principles apply to Event Creator now and to every future hosted app �
 
 ## Open Questions
 
-- **Shared styling foundation mechanism** — how Host and Event Creator actually share one visual design system (a shared package, a git submodule, copy-at-scaffold-time, etc.) — *engineering, non-blocking: Event Creator can launch from a copied config and adopt the real mechanism later.*
+- **Shared styling foundation mechanism** — how Host and Event Creator actually share one visual design system (a shared package, a git submodule, copy-at-scaffold-time, etc.) — **Resolved (R3):** a shared `organizeme-chrome` package, published as a pinned git-tag dependency; see the P1 item above.
 
 ## Timeline Considerations
 

@@ -10,6 +10,12 @@ It complements [`host-integration-guide.md`](host-integration-guide.md) (the sli
 doc is the condensed, forward-looking "start here" version for app #3 and beyond. Every example
 below is the real `event-creator` entry/config, not a hypothetical.
 
+Before starting, skim `host-integration-guide.md`'s ["Manual steps a human must do outside the
+repo"](host-integration-guide.md#manual-steps-a-human-must-do-outside-the-repo) checklist — several
+of the steps below (provisioning infra, registering OAuth redirect URIs, creating secrets) are
+things an operator does by hand via `gcloud`/Console, not something this repeatable pattern
+automates.
+
 ## 0. The one-sentence version
 
 A hosted app is its own repo, its own Cloud Run service(s), and its own DB schema; it never
@@ -149,6 +155,13 @@ What it gives you:
 - **Theme constants** (Tailwind/DaisyUI CDN links, `theme_attr`) for a consistent look with zero
   build step.
 
+**Gotcha (R7, issue #207):** every page route that renders the shared chrome must pass the Host's
+`dark_mode` preference — read via the `HostUser` cross-schema mapping (step 4's pattern, extended
+to a Host-owned field) — into `theme_attr()`'s template context, not just the routes you remember
+to check first. A route that forgets it always renders light-only regardless of the user's actual
+Host Profile setting; this shipped unnoticed in `event-creator` for two parity slices before being
+caught.
+
 Bumping the pin is a **deliberate, explicit action in your own repo** — a Host-side chrome edit
 never silently changes what your app renders until you bump and redeploy. This bit an actual
 slice: R6 shipped with a stale pin that silently kept the live URL map on a pre-split registry,
@@ -227,8 +240,9 @@ Unit tests and e2e tests live with the code they exercise, in the app's **own** 
 
 ## 6. Quick-start checklist
 
-Distilled from the above (and `host-integration-guide.md`'s own quick-start section) — everything
-you need for a brand-new hosted app from scratch:
+Distilled from the above — everything you need for a brand-new hosted app from scratch. This is
+the maintained, current version of this checklist; `host-integration-guide.md` keeps its own
+older copy for historical continuity but points here as the canonical one.
 
 1. Own git repo, own CI/CD (build → test → deploy) — never a Host build/redeploy.
 2. Own `<app>-qa` / `<app>-prod` Cloud Run service pair.
