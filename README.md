@@ -1,95 +1,43 @@
-# OrganizeMe
+# OrganizeMe (Host)
 
-Turn your WhatsApp and SMS conversation history into structured calendar events and tasks — automatically.
+The **Host** application in the OrganizeMe platform: owns authentication, account/profile
+management, the Settings-page shell, and the sidebar/nav chrome shared by every hosted app.
 
 ---
 
 ## What is it?
 
-OrganizeMe is a web application that watches a connected cloud storage folder for conversation export files. When a new file arrives, it uses the Gemini LLM to extract agreed events, appointments, and actions from the conversation, stores them in a structured dashboard, and notifies you by SMS and email. You can also upload files manually at any time.
+`organize-me` used to be a single monolith that also watched cloud storage, ran an LLM
+extraction pipeline, and served an events dashboard. As of the Platform Restructure (see
+[`docs/platform-restructure/`](docs/platform-restructure/)), all of that event-extraction
+functionality — upload, the processing pipeline, storage connections, LLM prompt config, the
+events dashboard, and processing logs — has moved to its own independent service,
+**[event-creator](https://github.com/rustycoopes/event-creator)**. Slice R13 (issue #168) removed
+the Host's now-dead copies of that code.
 
-Every extracted event can be sent to Google Calendar or Google Tasks in one click.
+The Host is now purely the platform's identity provider and shared UI chrome:
+
+- **Auth** — registration, login/logout, Google OAuth, password reset, JWT issuance
+  (`organizeme_auth` HTTPOnly cookie) that every hosted app trusts.
+- **Profile** — name, email, phone number, dark-mode preference, account deletion.
+- **Settings shell** — renders the tab-bar chrome; each tab's actual content is an HTML fragment
+  served by whichever app owns it (today, entirely `event-creator`).
+- **Nav shell** — the sidebar, merged from every hosted app's app-registry entry
+  (`organizeme_chrome.registry`), so users see one consistent sidebar regardless of which service
+  rendered the current page.
+
+For "what does OrganizeMe do end-to-end" (the WhatsApp/SMS-to-calendar-events product), see
+`event-creator`'s own README — that's where the extraction pipeline, dashboard, storage
+integrations, and notifications now live.
 
 ---
 
-## Who is it for?
+## Adding a new hosted app
 
-Anyone who coordinates logistics, agreements, or commitments over chat — co-parents, caregivers, small business owners, project teams. If you've ever had to re-read a conversation to work out what was agreed and when, OrganizeMe is for you.
-
----
-
-## How it works
-
-1. Export your WhatsApp or SMS conversation as a `.txt`, `.zip`, or `.csv` file.
-2. Drop it into your connected cloud storage watch folder (Dropbox, Google Drive, or S3).
-3. OrganizeMe detects the file, runs it through a 7-step processing pipeline, and extracts structured events.
-4. You receive an SMS and email summary with a link to the dashboard.
-5. Review the events table, add items to Google Calendar or Google Tasks, and delete anything irrelevant.
-
----
-
-## Features
-
-### Events Dashboard
-- Table of all extracted events: type, description, resolved date, raw date text, agreed-by (initials chips)
-- One-click "Add to Google Calendar" and "Add to Google Task" buttons per row (opens pre-filled in a new tab)
-- Filter by event type, date range, and free-text search
-- Sort by date
-- Delete individual events
-- Duplicate events (same description + date) are automatically skipped on import
-
-### Automated Storage Watching
-- Connects to **Dropbox**, **Google Drive**, or **AWS S3** (one provider at a time)
-- Watches a specific folder you configure
-- Successfully processed files move to a `processed/` subfolder
-- Failed files move to a `failed/` subfolder
-
-### Manual Upload
-- Upload a `.txt`, `.zip`, or `.csv` file directly from the app
-- Goes through the identical processing pipeline as auto-detected files
-
-### Import Pending Files
-- "Import pending files" button on the Upload and Dashboard pages scans your connected storage's
-  watch folder for files not yet processed
-- Processes them one after another through the same 7-step pipeline as a manual upload
-- Follows the first file's progress to the live `/processing` page; the rest of the batch finishes
-  in the background and shows up afterward in the processing history (`/logs`)
-
-### Processing Pipeline
-- 7 visible steps: File Received → Extract → Filter by Date → Call Gemini LLM → Parse Response → Deduplicate & Save → Notify
-- Real-time step progress with success/failure state per step — a live progress page (`/processing`)
-  streams each step's status as it changes via Server-Sent Events (`GET /api/v1/processing-runs/{id}/sse`, HTMX SSE), no manual refresh
-- Full processing history with drillable per-run detail and logs
-
-### Logs
-- Structured, searchable logs per processing run
-- Downloadable for offline review or sharing
-
-### Notifications
-- **Success:** SMS (event count + dashboard link) and rich HTML email (event table + link)
-- **Failure:** SMS and email with failure details and a direct link to the log page
-- SMS and email notifications are independently toggleable
-
-### LLM Prompt Management
-- View and edit the Gemini prompt used for event extraction
-- One active prompt per user — always editable, never deleted
-
-### Settings
-- **Storage tab:** Connect and configure your cloud storage provider
-- **Notifications tab:** Toggle SMS and email on/off independently; manage your phone number
-- **Preferences tab:** Set the message look-back window (default 7 days, max 90 days) and UI theme
-
-### Authentication
-- Sign in with Google or email + password
-- Open self-registration — no invitation required
-- Password reset by email
-- Account self-deletion (removes all data)
-
-### UI
-- Laravel-inspired aesthetic
-- Dark mode / light mode (persists across sessions)
-- Left sidebar navigation: Dashboard · Upload · Processing · Logs · Prompt · Settings · Profile
-- Getting Started checklist for new users, dismissed automatically once complete
+See [`docs/platform-restructure/how-to-add-a-hosted-app.md`](docs/platform-restructure/how-to-add-a-hosted-app.md)
+for the concrete playbook (app-registry entry, LB URL-map regeneration, the `organizeme-chrome`
+shared package, and the JWT-verify pattern), validated against the real `event-creator`
+integration.
 
 ---
 
@@ -123,8 +71,12 @@ uv run mypy app tests
 
 The `e2e/` folder holds a Playwright/TypeScript suite that drives the **real deployed QA app**
 end-to-end (landing, register/login/logout, forgot/reset password, profile edit, dark-mode
-persistence, account deletion, sidebar nav). It's separate from the Python `pytest` suite and
-runs in CI as the `e2e-qa` job after QA deploys.
+persistence, account deletion, sidebar nav). It's separate from the Python `pytest` suite and runs
+in CI as the `e2e-qa` job after QA deploys. It also keeps `host-event-creator-boundary.spec.ts`,
+which asserts the Host↔Event-Creator seam (JWT cookie flowing cross-app, shared sidebar rendering)
+rather than either app's internals — the rest of the former event-extraction specs
+(upload/processing/storage/prompt/logs/dashboard/notifications) moved to `event-creator`'s own
+`e2e/` suite in R13 (#168), since that's the code they exercise.
 
 ```bash
 cd e2e
@@ -145,7 +97,9 @@ docker build -t organize-me .
 docker run --env-file .env.local -p 8000:8000 organize-me
 ```
 
-The container runs the FastAPI app and the Celery worker as separate processes under `supervisord`.
+The container runs the FastAPI app under `supervisord` (a single process now — the Celery worker
+that used to run alongside it was removed in R13 along with the Host's other event-extraction
+code; see `supervisord.conf`).
 
 ### CI/CD
 
@@ -155,9 +109,10 @@ GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy -
 
 ## Security
 
-- All personal data and conversation content is encrypted at rest
-- Cloud storage credentials (OAuth tokens, API keys) are stored securely and never exposed
+- Passwords are bcrypt-hashed; auth JWTs live in an HTTPOnly, Secure cookie
 - `.env` and `.env.local` files are excluded from source control
+- Cloud storage credentials, conversation content, and other event-extraction data are entirely
+  `event-creator`'s concern now — see that repo for its own security notes
 
 ---
 
@@ -183,4 +138,10 @@ The `examples/` folder contains reference files used for development and testing
 
 ## Status
 
-**In development** — Slice 1 (project scaffold, auth, CI/CD) and Slice 2 (Google Drive storage) complete: the storage foundation, the Settings > Storage tab (`GET`/`PUT /api/v1/storage-config`), and the Google Drive OAuth connect/disconnect flow (tokens encrypted at rest) are all in. Slice 3 (LLM Prompt page) complete: an `llm_prompts` table with a factory-default extraction prompt seeded into every new account, plus a Prompt page (`/prompt`) and `GET`/`PUT /api/v1/llm-prompt` + `POST /api/v1/llm-prompt/reset` endpoints letting a user view, edit, and reset that prompt. Slice 4 (upload + processing pipeline) complete: the `processing_runs`/`processing_steps`/`events` tables (with duplicate-detection), a `resolved_date` → earliest-date parser, an injectable Gemini call wrapper, the Upload page + `POST /api/v1/upload` + the 7-step pipeline (in-process asyncio, not Celery), and a live SSE progress page (`/processing` + `GET /api/v1/processing-runs/{id}/sse`, HTMX SSE, no manual refresh) are all in. Slice 5 (events dashboard) in progress: `GET /api/v1/events` (paginated, newest-date-first) + `DELETE /api/v1/events/{id}`, Google Calendar/Tasks link builders (`app/core/calendar_url.py`), a real Dashboard page (`/dashboard`) with a confirm-gated delete, and the Getting Started onboarding checklist (#56 — a 3-step checklist shown above the events table until all three onboarding flags are done) are now in place; filters/sort/search (#55) is next. Slice 8 (Dropbox + S3 storage providers) in progress: `DropboxStorageProvider` (Dropbox API v2 via `httpx`) plus its OAuth connect/disconnect flow are in (Slice 8.1, #93), and `S3StorageProvider` (`boto3`, manual access key/secret/bucket/region credentials) is in (Slice 8.2, #94); Settings > Storage tab support for all three providers (#95) is next. See [Project Status](docs/project-status.md) for the full slice-by-slice history. **Human setup** to run things live: register the Drive OAuth callback redirect URI + `drive` scope on the Google client (Slice 2, `ENCRYPTION_KEY` secret now set — issue #78); set the `GEMINI_API_KEY` secret, enable Cloud Run "CPU always allocated", and verify `GoogleDriveStorageProvider` against a real connected Drive account (Slice 4.1, tracked in issue #72); manually confirm whether Google's Tasks frontend honours the dashboard's pre-fill link (Slice 5.1, noted in the PR for #54); and register a Dropbox app (scoped access, `files.content.write`/`files.content.read` permissions) + set `DROPBOX_OAUTH_CLIENT_ID`/`DROPBOX_OAUTH_CLIENT_SECRET` as repo secrets (Slice 8.1, #93).
+**Platform Restructure complete through R13** — `organize-me` is now the Host-only app: auth,
+profile, settings-shell, and nav-shell, with all event-extraction functionality (upload,
+processing pipeline, storage connections, LLM prompt config, events dashboard, logs) split out
+into the independent `event-creator` service and removed from this repo (Slice R13, issue #168).
+See [`docs/platform-restructure/`](docs/platform-restructure/) for the full restructure design
+and slice-by-slice WBS, and [Project Status](docs/project-status.md) for the complete history
+(including the pre-restructure monolith slices this repo used to carry).

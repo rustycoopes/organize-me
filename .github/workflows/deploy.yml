@@ -20,16 +20,6 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/auth/google/callback
-      # Fixed per-environment value (issue #200), not a secret. R12 cut prod over to the LB domain
-      # (organizeme.russcoopersoftware.com) - this URL is now registered on the Google OAuth client
-      # alongside GOOGLE_OAUTH_REDIRECT_URI (see docs/creating-prerequisites.md).
-      GOOGLE_DRIVE_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback
-      # Dropbox OAuth app (Slice 8.1, #93). See ci.yml's identical env var for why tests pass
-      # regardless of whether this is actually configured yet.
-      DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
-      DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
-      # Storage-credential encryption key (issue #45). Set on the repo since #78.
-      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,10 +64,12 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # JWT_SECRET and ENCRYPTION_KEY are intentionally absent here (Slice R4 / R6): both are
-      # wired below via --set-secrets from GCP Secret Manager (`jwt-secret-prod`,
-      # `encryption-key-prod`), not this plaintext env-vars-file, so the hosted-app side (R6,
-      # event-creator) can read the same Secret Manager values without a network call to the Host.
+      # JWT_SECRET is intentionally absent here (Slice R4): wired below via --set-secrets from
+      # GCP Secret Manager (`jwt-secret-prod`), not this plaintext env-vars-file, so the
+      # hosted-app side (event-creator) can read the same Secret Manager value without a network
+      # call to the Host. R13 (#168) removed ENCRYPTION_KEY/GEMINI_API_KEY/TWILIO_*/
+      # DROPBOX_OAUTH_*/GOOGLE_DRIVE_REDIRECT_URI from here too - the Host code that read them
+      # was deleted in that slice; event-creator's own CI/CD wires its own copies.
       - name: Write Cloud Run env vars file
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_PROD_URL }}
@@ -85,12 +77,6 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REDIRECT_URI: https://organizeme.russcoopersoftware.com/api/v1/auth/google/callback
-          DROPBOX_OAUTH_CLIENT_ID: ${{ secrets.DROPBOX_OAUTH_CLIENT_ID }}
-          DROPBOX_OAUTH_CLIENT_SECRET: ${{ secrets.DROPBOX_OAUTH_CLIENT_SECRET }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
         run: |
           cat > /tmp/cloud-run-env.yaml <<EOF
           DATABASE_URL: "${DATABASE_URL}"
@@ -98,13 +84,6 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
-          GOOGLE_DRIVE_REDIRECT_URI: "https://organizeme.russcoopersoftware.com/api/v1/storage-config/google-drive/callback"
-          DROPBOX_OAUTH_CLIENT_ID: "${DROPBOX_OAUTH_CLIENT_ID}"
-          DROPBOX_OAUTH_CLIENT_SECRET: "${DROPBOX_OAUTH_CLIENT_SECRET}"
-          GEMINI_API_KEY: "${GEMINI_API_KEY}"
-          TWILIO_ACCOUNT_SID: "${TWILIO_ACCOUNT_SID}"
-          TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN}"
-          TWILIO_PHONE_NUMBER: "${TWILIO_PHONE_NUMBER}"
           EOF
 
       - name: Build image
@@ -126,5 +105,5 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
-            --set-secrets=JWT_SECRET=jwt-secret-prod:latest,ENCRYPTION_KEY=encryption-key-prod:latest \
+            --set-secrets=JWT_SECRET=jwt-secret-prod:latest \
             --quiet

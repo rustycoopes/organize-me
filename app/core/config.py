@@ -11,20 +11,6 @@ class Settings(BaseSettings):
     google_oauth_client_id: str
     google_oauth_client_secret: str
     google_oauth_redirect_uri: str
-    # The Google Drive OAuth callback's absolute redirect_uri (issue #200), fixed per environment
-    # rather than derived from the incoming request's Host header. Google rejects a redirect_uri
-    # that doesn't exactly match one registered on the OAuth client with
-    # `Error 400: redirect_uri_mismatch` - deriving it from request.base_url meant the value
-    # silently tracked whatever domain happened to receive the request instead of one fixed value
-    # an operator could register in Google Cloud Console. Empty default (mirrors
-    # ENCRYPTION_KEY/GEMINI_API_KEY above) - /auth fails fast with a clear error if it's actually
-    # used while unset.
-    google_drive_redirect_uri: str = ""
-    # Dropbox OAuth app credentials (Slice 8.1). Empty defaults (like the Resend/Gemini/Twilio
-    # keys above) so deploys/CI that don't set them yet don't fail Settings construction -
-    # get_dropbox_oauth_client() only needs real values once a user actually connects Dropbox.
-    dropbox_oauth_client_id: str = ""
-    dropbox_oauth_client_secret: str = ""
     # Empty default (rather than a required field) so existing deployments/CI jobs that don't
     # set RESEND_API_KEY yet don't fail Settings construction; ResendEmailSender only needs a
     # real value once forgot-password is actually exercised in a live environment.
@@ -38,29 +24,6 @@ class Settings(BaseSettings):
     # password-reset token for any registered email. Defaults false so those routes return 404
     # everywhere it isn't explicitly switched on.
     e2e_test_mode: bool = False
-    # Fernet key used to encrypt stored storage-provider credentials at rest (see
-    # app.core.security). Empty default (like RESEND_API_KEY) so existing deploys/CI that don't
-    # set it yet don't fail Settings construction - get_credential_cipher() raises a clear error
-    # if it's actually used while unset. Must be a urlsafe-base64 32-byte key
-    # (cryptography.fernet.Fernet.generate_key()); wire ENCRYPTION_KEY into QA/prod before the
-    # storage-config write paths (issues #46/#47) go live.
-    encryption_key: str = ""
-    # API key for the Gemini LLM (google-genai SDK), used by the processing pipeline's
-    # extraction step (Slice 4). Empty default (like RESEND_API_KEY / ENCRYPTION_KEY) so
-    # deploys/CI that don't set it yet don't fail Settings construction - GoogleGeminiClient
-    # raises a clear error if it's actually used while unset. Tests never call the live API
-    # (they inject FakeGeminiClient), so they don't need a real key. Wire GEMINI_API_KEY into
-    # QA/prod before the upload pipeline (issue #52) goes live.
-    gemini_api_key: str = ""
-    # Base URL for the app, used in notification emails (Slice 7).
-    # Defaults to https://organize-me.app for production; override to http://localhost:3000 in dev.
-    base_url: str = "https://organize-me.app"
-    # Twilio credentials for SMS notifications (Slice 7.2). Empty defaults (like
-    # RESEND_API_KEY/GEMINI_API_KEY) so deploys/CI that don't set them yet don't fail Settings
-    # construction - TwilioSmsSender raises a clear error if it's actually used while unset.
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_phone_number: str = ""
 
 
 @lru_cache

@@ -10,6 +10,47 @@
 ## [Unreleased]
 
 ### Added
+- **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
+  Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
+  since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API
+  routers (`app/api/v1/{upload,events,llm_prompt,processing_runs,storage_config,
+  storage_google_drive,storage_dropbox,import_pending_files}.py`), `app/services/{pipeline,llm,
+  storage}/` (whole dirs), the pipeline-only parts of `app/services/notifications/` (kept
+  `email.py` — the Host's own password-reset emails still use it), `app/core/{prompts,
+  date_parser,calendar_url,message_filter,onboarding}.py`, `app/worker.py` (a Celery stub that
+  was never wired up — real background processing moved to `event-creator`'s Cloud Tasks design
+  in R11), their SQLAlchemy models/Pydantic schemas, and their Jinja templates. Also stripped
+  `notification_email`/`notification_sms` off `app/api/v1/users.py`'s `UserRead`/`UserUpdate` —
+  those fields read/wrote the now-removed `event_creator.user_settings` model, and R7 had already
+  moved the Notifications Settings tab's UI to `event-creator`, so this was dead surface on the
+  Host's own `/api/v1/users` endpoint. 63 files deleted from `app/`, 34 Python test files + 8
+  Playwright specs deleted from `tests/`/`e2e/tests/` (equivalent coverage already verified in
+  `event-creator`'s own suites). `notifications.spec.ts` was found during review to have been
+  missed from #168's original migration list — it's architecturally identical to
+  `storage.spec.ts`/`prompt.spec.ts` (a Host-rendered settings-tab whose actual content/data is
+  entirely event-creator-owned); ported it to `event-creator` (PR #17) and deleted it here too.
+  Plus one Host-only DB-schema regression test
+  (`test_host_users_no_longer_has_moved_columns`) moved from the deleted
+  `test_user_settings_model.py` into `tests/test_schema_separation.py`, its natural home. Wrote
+  [`docs/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md),
+  the condensed playbook for a future app #3, validated against `event-creator`'s real
+  app-registry entry, `organizeme_chrome.jwt_verify` usage, and LB URL-map regeneration. Updated
+  README/technical-approach to describe the Host-only surface (auth/profile/settings-shell/
+  nav-shell) and added this slice's section to `host-integration-guide.md`.
+
+  A code-review pass caught dead code the mechanical deletion sweep missed — nothing mypy/pytest
+  could catch since it was still syntactically valid, just orphaned: `app/core/security.py`
+  (`CredentialCipher`) + `tests/test_security.py` (its only caller, `storage_config.py`, was
+  already gone), `app/auth/oauth.py::get_dropbox_oauth_client()` (Dropbox's OAuth client
+  constructor — same story), and the `Settings` fields only those dead functions read
+  (`encryption_key`, `google_drive_redirect_uri`, `dropbox_oauth_client_id/secret`,
+  `gemini_api_key`, `twilio_account_sid/auth_token/phone_number`, `base_url`). Removing them
+  exposed `celery[redis]`, `twilio`, `google-genai`, `boto3`, and `sse-starlette` as unused
+  dependencies too (zero remaining imports) — pruned from `pyproject.toml`, `uv.lock`
+  regenerated, and `ci.yml`/`deploy.yml`/`.env.local.example` trimmed of the env vars/secrets
+  that only ever fed this dead code. `uv run mypy app tests` (52 files) and
+  `uv run pytest --collect-only` (141 tests) clean after the full sweep. Branch
+  `restructure/r13-host-cleanup`.
 - **Issue #167 (done) — Slice R12: Production Cutover.** Post-cutover smoke testing (real login,
   real upload) surfaced two live bugs the routing/redirect_uri work couldn't catch on its own,
   both now fixed:

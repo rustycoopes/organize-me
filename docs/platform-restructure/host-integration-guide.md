@@ -443,30 +443,51 @@ dispatch — this is a redesign within R11, not a new numbered slice.
 - Real login (existing data confirmed intact) and a real upload (pipeline ran to completion) both
   verified working end-to-end in prod after both fixes.
 
-## Slice R13 — not yet landed
+## Slice R13 — Host Cleanup + "How to Add a Hosted App" Playbook
 
-Per `docs/project-status.md`, R12 (Production Cutover) is in progress — see its section above for
-current state. R13 exists as a WBS doc under `docs/platform-restructure/WBS/slice-R13.md` but
-hasn't been started — check that file and `docs/project-status.md` before relying on anything past
-R12 as current state. Known deferred items called out by earlier slices that a future slice will
-resolve:
-
-- `COOKIE_DOMAIN` and full cross-domain SSO cookie scoping — still unresolved, no slice assigned.
-  R11's cutover didn't touch this: SSO across Host/Event Creator already works today without it,
-  since both services sit behind the *same hostname* via the shared LB, so a host-only cookie (no
-  explicit `Domain` attribute) is already sent on every request to that hostname regardless of
-  which backend answers. `COOKIE_DOMAIN` only matters if Event Creator (or a future hosted app)
-  ever needs a genuinely different domain/subdomain than the Host — not a current need.
-- Per-schema DB connection identity (`host_app`/`event_creator_app` roles exist but neither app
-  actually connects as them yet; both still use the shared admin `DATABASE_URL`) — flagged as a
-  deferred hardening item, no slice assigned yet.
-- `DATABASE_URL` living as a GitHub Actions secret rather than GCP Secret Manager — candidate for a
-  future hardening pass.
-- Post-login redirect target (`/profile`, not `/dashboard`) — flagged in R9 (issue #189), still
-  unresolved; R11 didn't touch it either. No slice assigned yet — a natural fit for R13's Host
-  cleanup, since it's Host-only code.
-- Hardcoded QA Load Balancer domain duplicated across `organize-me`'s and `event-creator`'s CI
-  configs (issue #191, flagged in R10) — still unresolved, low-priority.
+- **Infra:** None new. The Host's Celery worker process definition (`[program:worker]` in
+  `supervisord.conf`, always `autostart=false` and never wired to real `REDIS_URL`/tasks since
+  the R11-redesign moved that architecture to Cloud Tasks in `event-creator` instead) was removed
+  — the Host's container now runs a single `uvicorn` process.
+- **Routing:** None. The Host's own app-registry entry (`packages/chrome/src/organizeme_chrome/
+  registry.py`'s `"organizeme"` `AppEntry`) already only listed `/settings` and `/profile` — the
+  Dashboard/Upload/Processing/Logs/Prompt nav items had already moved to the `event-creator`
+  entry back in R11, so no registry/URL-map change was needed for this slice.
+- **Secrets:** None new.
+- **Interface contract / what changed:**
+  - Removed the Host's now-dead event-extraction code entirely: the page modules, API routers,
+    `app/services/{pipeline,llm,storage}/` (whole dirs), the pipeline-only parts of
+    `app/services/notifications/` (kept `email.py` — still used for the Host's own
+    password-reset emails), `app/core/{prompts,date_parser,calendar_url,message_filter,
+    onboarding}.py`, `app/worker.py`, their SQLAlchemy models (`Event`, `LLMPrompt`,
+    `ProcessingRun`, `ProcessingStep`, `StorageConfig`, `UserSettings`), their Pydantic schemas,
+    and their Jinja templates. `app/api/v1/users.py`'s `UserRead`/`UserUpdate` also dropped
+    `notification_email`/`notification_sms` — those fields read/wrote
+    `event_creator.user_settings` (moved there in R2, and R7 already migrated the Settings UI for
+    them to event-creator), so exposing them on the Host's own `/api/v1/users` was leftover
+    surface with no remaining owner-side purpose once the model was removed.
+  - `app/pages/app_shell.py`'s placeholder-page logic no longer needs to special-case
+    Dashboard/Upload/Processing/Logs/Prompt paths (`PAGES_WITH_OWN_ROUTER` shrank to
+    `{"/profile", "/settings"}`) — those paths were never in the Host's own registry nav to begin
+    with, so this was pure code cleanup, not a behavior change.
+  - Wrote [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md), the condensed forward-looking
+    playbook for app #3+, validated against `event-creator`'s real registry entry, `jwt_verify`
+    usage, and `organizeme-chrome` pin.
+  - **Interface contract for future slices:** removing a hosted app's leftover code from the Host
+    is purely additive-safe cleanup as long as (a) the app-registry's nav for that app already
+    points entirely at the other service (true here since R11), and (b) any Host-owned code that
+    happens to import the app's models/schemas (found here: `app/api/v1/users.py` reading
+    `UserSettings` for notification prefs) gets explicitly untangled first, not just deleted
+    alongside — grep for cross-imports before assuming a module is exclusively
+    event-extraction's.
+  - Deferred items still open after this slice (unchanged by it, listed here for continuity):
+    `COOKIE_DOMAIN`/full cross-domain SSO cookie scoping (still not needed — both services share
+    a hostname via the LB); per-schema DB connection identity (`host_app`/`event_creator_app`
+    roles unused, both apps still connect as the shared admin `DATABASE_URL`); `DATABASE_URL` as a
+    GitHub Actions secret rather than Secret Manager; the post-login redirect target (`/profile`,
+    not `/dashboard` — issue #189, still unresolved, out of scope for this slice since it's a
+    user-visible auth-flow change); the hardcoded QA LB domain duplicated across both repos' CI
+    configs (issue #191).
 
 ---
 

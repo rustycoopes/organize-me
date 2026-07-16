@@ -4,6 +4,13 @@ The sidebar is a shared layout element: rather than re-assert its contents on ev
 route, these tests check auth-gating on all nav routes and verify the shared sidebar
 (presence + documented order) on a representative couple of authenticated routes, per
 the issue's "asserted via a shared layout test across at least two routes" criterion.
+
+R13 (#168): Dashboard/Upload/Processing/Logs/Prompt are event-creator-owned routes (moved
+there in R11's QA cutover) - the merged sidebar (organizeme_chrome.templating.register_chrome)
+still renders links to them (nav_items is merged across every registered app, per that
+function's docstring), but the Host's own ASGI app no longer serves them at all, so they're
+only exercised here as *links rendered in the sidebar*, not as routes this app's test client can
+fetch directly (that's event-creator's own test suite's job now).
 """
 
 import uuid
@@ -12,7 +19,9 @@ import pytest
 from httpx import AsyncClient
 
 # Every route reachable from the sidebar, in the documented order
-# (Dashboard -> Upload -> Processing -> Logs -> Prompt -> Settings -> Profile).
+# (Dashboard -> Upload -> Processing -> Logs -> Prompt -> Settings -> Profile). Dashboard through
+# Prompt are event-creator-owned (see module docstring); only Settings/Profile are routes the
+# Host itself serves.
 NAV_ROUTES = [
     "/dashboard",
     "/upload",
@@ -33,6 +42,10 @@ NAV_LABELS_IN_ORDER = [
     "Profile",
 ]
 
+# Routes the Host's own ASGI app actually serves (Dashboard/Upload/Processing/Logs/Prompt are
+# event-creator-owned - see module docstring - and 404 against the Host directly).
+HOST_OWNED_ROUTES = ["/settings", "/profile"]
+
 
 def unique_email() -> str:
     return f"sidebar-test-{uuid.uuid4().hex}@example.com"
@@ -45,7 +58,7 @@ async def register_and_login(client: AsyncClient) -> None:
     await client.post("/api/v1/auth/login", data={"email": email, "password": password})
 
 
-@pytest.mark.parametrize("route", NAV_ROUTES)
+@pytest.mark.parametrize("route", HOST_OWNED_ROUTES)
 async def test_nav_route_redirects_anonymous_visitor_to_login(
     client: AsyncClient, route: str
 ) -> None:
@@ -55,7 +68,7 @@ async def test_nav_route_redirects_anonymous_visitor_to_login(
     assert response.headers["location"] == "/login"
 
 
-@pytest.mark.parametrize("route", NAV_ROUTES)
+@pytest.mark.parametrize("route", HOST_OWNED_ROUTES)
 async def test_nav_route_returns_200_when_authenticated(
     client: AsyncClient, route: str
 ) -> None:
@@ -66,7 +79,7 @@ async def test_nav_route_returns_200_when_authenticated(
     assert response.status_code == 200
 
 
-@pytest.mark.parametrize("route", ["/dashboard", "/settings"])
+@pytest.mark.parametrize("route", ["/settings", "/profile"])
 async def test_sidebar_lists_every_nav_item_in_order(client: AsyncClient, route: str) -> None:
     await register_and_login(client)
 
@@ -88,7 +101,7 @@ async def test_sidebar_lists_every_nav_item_in_order(client: AsyncClient, route:
     assert positions == sorted(positions)
 
 
-@pytest.mark.parametrize("route", ["/dashboard", "/settings", "/profile"])
+@pytest.mark.parametrize("route", ["/settings", "/profile"])
 async def test_sidebar_marks_only_the_current_route_active(
     client: AsyncClient, route: str
 ) -> None:
@@ -109,7 +122,7 @@ async def test_sidebar_marks_only_the_current_route_active(
 async def test_sidebar_offers_logout(client: AsyncClient) -> None:
     await register_and_login(client)
 
-    response = await client.get("/dashboard")
+    response = await client.get("/settings")
     assert response.status_code == 200
     body = response.text
     assert "Log out" in body
