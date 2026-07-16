@@ -56,7 +56,12 @@ def build_nav_groups(
         if is_collapsed and any(item.path == current_path for item in entry.nav):
             is_collapsed = False
         groups.append(
-            NavGroup(entry.service_name, _humanize_label(entry.service_name), entry.nav, is_collapsed)
+            NavGroup(
+                service_name=entry.service_name,
+                label=_humanize_label(entry.service_name),
+                nav=entry.nav,
+                collapsed=is_collapsed,
+            )
         )
     return groups
 

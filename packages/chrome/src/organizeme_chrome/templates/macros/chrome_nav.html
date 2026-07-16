@@ -1,0 +1,20 @@
+{#
+  nav_link — a single sidebar nav `<li><a>`, shared between grouped and flat nav rendering in
+  chrome_authenticated_base.html so the two never drift (active-state markup, attributes, etc.)
+
+  Usage:
+    {% from "macros/chrome_nav.html" import nav_link %}
+    {{ nav_link(item, request) }}
+
+  Parameters
+    item     — an AppNavItem (path, label) — organizeme_chrome.registry.
+    request  — the current Starlette Request, to derive the active/current-page state.
+#}
+{% macro nav_link(item, request) %}
+<li>
+  <a
+    href="{{ item.path }}"
+    {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
+  >{{ item.label }}</a>
+</li>
+{% endmacro %}
