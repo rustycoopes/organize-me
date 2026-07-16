@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-16 — #212 Slice 1: Grouped, collapsible sidebar in organize-me (Host) — [details](features/sidebar-nav-groups/WBS/slice-1-host-sidebar-groups.md)
 - **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
   Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
   since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API

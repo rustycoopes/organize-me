@@ -74,3 +74,30 @@ None — can start immediately.
   current-page force-expand override, and Settings/Profile always rendering outside any group.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-16, issue #212, branch `feature/sidebar-nav-groups`)
+
+Shipped as designed, with two corrections found during code review (not in the original design):
+
+- The `tojson` Jinja filter's HTML-escape table (borrowed from Flask's `htmlsafe_json_dumps`
+  convention) omitted `"`, which broke the double-quoted `x-data` HTML attribute it's embedded in
+  on every render with a non-empty collapsed map. Fixed by escaping `"` too.
+- The original design sent the *displayed* collapsed map (including the current-page force-open
+  override) back in the toggle's PATCH body. That could silently persist a temporary force-open
+  override for an untouched, unrelated group as its new "real" stored preference. Fixed by
+  splitting displayed state (`nav_collapsed_json`) from the user's real stored preference
+  (`nav_stored_collapsed_json`) in `app/core/nav.py`'s `sidebar_nav_context()` — the toggle now
+  mutates and PATCHes only the latter.
+
+`packages/chrome` was tagged three times during implementation (`chrome-v0.5.0` → `0.5.1` fixing
+the two bugs above → `0.5.2` for code-quality cleanup: duplicated nav-link markup extracted into a
+`nav_link` Jinja macro, `NavGroup` construction switched to keyword args, a lockfile re-lock, and a
+comment documenting why `service_name` is safe to interpolate unescaped into Alpine JS string
+literals). The Host's own `organizeme-chrome` pin ended on `chrome-v0.5.2`.
+
+Everything in the original "What to build" and acceptance criteria shipped as specified — no scope
+changes. `packages/chrome`'s own test suite (23 existing + 9 new `build_nav_groups`/`flat_nav_items`
+tests) and `mypy --strict` on both `packages/chrome` and the Host `app/` were run and pass. The
+DB-backed integration suite (`tests/test_users.py`, `tests/test_sidebar.py`) could not be run
+locally (no DB credentials in the implementation sandbox) — verified via CI on the PR instead, per
+explicit direction from the issue owner.

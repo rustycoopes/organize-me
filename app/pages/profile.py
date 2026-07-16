@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth.users import current_active_user_optional
+from app.core.nav import sidebar_nav_context
 from app.core.templating import templates
 from app.models.user import User
 
@@ -23,5 +24,10 @@ async def profile_page(
     return templates.TemplateResponse(
         request,
         "profile.html",
-        {"user": user, "dark_mode": profile_data["dark_mode"], "profile_data": profile_data},
+        {
+            "user": user,
+            "dark_mode": profile_data["dark_mode"],
+            "profile_data": profile_data,
+            **sidebar_nav_context(user, request),
+        },
     )

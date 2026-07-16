@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from organizeme_chrome.registry import get_app
 
 from app.auth.users import current_active_user_optional
+from app.core.nav import sidebar_nav_context
 from app.core.templating import templates
 from app.models.user import User
 
@@ -49,5 +50,6 @@ async def settings_page(
             # precedence over environment globals of the same name, so this overrides it for this
             # page only.
             "settings_tabs": _EVENT_CREATOR_APP.settings_tabs,
+            **sidebar_nav_context(user, request),
         },
     )

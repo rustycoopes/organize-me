@@ -25,6 +25,7 @@ async def test_get_current_user_returns_profile_fields(client: AsyncClient) -> N
     assert body["name"] is None
     assert body["phone_number"] is None
     assert body["dark_mode"] is False
+    assert body["nav_collapsed_groups"] == {}
 
 
 async def test_patch_updates_name_email_phone_and_persists(client: AsyncClient) -> None:
@@ -65,6 +66,72 @@ async def test_patch_dark_mode_persists(client: AsyncClient) -> None:
 
     follow_up = await client.get("/api/v1/users/me")
     assert follow_up.json()["dark_mode"] is True
+
+
+async def test_patch_nav_collapsed_groups_persists(client: AsyncClient) -> None:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    response = await client.patch(
+        "/api/v1/users/me", json={"nav_collapsed_groups": {"event-creator": True}}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["nav_collapsed_groups"] == {"event-creator": True}
+
+    follow_up = await client.get("/api/v1/users/me")
+    assert follow_up.json()["nav_collapsed_groups"] == {"event-creator": True}
+
+
+async def test_patch_nav_collapsed_groups_fully_replaces_not_merges(client: AsyncClient) -> None:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    await client.patch(
+        "/api/v1/users/me",
+        json={"nav_collapsed_groups": {"event-creator": True, "some-other-app": True}},
+    )
+    response = await client.patch(
+        "/api/v1/users/me", json={"nav_collapsed_groups": {"event-creator": False}}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["nav_collapsed_groups"] == {"event-creator": False}
+
+
+async def test_patch_partial_update_leaves_nav_collapsed_groups_unchanged(
+    client: AsyncClient,
+) -> None:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    await client.patch(
+        "/api/v1/users/me", json={"nav_collapsed_groups": {"event-creator": True}}
+    )
+    response = await client.patch("/api/v1/users/me", json={"name": "New Name"})
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "New Name"
+    assert response.json()["nav_collapsed_groups"] == {"event-creator": True}
+
+
+async def test_patch_with_explicit_null_nav_collapsed_groups_returns_422(
+    client: AsyncClient,
+) -> None:
+    email = unique_email()
+    password = "correct-horse-battery"
+    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
+    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+    response = await client.patch("/api/v1/users/me", json={"nav_collapsed_groups": None})
+
+    assert response.status_code == 422
 
 
 async def test_patch_partial_update_leaves_other_fields_unchanged(client: AsyncClient) -> None:

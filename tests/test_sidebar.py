@@ -136,3 +136,69 @@ async def test_sidebar_absent_on_unauthenticated_pages(client: AsyncClient, rout
     assert response.status_code == 200
     # The sidebar nav carries a stable landmark id; it must not appear on public pages.
     assert 'id="sidebar-nav"' not in response.text
+
+
+# --- Collapsible per-app nav groups (sidebar-nav-groups, organize-me#212) -------------------
+
+
+async def test_new_user_sees_all_groups_expanded_by_default(client: AsyncClient) -> None:
+    await register_and_login(client)
+
+    response = await client.get("/settings")
+    assert response.status_code == 200
+    body = response.text
+
+    assert 'aria-expanded="true"' in body
+    assert 'aria-expanded="false"' not in body
+    # No stored preference yet -> nothing rendered as pre-hidden.
+    assert "display:none" not in body
+
+
+async def test_collapsed_group_renders_hidden_and_aria_expanded_false(
+    client: AsyncClient,
+) -> None:
+    await register_and_login(client)
+    await client.patch(
+        "/api/v1/users/me", json={"nav_collapsed_groups": {"event-creator": True}}
+    )
+
+    response = await client.get("/settings")
+    assert response.status_code == 200
+    body = response.text
+
+    assert 'aria-expanded="false"' in body
+    group_start = body.index('aria-controls="nav-group-event-creator"')
+    group_button = body[max(0, group_start - 400) : group_start]
+    assert 'aria-expanded="false"' in group_button
+
+
+async def test_flat_items_always_visible_regardless_of_any_group_state(
+    client: AsyncClient,
+) -> None:
+    await register_and_login(client)
+    await client.patch(
+        "/api/v1/users/me", json={"nav_collapsed_groups": {"event-creator": True}}
+    )
+
+    response = await client.get("/settings")
+    assert response.status_code == 200
+    body = response.text
+
+    # Settings/Profile links are present and not inside a hidden ("display:none") container.
+    settings_link_index = body.index('href="/settings"')
+    profile_link_index = body.index('href="/profile"')
+    assert "display:none" not in body[max(0, settings_link_index - 200) : settings_link_index]
+    assert "display:none" not in body[max(0, profile_link_index - 200) : profile_link_index]
+
+
+async def test_group_toggle_button_is_a_real_button_with_aria_controls(
+    client: AsyncClient,
+) -> None:
+    await register_and_login(client)
+
+    response = await client.get("/settings")
+    assert response.status_code == 200
+    body = response.text
+
+    assert '<button' in body
+    assert 'aria-controls="nav-group-event-creator"' in body

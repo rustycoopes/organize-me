@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import DateTime, Index, String, func, text
+from sqlalchemy import JSON, DateTime, Index, String, func, text
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -34,6 +35,14 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     name: Mapped[str | None] = mapped_column(nullable=True)
     phone_number: Mapped[str | None] = mapped_column(nullable=True)
     dark_mode: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Sidebar nav-group collapse state, keyed by app service_name (organizeme_chrome.registry) ->
+    # collapsed bool. A missing key means expanded (the default for a service_name never toggled).
+    # The write path (PATCH /api/v1/users/me) always replaces the whole dict, never merges a
+    # single key - MutableDict wrapping is defensive against a future call site that mutates a key
+    # in place and expects SQLAlchemy to notice, which plain `Mapped[dict]` + JSON would not detect.
+    nav_collapsed_groups: Mapped[dict[str, bool]] = mapped_column(
+        MutableDict.as_mutable(JSON), default=dict, server_default="{}"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
