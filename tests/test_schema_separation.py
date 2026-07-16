@@ -113,7 +113,8 @@ async def test_deleting_host_user_cascades_to_event_creator_rows(
     await db_session.execute(
         text(
             "INSERT INTO event_creator.processing_runs (id, user_id, filename, status) "
-            "VALUES (:id, :user_id, :filename, :status::event_creator.processing_run_status)"
+            "VALUES (:id, :user_id, :filename, "
+            "CAST(:status AS event_creator.processing_run_status))"
         ).bindparams(id=run_id, user_id=user.id, filename="test.zip", status="success")
     )
 
