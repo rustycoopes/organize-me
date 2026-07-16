@@ -1,26 +1,19 @@
 """A Jinja `tojson` filter, since Starlette's `Jinja2Templates` (unlike Flask) doesn't register
 one. Used to embed the current user's nav-group collapsed state as an Alpine `x-data` attribute.
 
-Escapes the characters that could otherwise break out of an HTML attribute or a `</script>` tag,
-mirroring Flask's `htmlsafe_json_dumps`, then marks the result `Markup`-safe so Jinja's normal
-autoescaping doesn't double-escape it.
+Deliberately NOT Flask's `htmlsafe_json_dumps` approach (replacing HTML-special characters with
+JS unicode escapes like `\\u0022`): that only works for content placed inside a `<script>` body,
+where HTML-entity decoding never happens. Here the JSON is embedded inside an HTML *attribute*
+value, where the browser's HTML parser decodes entities (`&#34;` -> `"`) before Alpine ever reads
+the attribute and evaluates it as JS. Standard HTML-entity escaping is therefore both correct and
+sufficient: it protects the surrounding attribute markup, and is fully reversed by the time Alpine
+parses the string, so the `"` characters JSON needs as string delimiters arrive intact.
 """
 
 import json
 
-from markupsafe import Markup
-
-_HTML_UNSAFE_CHARS = {
-    "<": "\\u003c",
-    ">": "\\u003e",
-    "&": "\\u0026",
-    "'": "\\u0027",
-    '"': "\\u0022",
-}
+from markupsafe import Markup, escape
 
 
 def tojson_filter(value: object) -> Markup:
-    dumped = json.dumps(value)
-    for char, escaped in _HTML_UNSAFE_CHARS.items():
-        dumped = dumped.replace(char, escaped)
-    return Markup(dumped)
+    return Markup(escape(json.dumps(value)))
