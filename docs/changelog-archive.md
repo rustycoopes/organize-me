@@ -126,7 +126,7 @@ now green on `main`; prod `/health` confirmed live.
 
 ### Issue #12 — email/password auth: register, login, logout (branch `feature/slice-1-auth-register-login`)
 - FastAPI-Users v15 wired up with a **bcrypt-only** `PasswordHelper` (the library defaults to
-  Argon2 for new hashes; `docs/technical-approach.md` and issue #12 both specify bcrypt), a
+  Argon2 for new hashes; `docs/features/original-organize-me/technical-approach.md` and issue #12 both specify bcrypt), a
   cookie-based JWT backend (`organizeme_auth` cookie, HttpOnly, `SameSite=Lax`, 7-day
   max-age/token lifetime), and a `UserManager` enforcing an 8-character minimum password
 - Custom `POST /api/v1/auth/register`, `/login`, `/logout` under `app/api/v1/auth.py` rather
@@ -202,7 +202,7 @@ now green on `main`; prod `/health` confirmed live.
 - Account linking: a Google sign-in whose email matches an existing email/password account is
   linked to it (`associate_by_email=True`) rather than rejected, and marked verified without a
   separate step since Google already verified the address (`is_verified_by_default=True`) —
-  documented in `docs/technical-approach.md`'s Authentication section
+  documented in `docs/features/original-organize-me/technical-approach.md`'s Authentication section
 - "Sign in with Google" button (with Google's four-colour "G" mark) added to the login and
   register DaisyUI pages
 - Five improvements applied after comparing the implementation against issue #13's acceptance
@@ -325,7 +325,7 @@ page/template) since their file sets didn't overlap.
   changes" button, PATCHed together via `fetch`), an immediate-fire dark/light toggle that
   PATCHes on every change and optimistically updates `data-theme` client-side, and a native
   `<dialog>`-based delete-confirmation modal. First template in the app to use Alpine.js (named
-  in `docs/technical-approach.md` since #10 but never actually wired in) — added its CDN
+  in `docs/features/original-organize-me/technical-approach.md` since #10 but never actually wired in) — added its CDN
   `<script>` tag and an `[x-cloak] { display: none !important; }` rule to `base.html` (Alpine
   doesn't supply that CSS itself; without it, `x-cloak`-gated elements flash visibly for a frame
   on load)

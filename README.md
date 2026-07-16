@@ -9,7 +9,7 @@ management, the Settings-page shell, and the sidebar/nav chrome shared by every 
 
 `organize-me` used to be a single monolith that also watched cloud storage, ran an LLM
 extraction pipeline, and served an events dashboard. As of the Platform Restructure (see
-[`docs/platform-restructure/`](docs/platform-restructure/)), all of that event-extraction
+[`docs/features/platform-restructure/`](docs/features/platform-restructure/)), all of that event-extraction
 functionality — upload, the processing pipeline, storage connections, LLM prompt config, the
 events dashboard, and processing logs — has moved to its own independent service,
 **[event-creator](https://github.com/rustycoopes/event-creator)**. Slice R13 (issue #168) removed
@@ -34,7 +34,7 @@ integrations, and notifications now live.
 
 ## Adding a new hosted app
 
-See [`docs/platform-restructure/how-to-add-a-hosted-app.md`](docs/platform-restructure/how-to-add-a-hosted-app.md)
+See [`docs/features/platform-restructure/how-to-add-a-hosted-app.md`](docs/features/platform-restructure/how-to-add-a-hosted-app.md)
 for the concrete playbook (app-registry entry, LB URL-map regeneration, the `organizeme-chrome`
 shared package, and the JWT-verify pattern), validated against the real `event-creator`
 integration.
@@ -43,7 +43,7 @@ integration.
 
 ## Development
 
-**Stack:** Python 3.12 + FastAPI, managed with [uv](https://docs.astral.sh/uv/). See [Technical Approach](docs/technical-approach.md) for the full stack.
+**Stack:** Python 3.12 + FastAPI, managed with [uv](https://docs.astral.sh/uv/). See [Technical Approach](docs/features/original-organize-me/technical-approach.md) for the full stack.
 
 ### Setup
 
@@ -120,8 +120,8 @@ GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) run `pytest` + `mypy -
 
 | Document | Description |
 |----------|-------------|
-| [PRD](docs/prd.md) | Full product requirements and user stories |
-| [Technical Approach](docs/technical-approach.md) | Stack selection, infrastructure, CI/CD, cost summary, and prerequisites checklist |
+| [PRD](docs/features/original-organize-me/prd.md) | Full product requirements and user stories |
+| [Technical Approach](docs/features/original-organize-me/technical-approach.md) | Stack selection, infrastructure, CI/CD, cost summary, and prerequisites checklist |
 | [Changelog](docs/changelog.md) | Release history — one line per merged issue, linking to full detail |
 
 ---
@@ -141,6 +141,6 @@ The `examples/` folder contains reference files used for development and testing
 profile, settings-shell, and nav-shell, with all event-extraction functionality (upload,
 processing pipeline, storage connections, LLM prompt config, events dashboard, logs) split out
 into the independent `event-creator` service and removed from this repo (Slice R13, issue #168).
-See [`docs/platform-restructure/`](docs/platform-restructure/) for the full restructure design
+See [`docs/features/platform-restructure/`](docs/features/platform-restructure/) for the full restructure design
 and slice-by-slice WBS, and [Changelog](docs/changelog.md) for the complete history (including the
 pre-restructure monolith slices this repo used to carry).

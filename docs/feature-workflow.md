@@ -125,8 +125,10 @@ docs/features/<feature-slug>/
     slice-2-<name>.md
 ```
 
-`docs/platform-restructure/` and `docs/slices/` are the legacy precedents this convention
-formalizes — left in place, not retrofitted.
+`docs/features/platform-restructure/` and `docs/features/original-organize-me/` are the two
+pre-existing bodies of work this convention formalizes — moved under `docs/features/` to match,
+but kept in their original shape (their own filenames, not renamed to `PRD.md`/`TDD.md`/
+`WBS/slice-<n>-<name>.md`) rather than rewritten.
 
 ## ADRs
 

@@ -11,7 +11,7 @@ and the Prompt page (view / edit / reset) rebuilt in Event Creator — completin
 
 Migrate the remaining Event-Creator surfaces: the Dashboard that replaces R6's placeholder with
 the real events table, and the Prompt page. After this slice, every event-extraction feature from
-`docs/prd.md` lives in Event Creator with no user-visible behaviour change.
+`docs/features/original-organize-me/prd.md` lives in Event Creator with no user-visible behaviour change.
 
 ## Includes
 - Events dashboard: table (type, description, resolved_date, raw_date_text, agreed_by, Calendar

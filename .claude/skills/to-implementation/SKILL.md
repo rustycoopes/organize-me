@@ -12,7 +12,7 @@ Locate the relevant WBS slice spec from the issue's labels (each slice file embe
   `docs/features/<feature-slug>/WBS/slice-<n>-<name>.md` (find the exact filename by slice number if
   the label alone doesn't spell it out).
 - If the issue instead carries a legacy `restructure-rN` label (the still-active Platform
-  Restructure track), read `docs/platform-restructure/WBS/slice-R<N>.md` as before.
+  Restructure track), read `docs/features/platform-restructure/WBS/slice-R<N>.md` as before.
 - If there's no WBS slice at all (a small, direct-to-issue change per CLAUDE.md's minor-change
   path), work from the issue body alone.
 
@@ -37,7 +37,7 @@ Once the code is ready, record delivery:
 1. If a WBS slice file exists for this issue, append a `## Delivered` section to it — issue number,
    branch name, date, and a short account of what actually shipped (including anything that
    diverged from the plan), matching the pattern already used in
-   `docs/platform-restructure/WBS/slice-R13.md`.
+   `docs/features/platform-restructure/WBS/slice-R13.md`.
 2. Add one line to `docs/changelog.md`'s `[Unreleased]` section: date, issue number, title, and a
    link to the WBS slice's Delivered section (or to the issue/PR if there's no WBS slice).
 

@@ -184,4 +184,4 @@ OrganizeMe is a multi-user web application that monitors a connected cloud stora
 - The WhatsApp export format (`examples/example.whatsapp.txt`) and LLM output format (`examples/example.lmmoutput.txt`) are the canonical reference formats for the first release.
 - "Agreed-by" names come from the LLM output and are displayed as initials chips on the dashboard — no user-side configuration of participant names is required.
 - The `resolved_date` field from the LLM may represent multiple dates (e.g., `"Sunday 28 June 2026, Monday 29 June 2026"`); the dashboard must handle multi-date values gracefully.
-- Tech Design (architecture, stack selection, infrastructure) is documented separately in `docs/technical-approach.md`.
+- Tech Design (architecture, stack selection, infrastructure) is documented separately in `docs/features/original-organize-me/technical-approach.md`.

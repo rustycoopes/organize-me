@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
 Slice R5 — provisions the shared External HTTPS Load Balancer that fronts
-organizeme.qa.russcoopersoftware.com for QA. See docs/platform-restructure/WBS/slice-R5.md.
+organizeme.qa.russcoopersoftware.com for QA. See docs/features/platform-restructure/WBS/slice-R5.md.
 
 .DESCRIPTION
 Windows PowerShell equivalent of provision.sh — same steps, same idempotency pattern (each

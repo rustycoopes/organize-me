@@ -6,8 +6,8 @@
 monolith. As of Slice R13 (issue #168, 2026-07), `organize-me` is the **Host** app only; the
 event-extraction stack described below (storage watching, the LLM pipeline, notifications, etc.)
 has moved to the independent `event-creator` service — see
-[`docs/platform-restructure/platform-restructure-design.md`](platform-restructure/platform-restructure-design.md)
-and [`docs/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md)
+[`docs/features/platform-restructure/platform-restructure-design.md`](platform-restructure/platform-restructure-design.md)
+and [`docs/features/platform-restructure/how-to-add-a-hosted-app.md`](platform-restructure/how-to-add-a-hosted-app.md)
 for the current architecture. The sections below are kept for historical reference on the
 original stack decisions (most still apply to `event-creator` today, since it inherited this
 design); the **Host-only stack** actually running in this repo now is:
@@ -294,13 +294,13 @@ as GitHub Actions secrets.
 
 ## Prerequisites Checklist
 
-> Moved to [`docs/implementation-plan.md`](implementation-plan.md#prerequisites-before-slice-1-begins) — that version reflects the confirmed infrastructure decisions (no local Docker Compose; Supabase QA + Upstash Redis accessed directly via `.env.local`).
+> Moved to [`docs/features/original-organize-me/implementation-plan.md`](implementation-plan.md#prerequisites-before-slice-1-begins) — that version reflects the confirmed infrastructure decisions (no local Docker Compose; Supabase QA + Upstash Redis accessed directly via `.env.local`).
 
 ---
 
 ## Reference Fixtures
 
-> See [`docs/implementation-plan.md`](implementation-plan.md#reference-fixtures) for canonical fixture details and their role in the test suite.
+> See [`docs/features/original-organize-me/implementation-plan.md`](implementation-plan.md#reference-fixtures) for canonical fixture details and their role in the test suite.
 
 ---
 

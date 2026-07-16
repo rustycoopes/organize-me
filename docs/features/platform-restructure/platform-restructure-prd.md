@@ -6,7 +6,7 @@
 production; see `docs/changelog.md` for the slice-by-slice record. Retained as the structural
 rationale/requirements record, not as a forward-looking proposal.
 
-**Relationship to other docs:** [`docs/prd.md`](prd.md) captures the *functional* requirements of the event-extraction product (dashboard, upload, processing, prompt, notifications, etc.) as it exists today. This document governs the *structural* restructuring of that same functionality into a multi-repo, multi-application platform. `docs/prd.md` doesn't change — it becomes the functional spec for the **Event Creator** application described here. `docs/technical-approach.md` remains the technical reference for today's single-repo build and will be superseded by per-repo technical-approach docs once implementation begins.
+**Relationship to other docs:** [`docs/features/original-organize-me/prd.md`](prd.md) captures the *functional* requirements of the event-extraction product (dashboard, upload, processing, prompt, notifications, etc.) as it exists today. This document governs the *structural* restructuring of that same functionality into a multi-repo, multi-application platform. `docs/features/original-organize-me/prd.md` doesn't change — it becomes the functional spec for the **Event Creator** application described here. `docs/features/original-organize-me/technical-approach.md` remains the technical reference for today's single-repo build and will be superseded by per-repo technical-approach docs once implementation begins.
 
 ---
 
@@ -67,11 +67,11 @@ These two principles apply to Event Creator now and to every future hosted app �
 ### Must-Have (P0)
 
 **Host — identity & session**
-- The Host owns registration, login (email/password + Google OAuth), logout, password reset, and account deletion, per `docs/prd.md`'s Authentication & Account Management stories.
+- The Host owns registration, login (email/password + Google OAuth), logout, password reset, and account deletion, per `docs/features/original-organize-me/prd.md`'s Authentication & Account Management stories.
 - Acceptance: a user authenticated at the Host is recognized by Event Creator with no separate login step; logging out at the Host ends the session for Event Creator too.
 
 **Host — Profile**
-- The Host owns the Profile page (name, email, phone, dark/light mode, account deletion), per `docs/prd.md`'s Profile & Preferences stories.
+- The Host owns the Profile page (name, email, phone, dark/light mode, account deletion), per `docs/features/original-organize-me/prd.md`'s Profile & Preferences stories.
 - Acceptance: profile changes made at the Host are immediately available to Event Creator (e.g. phone number for SMS).
 
 **Host — chrome & Settings shell**
@@ -87,8 +87,8 @@ These two principles apply to Event Creator now and to every future hosted app �
 - Acceptance: Event Creator's pages never implement or check session/login state themselves, only "which user is this."
 
 **Event Creator — functional parity**
-- All existing functionality from `docs/prd.md` — excluding Authentication & Account Management, Profile & Preferences (dark mode), and the sidebar shell, which move to the Host — is rebuilt in the Event Creator repo with no user-visible behavior change.
-- Acceptance: every `docs/prd.md` user story 13–52 continues to pass its existing/equivalent acceptance criteria through the new structure.
+- All existing functionality from `docs/features/original-organize-me/prd.md` — excluding Authentication & Account Management, Profile & Preferences (dark mode), and the sidebar shell, which move to the Host — is rebuilt in the Event Creator repo with no user-visible behavior change.
+- Acceptance: every `docs/features/original-organize-me/prd.md` user story 13–52 continues to pass its existing/equivalent acceptance criteria through the new structure.
 
 **Repo, infra & deployment structure**
 - The existing `organize-me` repo is repurposed as the **Host**: event-extraction-specific code is removed, leaving auth/profile/settings-shell/nav-shell. **Event Creator** is a new repo, built fresh.
@@ -119,7 +119,7 @@ These two principles apply to Event Creator now and to every future hosted app �
 ## Success Metrics
 
 **Leading indicators (checked before/at cutover)**
-- 100% of `docs/prd.md` user stories 13–52 pass their acceptance criteria against the new structure.
+- 100% of `docs/features/original-organize-me/prd.md` user stories 13–52 pass their acceptance criteria against the new structure.
 - The Host↔Event Creator boundary test suite is green in QA before the production cutover deploy.
 - Event Creator deploys (build → QA → prod) at least once with zero changes to, or redeploys of, the Host.
 
@@ -139,7 +139,7 @@ These two principles apply to Event Creator now and to every future hosted app �
   1. This PRD.
   2. Lightweight technical design — resolve the shared-styling-mechanism question and turn the settled architecture decisions above into an implementation plan (exact routing/proxy config, trusted-identity header format, etc.).
   3. Strip `organize-me` down to the Host (keep auth/profile/settings-shell/nav-shell, remove event-extraction code).
-  4. Build the Event Creator repo, migrating functionality, verified against `docs/prd.md`'s acceptance criteria plus the new Host↔Event Creator boundary test suite.
+  4. Build the Event Creator repo, migrating functionality, verified against `docs/features/original-organize-me/prd.md`'s acceptance criteria plus the new Host↔Event Creator boundary test suite.
   5. QA verification of the full boundary flow (P0 gate).
   6. Coordinated production deploy — a standard deploy, not a scheduled-downtime event.
   7. Post-cutover verification against Success Metrics, then the P1 cleanup pass on the Host repo.

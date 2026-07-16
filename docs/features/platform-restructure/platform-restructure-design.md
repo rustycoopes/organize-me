@@ -5,7 +5,7 @@
 **Status:** Implemented — slices R0–R13 all shipped (see `docs/changelog.md`); this doc now
 describes the architecture as built, not a proposal. Where the actual build diverged from a
 decision below, that's called out inline.
-**Implements:** [`docs/platform-restructure-prd.md`](platform-restructure-prd.md)
+**Implements:** [`platform-restructure-prd.md`](platform-restructure-prd.md)
 
 This document resolves the engineering decisions the PRD deliberately left open (routing mechanism, SSO mechanism, database ownership, styling/chrome sharing) into a concrete architecture, ready for task breakdown.
 
@@ -97,7 +97,7 @@ Logout clears the cookie client-side, same as today's single-app behavior — th
 
 ### Event Creator (new repo)
 
-- **Owns:** Dashboard, Upload, Processing Pipeline & Progress, Logs, Prompt, and its own Settings tabs (Storage, Notifications, Preferences) — full functional parity with `docs/prd.md` stories 13–52.
+- **Owns:** Dashboard, Upload, Processing Pipeline & Progress, Logs, Prompt, and its own Settings tabs (Storage, Notifications, Preferences) — full functional parity with `docs/features/original-organize-me/prd.md` stories 13–52.
 - **Database schema:** `event_creator` — `storage_configs`, `llm_prompts`, `processing_runs`, `processing_steps`, `events`. `user_id` columns keep a real foreign key to `host.users.id` via a narrow `REFERENCES`-only grant (see Data section) with `ON DELETE CASCADE`.
 - **Depends on:** the shared chrome/theme package (pinned version) for rendering its full pages, and the bundled JWT-verification helper for identity — never its own login/session logic.
 - **Deploys as:** new `event-creator-qa` / `event-creator-prod` Cloud Run services.
@@ -187,7 +187,7 @@ apps:
 1. Confirm editable Squarespace DNS for the `russcoopersoftware.com` subdomains (R0); provision the Load Balancer, URL map, and managed SSL cert, pointing the subdomain at the LB IP via a Custom A/AAAA record.
 2. Introduce `host` and `event_creator` schemas plus their DB roles in the existing database; move existing tables via `ALTER TABLE ... SET SCHEMA` (no data movement).
 3. Strip `organize-me` down to the Host; publish v1 of the shared chrome/theme package.
-4. Build the Event Creator repo consuming that package; verify against `docs/prd.md`'s acceptance criteria plus the new boundary E2E suite, in QA.
+4. Build the Event Creator repo consuming that package; verify against `docs/features/original-organize-me/prd.md`'s acceptance criteria plus the new boundary E2E suite, in QA.
 5. Point the QA Load Balancer's URL map at both services; verify end-to-end in QA.
 6. Repeat for production; cut the Load Balancer/DNS live.
 7. **Rollback:** since the schema change is additive (`SET SCHEMA`, not destructive) and no data physically moves, rollback doesn't require reversing data — reverting the Load Balancer's URL map or rolling back a Cloud Run revision is sufficient if issues surface.

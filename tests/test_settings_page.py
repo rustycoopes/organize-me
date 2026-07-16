@@ -1,6 +1,6 @@
 """Tests for the Settings page shell (issue #46).
 
-R7 (docs/platform-restructure/WBS/slice-R7.md): the Host renders only the Settings *shell* here
+R7 (docs/features/platform-restructure/WBS/slice-R7.md): the Host renders only the Settings *shell* here
 (the tab-bar chrome, driven by the event-creator app-registry entry's settings_tabs) — Storage,
 Notifications, and Preferences tab *content* now lives in the independent event-creator service
 and is fetched as an HTML fragment via HTMX (GET /settings/event-creator/{tab.id}). These tests

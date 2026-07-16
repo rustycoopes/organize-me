@@ -1,6 +1,6 @@
 """The authenticated Settings page (issue #46).
 
-R7 (docs/platform-restructure/WBS/slice-R7.md): the Host still renders the Settings *shell*
+R7 (docs/features/platform-restructure/WBS/slice-R7.md): the Host still renders the Settings *shell*
 (tab-bar chrome, from the app-registry's settings_tabs — organizeme_chrome.registry), but no
 longer owns any tab's *content*. Storage config (issue #46) and Notifications (issue #88) have
 moved to the independent event-creator service, which now declares those tabs (plus a new stub

@@ -11,7 +11,7 @@ way. Some of the earliest slices (R0, R1) were one-time platform setup, not part
 new app — flagged inline where that applies.
 
 It is a living document — **update it in the same PR that lands each new Platform Restructure
-slice** (`docs/platform-restructure/WBS/slice-R*.md`), whether or not that slice touches another
+slice** (`docs/features/platform-restructure/WBS/slice-R*.md`), whether or not that slice touches another
 repo directly. Each slice gets its own `## Slice R<n> — <name>` section below, added in order.
 
 For the full architecture rationale, see
