@@ -400,7 +400,7 @@ dispatch — this is a redesign within R11, not a new numbered slice.
     finishes (including on a retried/already-terminal redelivery, so the chain can resume even if
     an earlier attempt died between finishing its item and advancing the chain).
 
-## Slice R12 — Production cutover (in progress)
+## Slice R12 — Production cutover (done)
 
 - **Infra:** Production External HTTPS Load Balancer fronting `organizeme.russcoopersoftware.com`
   provisioned via `infra/gcp_lb/provision-prod.{sh,ps1}` — same shape as R5's QA setup, every
@@ -426,8 +426,22 @@ dispatch — this is a redesign within R11, not a new numbered slice.
   domain in `organize-me`'s `deploy.yml`; `event-creator`'s prod `GOOGLE_DRIVE_REDIRECT_URI` was
   already pointed there (set proactively during #200, since event-creator-prod wasn't yet receiving
   real traffic), so no change was needed there.
-- **Still open:** post-cutover smoke tests (real login with a pre-existing account confirming
-  existing data is intact; a real upload run through the pipeline to completion).
+- **Post-cutover smoke tests surfaced two live bugs, both fixed (neither an R12 regression — both
+  were latent, first exercised by this cutover's real-upload test):**
+  - **Stale Google Drive OAuth token in prod.** `event-creator-prod` failed every upload/import
+    with a Fernet `InvalidSignature` decrypting the stored `oauth_access_token` — it had been
+    encrypted before `ENCRYPTION_KEY` moved to GCP Secret Manager, under a different key value than
+    what's there now. Fixed by reconnecting Google Drive in prod Settings (re-encrypts under the
+    current key); no code change. Any other prod user who connected Drive before that Secret Manager
+    migration and hasn't uploaded since would hit the same error — flagged as issue #206 for a
+    deliberate audit decision.
+  - **Missing `GEMINI_API_KEY` in `event-creator`.** R11 moved the Gemini-calling pipeline here, but
+    the key was only ever wired into `organize-me`'s `ci.yml`/`deploy.yml` — invisible to CI since
+    tests mock the Gemini client. Fixed in `event-creator` PR #14
+    (`fix/wire-gemini-api-key`): added the GitHub secret and wired it into both QA and prod Cloud
+    Run env.
+- Real login (existing data confirmed intact) and a real upload (pipeline ran to completion) both
+  verified working end-to-end in prod after both fixes.
 
 ## Slice R13 — not yet landed
 
