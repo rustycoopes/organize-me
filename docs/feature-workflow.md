@@ -24,6 +24,8 @@ flowchart LR
     C --> D["/to-wbs"]
     D --> E["/to-issues"]
     E --> F["/to-implementation"]
+    D -. new hosted app only .-> H["/new-hosted-app"]
+    H -. repo scaffolded, then .-> E
     G["/next-issue"] -.picks an issue,\nhands off to.-> F
 ```
 
@@ -36,6 +38,7 @@ fixed path, so nothing downstream has to re-derive context:
 | 2. Requirements | `/to-prd` | conversation context | `docs/features/<feature-slug>/PRD.md` | none |
 | 3. Design | `/to-design` | `PRD.md` | `docs/features/<feature-slug>/TDD.md` + any `docs/adr/<feature-slug>-<decision-slug>.md` | `fastapi-expert`, `clean-architecture-expert`, `microservices-architect` (parallel) |
 | 4. Slicing | `/to-wbs` | `PRD.md` + `TDD.md` | `docs/features/<feature-slug>/WBS/slice-<n>-<name>.md` (one per slice) | none (interactive quiz with the user) |
+| 4.5. Repo scaffold *(new hosted apps only)* | `/new-hosted-app` | `docs/features/<feature-slug>/` (if it exists) | a new sibling repo, `CLAUDE.md` + skills/agents + platform docs copied in, pushed to GitHub | none |
 | 5. Issue filing | `/to-issues` | one WBS slice file | a GitHub issue, labeled `<feature-slug>` + `<slice-id>` + `enhancement` | none (interactive quiz with the user) |
 | 6. Build | `/to-implementation` | the issue + its WBS slice | code, PR, a `## Delivered` section appended to the WBS slice, one `changelog.md` line | `code-review-master`, `code-quality-guardian` (review pass) |
 | — | `/next-issue` | the GitHub project board | picks the next issue, hands off to `/to-implementation` | none |
@@ -82,6 +85,22 @@ and dependencies before writing anything. On approval, writes one
 `docs/features/<feature-slug>/WBS/slice-<n>-<name>.md` per slice, each with What to build / Design
 notes / Blocked by / Acceptance criteria / Testing — and room for a Delivered section to be
 appended later.
+
+### 4.5. `/new-hosted-app` — scaffold the new repo (new hosted apps only)
+
+Only relevant when the feature under work *is* standing up a brand-new hosted app (e.g.
+`doc-library`'s Slice 1, "Repo & infra setup") — most features live inside an existing repo and
+skip this stage entirely. Takes the feature slug (and its `docs/features/<slug>/` directory, if
+`/to-wbs` already wrote one) and generates the new repo: FastAPI/CI skeleton, `CLAUDE.md`, every
+skill and agent from this repo, and the platform docs a new hosted app needs
+(`how-to-add-a-hosted-app.md`, `host-integration-guide.md`, `feature-workflow.md`,
+`secrets-and-accounts.md`, `creating-prerequisites.md`, plus the feature's own
+`docs/features/<slug>/` if it exists) — then creates the repo on GitHub and pushes it, with an
+explicit confirmation step before that push since it's a real, externally-visible action. It
+deliberately does **not** touch GCP (Secret Manager, Cloud Run, the Load Balancer) or this repo's
+own `packages/chrome/src/organizeme_chrome/registry.py` — those stay manual/human steps, printed
+as a checklist once scaffolding finishes. `/to-issues` and `/to-implementation` then run *inside*
+the new repo for that feature's remaining slices, not this one.
 
 ### 5. `/to-issues` — publish one slice as an issue
 
