@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Verified custom domain sender (issue #152 - Resend's shared sandbox sender previously
     # used here, onboarding@resend.dev, only delivered to the account owner's own verified
     # address). Override via EMAIL_FROM if needed.
-    email_from: str = "OrganizeMe <uploads@organizeme.russcoopersoftware.com>"
+    email_from: str = "OrganizeMe <onboarding@organizeme.russcoopersoftware.com>"
     # Enables the test-only Playwright helper endpoints (app.api.v1.internal_e2e). MUST only
     # ever be true on the QA Cloud Run service, never prod - it exposes a way to mint a valid
     # password-reset token for any registered email. Defaults false so those routes return 404
