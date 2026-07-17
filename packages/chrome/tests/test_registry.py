@@ -8,6 +8,17 @@ def test_list_apps_includes_organizeme_and_event_creator() -> None:
 
     assert "organizeme" in service_names
     assert "event-creator" in service_names
+    assert "doc-library" in service_names
+
+
+def test_get_app_doc_library_owns_its_own_nav_and_api_prefixes() -> None:
+    # Slice 2 (issue #2): a brand-new hosted app, not a migration off the Host.
+    app = get_app("doc-library")
+
+    assert [item.path for item in app.nav] == ["/doc-library"]
+    assert [item.label for item in app.nav] == ["Doc Library"]
+    assert app.settings_tabs == []
+    assert app.api_prefixes == ["/api/v1/doc-links", "/doc-library/fragments"]
 
 
 def test_get_app_returns_the_matching_entry() -> None:
