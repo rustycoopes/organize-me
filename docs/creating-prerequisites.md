@@ -54,6 +54,11 @@ Created at the repo root (already covered by `.gitignore` — never committed). 
 ## Issue #2 — Artifact Registry + Cloud Run (QA + prod)
 
 - [x] Artifact Registry Docker repository created
+
+**Policy for any new Artifact Registry repo created after this one:** always pass
+`--disable-vulnerability-scanning` at creation time (`gcloud artifacts repositories create <repo>
+--repository-format=docker --location=<region> --disable-vulnerability-scanning`). The
+`organizeme` repo created below predates this policy and was not created with the flag.
 - [x] QA Cloud Run service created (`organizeme-qa`)
 - [x] Prod Cloud Run service created (`organizeme-prod`)
 - [x] Service URLs noted in `.env.local`
@@ -68,6 +73,11 @@ Key settings:
 - `--memory=1Gi` (FastAPI + Celery worker share the container via supervisord)
 - QA: `--min-instances=0` (cost savings, only hit during PR review)
 - Prod: `--min-instances=1` (avoid cold starts for real users)
+
+**Superseded:** this `--min-instances=1` setting was later removed. The platform-wide policy as of
+`docs/adr/0001-event-creator-worker-cpu-throttling.md` is that every Cloud Run service — QA and
+prod alike — stays on plain request-based billing: no `--min-instances`, no `--no-cpu-throttling`.
+Kept here for historical accuracy only; don't copy this setting into a new service.
 
 Resulting URLs (stored in `.env.local`):
 - QA: `https://organizeme-qa-170051512639.northamerica-northeast1.run.app`

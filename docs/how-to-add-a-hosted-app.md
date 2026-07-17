@@ -245,20 +245,35 @@ the maintained, current version of this checklist; `host-integration-guide.md` k
 older copy for historical continuity but points here as the canonical one.
 
 1. Own git repo, own CI/CD (build → test → deploy) — never a Host build/redeploy.
-2. Own `<app>-qa` / `<app>-prod` Cloud Run service pair.
-3. Pinned `organizeme-chrome` dependency (step 3).
-4. An entry in `registry.py` (step 1) — Host-repo PR, reviewed like any other Host change.
-5. Own Postgres schema, own independent Alembic history
+2. Own `<app>-qa` / `<app>-prod` Cloud Run service pair, deployed **request-based** (Cloud Run's
+   default billing model — CPU allocated only while handling a request): never pass
+   `--no-cpu-throttling` and never set `--min-instances` on `gcloud run deploy`. This is a hard
+   platform default, not a per-app judgment call — see
+   `docs/adr/0001-event-creator-worker-cpu-throttling.md` for why the one prior exception
+   (`event-creator` QA's `--no-cpu-throttling` experiment, to keep a Celery worker alive) was
+   reverted rather than kept: any background/async work should push back to the service as a real
+   HTTP request (Cloud Tasks push target) instead of trading into instance-based billing.
+3. Own Artifact Registry Docker repo, created **with vulnerability scanning disabled**:
+   ```bash
+   gcloud artifacts repositories create <app-slug> \
+     --repository-format=docker \
+     --location=<region> \
+     --disable-vulnerability-scanning
+   ```
+   (one-time manual step, before the first `docker push` in your deploy workflow can succeed).
+4. Pinned `organizeme-chrome` dependency (step 3).
+5. An entry in `registry.py` (step 1) — Host-repo PR, reviewed like any other Host change.
+6. Own Postgres schema, own independent Alembic history
    (`version_table_schema = <your_schema>`) — never write to another app's schema, and never
    more than a `REFERENCES`-only grant back to `host.users.id` if you need a real FK.
-6. `GCP_SA_KEY` and your own `SUPABASE_QA_URL`/`SUPABASE_PROD_URL` as GitHub Actions secrets in
+7. `GCP_SA_KEY` and your own `SUPABASE_QA_URL`/`SUPABASE_PROD_URL` as GitHub Actions secrets in
    **your own** repo.
-7. `--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest` on your deploy step (step 4).
-8. If you store third-party credentials at rest: `--set-secrets=ENCRYPTION_KEY=encryption-key-
+8. `--set-secrets=JWT_SECRET=jwt-secret-{qa,prod}:latest` on your deploy step (step 4).
+9. If you store third-party credentials at rest: `--set-secrets=ENCRYPTION_KEY=encryption-key-
    {qa,prod}:latest`, encrypted with a `CredentialCipher` pattern (see `event-creator`'s
    `app/core/security.py` — the Host's own copy was removed in this same slice, since it stored
    no such credentials of its own) — never plaintext.
-9. No login/session/registration/password code of your own, ever (step 4).
-10. No server-to-server call to the Host at request time, for anything (step 4).
-11. Regenerate and import the LB URL map once your service and registry entry both exist (step 2).
-12. Your own `tests/` and `e2e/` — nothing shared except the boundary spec (step 5).
+10. No login/session/registration/password code of your own, ever (step 4).
+11. No server-to-server call to the Host at request time, for anything (step 4).
+12. Regenerate and import the LB URL map once your service and registry entry both exist (step 2).
+13. Your own `tests/` and `e2e/` — nothing shared except the boundary spec (step 5).

@@ -42,11 +42,24 @@ per environment per app. Slice sections below tag the steps that correspond to o
    breaks the connect flow silently until someone tries it (see the R7 gotcha below).
 4. **Provision the Cloud Run service, Serverless NEG, and backend service** for a new app via
    `infra/gcp_lb/provision.sh` (QA) / `provision-prod.sh` (prod) — idempotent `gcloud` scripts, not
-   part of CI, run once per environment before the app's registry entry means anything.
-5. **Import the regenerated Load Balancer URL map** (`gcloud compute url-maps import ...`) after
+   part of CI, run once per environment before the app's registry entry means anything. Every
+   `gcloud run deploy` for that service, in every environment, always stays **request-based**
+   billing (Cloud Run's default): never add `--no-cpu-throttling`, never set `--min-instances`. See
+   `docs/adr/0001-event-creator-worker-cpu-throttling.md` — the one prior exception
+   (`event-creator` QA's `--no-cpu-throttling` experiment) was reverted, not kept, and background
+   work belongs on a Cloud Tasks push target instead.
+5. **Create the app's Artifact Registry Docker repo** with vulnerability scanning disabled, before
+   the first `docker push` in that app's deploy workflow:
+   ```bash
+   gcloud artifacts repositories create <app-slug> \
+     --repository-format=docker \
+     --location=<region> \
+     --disable-vulnerability-scanning
+   ```
+6. **Import the regenerated Load Balancer URL map** (`gcloud compute url-maps import ...`) after
    running `infra/gcp_lb/generate_url_map.py` — the generator only prints YAML; nothing applies it
    automatically.
-6. **Confirm DNS is editable** for any brand-new subdomain (Cloud DNS zone / registrar nameservers)
+7. **Confirm DNS is editable** for any brand-new subdomain (Cloud DNS zone / registrar nameservers)
    before Load Balancer provisioning — a one-time platform-level step (R0), not per-app.
 
 ## Quick-start checklist for a brand-new hosted app

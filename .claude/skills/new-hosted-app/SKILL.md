@@ -98,6 +98,14 @@ Use the script; don't hand-write these files again.
    - Confirm the shared deploy service account already has `secretmanager.secretAccessor` on
      `jwt-secret-{qa,prod}` (true today for every existing service, but worth a `gcloud` check,
      not an assumption).
+   - Create the app's Artifact Registry Docker repo **with vulnerability scanning disabled**
+     (`gcloud artifacts repositories create <app-slug> --repository-format=docker
+     --location=<region> --disable-vulnerability-scanning`) — needed before the generated
+     workflows' first `docker push` can succeed.
+   - Every Cloud Run service for the app (`<app>-qa` and `<app>-prod`) stays **request-based**
+     billing: never add `--no-cpu-throttling` or `--min-instances` to `gcloud run deploy` — this is
+     a platform-wide default, not a per-app choice (see
+     `docs/adr/0001-event-creator-worker-cpu-throttling.md` in the copied docs).
    - A new Postgres schema for the app, with its own independent Alembic history
      (`version_table_schema` — already wired into the generated `migrations/env.py`).
    - Only once the service is deployed and reachable: the Host-repo registry PR
