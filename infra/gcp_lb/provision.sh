@@ -18,6 +18,9 @@
 # is what wires that second backend into the URL map (which regenerates from the R3 app-registry
 # and now routes /dashboard to event-creator-backend). This step requires event-creator-qa to
 # already be deployed (its own repo's CI/CD does that) — run this only after that first deploy.
+#
+# Doc Library Slice 2 (issue #2) adds a third independent Cloud Run service the same way — its
+# own NEG + backend service, requiring doc-library-qa to already be deployed (Slice 1).
 
 set -euo pipefail
 
@@ -34,6 +37,10 @@ BACKEND_ORGANIZEME="organizeme-backend"
 EVENTCREATOR_RUN_SERVICE="event-creator-qa"
 EVENTCREATOR_NEG_NAME="event-creator-qa-neg"
 BACKEND_EVENTCREATOR="event-creator-backend"
+
+DOCLIBRARY_RUN_SERVICE="doc-library-qa"
+DOCLIBRARY_NEG_NAME="doc-library-qa-neg"
+BACKEND_DOCLIBRARY="doc-library-backend"
 
 IP_V4_NAME="organizeme-lb-ipv4"
 IP_V6_NAME="organizeme-lb-ipv6"
@@ -67,7 +74,7 @@ gcloud compute ssl-certificates describe "$CERT_NAME" --global >/dev/null 2>&1 |
   gcloud compute ssl-certificates create "$CERT_NAME" --global --domains="$QA_HOST"
 echo "NOTE: cert stays PROVISIONING until the A/AAAA records above resolve and Google validates them (can take up to ~24h)."
 
-echo "== 4. Serverless NEGs (organizeme-qa + event-creator-qa) =="
+echo "== 4. Serverless NEGs (organizeme-qa + event-creator-qa + doc-library-qa) =="
 gcloud compute network-endpoint-groups describe "$NEG_NAME" --region="$REGION" >/dev/null 2>&1 || \
   gcloud compute network-endpoint-groups create "$NEG_NAME" \
     --region="$REGION" \
@@ -79,8 +86,14 @@ if ! gcloud compute network-endpoint-groups describe "$EVENTCREATOR_NEG_NAME" --
     --network-endpoint-type=serverless \
     --cloud-run-service="$EVENTCREATOR_RUN_SERVICE"
 fi
+if ! gcloud compute network-endpoint-groups describe "$DOCLIBRARY_NEG_NAME" --region="$REGION" >/dev/null 2>&1; then
+  gcloud compute network-endpoint-groups create "$DOCLIBRARY_NEG_NAME" \
+    --region="$REGION" \
+    --network-endpoint-type=serverless \
+    --cloud-run-service="$DOCLIBRARY_RUN_SERVICE"
+fi
 
-echo "== 5. Backend services (host-backend, organizeme-backend -> organizeme NEG; event-creator-backend -> its own NEG) =="
+echo "== 5. Backend services (host-backend, organizeme-backend -> organizeme NEG; event-creator-backend/doc-library-backend -> their own NEGs) =="
 # NOTE: bash's errexit exemption on the RHS of `||` cascades into a whole `{ ...; }` block used
 # there (BashFAQ/105) — an `if` is used instead so a failing `add-backend` (after `create`
 # already succeeded) still aborts the script under `set -e`, rather than silently leaving a
@@ -96,6 +109,11 @@ if ! gcloud compute backend-services describe "$BACKEND_EVENTCREATOR" --global >
   gcloud compute backend-services create "$BACKEND_EVENTCREATOR" --global --load-balancing-scheme=EXTERNAL_MANAGED
   gcloud compute backend-services add-backend "$BACKEND_EVENTCREATOR" --global \
     --network-endpoint-group="$EVENTCREATOR_NEG_NAME" --network-endpoint-group-region="$REGION"
+fi
+if ! gcloud compute backend-services describe "$BACKEND_DOCLIBRARY" --global >/dev/null 2>&1; then
+  gcloud compute backend-services create "$BACKEND_DOCLIBRARY" --global --load-balancing-scheme=EXTERNAL_MANAGED
+  gcloud compute backend-services add-backend "$BACKEND_DOCLIBRARY" --global \
+    --network-endpoint-group="$DOCLIBRARY_NEG_NAME" --network-endpoint-group-region="$REGION"
 fi
 
 echo "== 6. URL map, generated from the R3 app-registry =="
@@ -127,3 +145,4 @@ gcloud compute forwarding-rules describe "$FWD_RULE_V6" --global >/dev/null 2>&1
 echo "Done. Once the cert shows ACTIVE (gcloud compute ssl-certificates describe $CERT_NAME --global),"
 echo "verify with: curl https://$QA_HOST/login"
 echo "verify Event Creator routing with: curl https://$QA_HOST/dashboard"
+echo "verify Doc Library routing with: curl https://$QA_HOST/doc-library"

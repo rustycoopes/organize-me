@@ -111,6 +111,16 @@ APPS: list[AppEntry] = [
         # still renders the Settings shell (tab-bar chrome) but no longer owns any tab's content.
         settings_tabs=[],
     ),
+    # Doc Library Slice 2 (SSO-trust tracer bullet, issue #2): a new independent hosted app, not a
+    # migration off the Host — its own repo, own Cloud Run service, own schema from day one.
+    # api_prefixes registered now (Slice 1 pattern established this) even though no route uses
+    # them yet, so Slice 3 doesn't need a second registry PR just to add API routes.
+    AppEntry(
+        service_name="doc-library",
+        nav=[AppNavItem("/doc-library", "Doc Library")],
+        settings_tabs=[],
+        api_prefixes=["/api/v1/doc-links", "/doc-library/fragments"],
+    ),
 ]
 
 
