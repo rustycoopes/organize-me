@@ -572,6 +572,42 @@ dispatch — this is a redesign within R11, not a new numbered slice.
     user-visible auth-flow change); the hardcoded QA LB domain duplicated across both repos' CI
     configs (issue #191).
 
+## Doc Library — Slice 5 — Production cutover (done)
+
+Feature-scoped equivalent of an "R\<n\>" platform slice — tracked in `doc-library`'s own
+[`docs/features/doc-library/WBS/slice-5-prod-cutover.md`](https://github.com/rustycoopes/doc-library/blob/main/docs/features/doc-library/WBS/slice-5-prod-cutover.md),
+not this repo's WBS.
+
+- **Infra:** `doc-library-prod` Cloud Run service (deployed by `doc-library`'s own `deploy.yml` on
+  every push to `main`, same shape as its QA pipeline from Slice 1). Prod `doc_library` schema
+  migrations (`0001`–`0003`: schema/grant setup, `doc_links`, `user_preferences`) run as the
+  `test` job's `alembic upgrade head` step ahead of every `deploy-prod` — already exercised
+  successfully across the Slice 3 and Slice 4 merges, so no dedicated migration run was needed for
+  this slice.
+- **Routing:** `doc-library-prod-neg` (Serverless NEG) + `doc-library-backend-prod` (backend
+  service) added to the shared prod External HTTPS Load Balancer
+  (`organizeme-prod-url-map`, provisioned in Slice R12) via `infra/gcp_lb/provision-prod.sh`,
+  which already carried the `doc-library` NEG/backend block from Slice 2's QA work but needed a
+  prod re-run — see commit `5006d96` ("fix: wire doc-library into prod LB provisioning (was
+  QA-only)"). **Gotcha, same shape as the R6/R11/R12 one:** adding a hosted app's block to
+  `provision.sh` does not by itself touch prod — `provision-prod.sh` is a separate, manually-run
+  script, and QA-only provisioning silently leaves prod routing missing (a bare 404 from the LB,
+  not an error CI catches) until someone re-runs the prod script. Path rules confirmed live via
+  `gcloud compute url-maps describe organizeme-prod-url-map --global`: `/doc-library`,
+  `/api/v1/doc-links(/*)`, `/doc-library/fragments(/*)` all route to `doc-library-backend-prod`.
+- **Secrets:** None new — `SUPABASE_PROD_URL`, `GCP_SA_KEY`, and `jwt-secret-prod` (via
+  `--set-secrets=JWT_SECRET=jwt-secret-prod:latest`) were already set up in Slice 1 alongside the
+  QA secrets.
+- **Interface contract:** No change — `doc-library` integrates exactly per
+  `how-to-add-a-hosted-app.md`, nothing prod-specific to call out beyond the LB-provisioning
+  gotcha above.
+- **Live smoke-verified against `https://organizeme.russcoopersoftware.com/doc-library`** using
+  the real prod user's existing session/data: authenticated page render (shared chrome, dark mode,
+  "Doc Library" sidebar nav, existing links grouped by category), List/Tiles toggle (persists and
+  survives a mutation), add/edit/delete of a disposable test link (cleaned up immediately after,
+  real data untouched). Unauthenticated requests to the page and both mutation routes continue to
+  redirect/401 as expected.
+
 ---
 
 ## How to keep this doc current
