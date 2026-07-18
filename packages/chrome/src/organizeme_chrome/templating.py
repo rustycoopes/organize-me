@@ -1,6 +1,15 @@
 from jinja2 import ChoiceLoader, Environment, PackageLoader
 
 from organizeme_chrome.cdn import ALPINE_CDN
+from organizeme_chrome.design import (
+    BADGE_VARIANT_CLASSES,
+    BUTTON_VARIANT_CLASSES,
+    DENSITY_BADGE_TEXT,
+    DENSITY_CARD_PADDING,
+    DENSITY_PADDING,
+    FOCUS_RING,
+    STATUS_VARIANT_CLASSES,
+)
 from organizeme_chrome.json_filter import tojson_filter
 from organizeme_chrome.registry import get_app
 from organizeme_chrome.theme import theme_attr
@@ -32,4 +41,11 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["settings_tabs"] = app.settings_tabs
     env.globals["theme_attr"] = theme_attr
     env.globals["ALPINE_CDN"] = ALPINE_CDN
+    env.globals["BUTTON_VARIANT_CLASSES"] = BUTTON_VARIANT_CLASSES
+    env.globals["BADGE_VARIANT_CLASSES"] = BADGE_VARIANT_CLASSES
+    env.globals["STATUS_VARIANT_CLASSES"] = STATUS_VARIANT_CLASSES
+    env.globals["DENSITY_PADDING"] = DENSITY_PADDING
+    env.globals["DENSITY_CARD_PADDING"] = DENSITY_CARD_PADDING
+    env.globals["DENSITY_BADGE_TEXT"] = DENSITY_BADGE_TEXT
+    env.globals["FOCUS_RING"] = FOCUS_RING
     env.filters["tojson"] = tojson_filter
