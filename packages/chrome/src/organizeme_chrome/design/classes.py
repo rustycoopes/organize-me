@@ -60,3 +60,8 @@ STATUS_VARIANT_CLASSES: dict[str, str] = {
     "danger": "bg-flame",
     "neutral": "bg-ink-2/40 dark:bg-paper-2/40",
 }
+
+ALERT_VARIANT_CLASSES: dict[str, str] = {
+    "danger": "border-flame/30 bg-flame-tint text-flame dark:border-flame/40 dark:bg-flame/10",
+    "info": "border-cobalt/30 bg-cobalt-tint text-cobalt dark:border-cobalt/40 dark:bg-cobalt/10",
+}

@@ -120,6 +120,29 @@ def test_input_renders_optional_minlength_and_autocomplete() -> None:
     assert 'autocomplete="new-password"' in html
 
 
+def test_alert_static_message_uses_variant_classes_and_icon() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Could not save.", variant="danger")
+
+    assert 'role="alert"' in html
+    assert "Could not save." in html
+    assert "bg-flame-tint" in html
+    assert "<svg" in html
+
+
+def test_alert_x_show_wires_visibility_and_defaults_x_text_to_it() -> None:
+    html = _render(_env(), "components/alert.html", "alert", variant="danger", x_show="error")
+
+    assert 'x-show="error"' in html
+    assert "x-cloak" in html
+    assert 'x-text="error"' in html
+
+
+def test_alert_info_variant_uses_cobalt() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Saved.", variant="info")
+
+    assert "bg-cobalt-tint" in html
+
+
 def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 
