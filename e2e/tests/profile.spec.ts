@@ -22,7 +22,7 @@ test.describe('Profile', () => {
     await registerNewUser(page, 'profile-dark');
 
     // A brand-new account defaults to light mode - no "dark" class on <html>.
-    await expect(page.locator('html')).not.toHaveClass('dark');
+    await expect(page.locator('html')).toHaveClass('');
 
     // Toggling fires a PATCH to /users/me; wait for it so the reload reflects saved state.
     const darkToggle = page.locator('input.toggle[type="checkbox"]');

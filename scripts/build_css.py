@@ -68,7 +68,11 @@ def main() -> None:
     cmd = ["tailwindcss", "-i", str(GENERATED_ENTRY), "-o", str(OUTPUT_CSS)]
     cmd += ["--watch"] if args.watch else ["--minify"]
 
-    subprocess.run(cmd, check=True, env=env, cwd=REPO_ROOT)
+    try:
+        subprocess.run(cmd, check=True, env=env, cwd=REPO_ROOT)
+    except KeyboardInterrupt:
+        # Expected way to stop --watch; not a build failure.
+        pass
 
 
 if __name__ == "__main__":

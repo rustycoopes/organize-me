@@ -1,8 +1,9 @@
 # ---- Build stage: compiles the Tailwind CSS build. The ~35-40MB Tailwind CLI binary and the
 # build-only Python packages that fetch it never reach the runtime image below - see
-# docs/adr/design-refresh-per-service-tailwind-build.md. Must stay in the same layer/step as the
-# dependency install immediately above it (never cached independently) so a Docker layer-caching
-# bug can't serve CSS compiled against a stale template set.
+# docs/adr/design-refresh-per-service-tailwind-build.md. The compile step (below) is a separate
+# RUN layer from `COPY app`, but Docker's cache invalidation still cascades correctly: any change
+# under app/ invalidates `COPY app` and therefore forces the compile layer to rerun too, so cached
+# CSS can never silently drift out of sync with the templates it was built from.
 FROM python:3.12-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
@@ -14,7 +15,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen --group build --no-install-project
+RUN uv sync --frozen --no-dev --group build --no-install-project
 
 COPY app ./app
 COPY scripts ./scripts
