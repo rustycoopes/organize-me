@@ -33,6 +33,29 @@ test.describe('Sidebar navigation', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
 
+  test('sidebar and shell markup carry no leftover DaisyUI classes (design-refresh)', async ({
+    page,
+  }) => {
+    await registerNewUser(page, 'sidebar-design');
+
+    // design-refresh Slice 2 restyled the shell onto plain Tailwind + design tokens; DaisyUI's
+    // component classes must be completely gone from the rendered page, not just re-themed.
+    const daisyUiSelector = [
+      '.drawer',
+      '.drawer-toggle',
+      '.drawer-content',
+      '.drawer-side',
+      '.drawer-overlay',
+      '.menu',
+      '.btn',
+      '.navbar',
+      '.tabs',
+      '.tab',
+    ].join(', ');
+
+    await expect(page.locator(daisyUiSelector)).toHaveCount(0);
+  });
+
   test('hitting an authenticated route while logged out redirects to /login', async ({ page }) => {
     // Fresh browser context (test isolation) => no auth cookie.
     await page.goto('/dashboard');

@@ -1,0 +1,27 @@
+{#
+  button — shared button/link primitive, following the same centralize-once approach as
+  macros/chrome_nav.html's nav_link (no per-app button markup).
+
+  Usage:
+    {% from "components/button.html" import button %}
+    {{ button("Save", type="submit") }}
+    {{ button("Docs", href="/docs", variant="ghost", density="marketing") }}
+
+  Parameters
+    label     — visible button text.
+    href      — if set, renders an <a> styled as a button instead of a <button>.
+    variant   — "primary" | "secondary" | "ghost" (default "primary").
+    density   — "product" | "marketing" (default "product") — see
+                docs/adr/design-refresh-shared-component-library.md for the density split.
+    type      — HTML button type, ignored when href is set (default "button").
+    disabled  — disables a <button>; ignored for <a>, which has no native disabled state.
+    id        — optional element id.
+#}
+{% macro button(label, href=None, variant="primary", density="product", type="button", disabled=False, id=None) %}
+{% set classes = "inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors " + FOCUS_RING + " " + DENSITY_PADDING[density] + " " + BUTTON_VARIANT_CLASSES[variant] %}
+{% if href %}
+<a{% if id %} id="{{ id }}"{% endif %} href="{{ href }}" class="{{ classes }}">{{ label }}</a>
+{% else %}
+<button{% if id %} id="{{ id }}"{% endif %} type="{{ type }}" class="{{ classes }}{% if disabled %} opacity-50 cursor-not-allowed{% endif %}"{% if disabled %} disabled{% endif %}>{{ label }}</button>
+{% endif %}
+{% endmacro %}

@@ -1,5 +1,5 @@
 {#
-  settings_tab_bar — shared DaisyUI tablist for a hosted app's Settings page.
+  settings_tab_bar — shared tablist for a hosted app's Settings page.
 
   Usage:
     {% from "macros/chrome_tabs.html" import settings_tab_bar %}
@@ -26,12 +26,15 @@
   hosted app registers tabs dynamically, escape/validate ids there rather than here.
 #}
 {% macro settings_tab_bar(tabs, active_var="activeTab") %}
-<div role="tablist" class="tabs tabs-bordered mt-2">
+{% set base = "px-3 py-2 font-body text-sm border-b-2 transition-colors " + FOCUS_RING %}
+{% set inactive = "border-transparent text-ink-2 hover:text-ink hover:border-ink-2/30" %}
+{% set active = "border-flame text-flame font-medium" %}
+<div role="tablist" class="flex gap-2 border-b border-ink-2/10 mt-2">
   {% for tab in tabs %}
   <a
     role="tab"
-    class="tab{% if loop.first %} tab-active{% endif %}"
-    :class="{{ active_var }} === '{{ tab.id }}' ? 'tab-active' : ''"
+    class="{{ base }} {{ active if loop.first else inactive }}"
+    :class="{{ active_var }} === '{{ tab.id }}' ? '{{ active }}' : '{{ inactive }}'"
     aria-selected="{{ 'true' if loop.first else 'false' }}"
     :aria-selected="{{ active_var }} === '{{ tab.id }}'"
     @click="{{ active_var }} = '{{ tab.id }}'"

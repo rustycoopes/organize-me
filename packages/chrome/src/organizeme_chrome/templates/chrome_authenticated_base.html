@@ -18,18 +18,22 @@
 #}
 
 {% block content %}
-<div class="drawer lg:drawer-open">
-  <input id="sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
+<div class="relative min-h-screen">
+  <input id="sidebar-drawer-toggle" type="checkbox" class="peer hidden" />
 
-  <div class="drawer-content flex flex-col min-h-screen">
+  <div class="flex min-h-screen flex-col lg:pl-64">
     <!-- Top bar: only the hamburger on small screens; sidebar is always visible on lg+. -->
-    <div class="navbar bg-base-100 border-b border-base-300 lg:hidden">
-      <label for="sidebar-drawer-toggle" class="btn btn-square btn-ghost" aria-label="Open navigation">
+    <div class="flex items-center gap-2 border-b border-ink-2/10 bg-paper px-2 py-2 lg:hidden">
+      <label
+        for="sidebar-drawer-toggle"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-2 hover:bg-mist {{ FOCUS_RING }}"
+        aria-label="Open navigation"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </label>
-      <span class="text-lg font-semibold px-2">OrganizeMe</span>
+      <span class="font-display text-lg font-semibold px-2 text-ink">OrganizeMe</span>
     </div>
 
     <main class="flex-1 p-4 lg:p-8">
@@ -37,13 +41,16 @@
     </main>
   </div>
 
-  <div class="drawer-side z-10">
-    <label for="sidebar-drawer-toggle" class="drawer-overlay" aria-label="Close navigation"></label>
-    <aside class="flex min-h-full w-64 flex-col bg-base-100 border-r border-base-300">
-      <div class="px-4 py-4 text-xl font-bold">OrganizeMe</div>
+  <label
+    for="sidebar-drawer-toggle"
+    class="fixed inset-0 z-10 hidden bg-ink/40 peer-checked:block lg:hidden"
+    aria-label="Close navigation"
+  ></label>
+  <aside class="fixed inset-y-0 left-0 z-20 flex w-64 -translate-x-full flex-col overflow-y-auto border-r border-ink-2/10 bg-paper transition-transform duration-200 ease-in-out peer-checked:translate-x-0 lg:translate-x-0">
+      <div class="px-4 py-4 font-display text-xl font-bold text-ink">OrganizeMe</div>
       <div
         id="sidebar-nav"
-        class="menu w-full grow gap-1 px-2"
+        class="flex w-full grow flex-col gap-1 px-2"
         aria-label="Main navigation"
         x-data="{
           collapsed: {{ nav_collapsed_json | tojson }},
@@ -69,7 +76,7 @@
         <div class="mb-1">
           <button
             type="button"
-            class="btn btn-ghost btn-sm btn-block justify-between px-2 text-xs font-semibold uppercase tracking-wide"
+            class="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2 hover:bg-mist {{ FOCUS_RING }}"
             aria-expanded="{{ 'false' if group.collapsed else 'true' }}"
             :aria-expanded="(!collapsed['{{ group.service_name }}']).toString()"
             aria-controls="nav-group-{{ group.service_name }}"
@@ -90,7 +97,7 @@
           </button>
           <ul
             id="nav-group-{{ group.service_name }}"
-            class="menu w-full gap-1"
+            class="flex w-full flex-col gap-1"
             x-show="!collapsed['{{ group.service_name }}']"
             {% if group.collapsed %}style="display:none"{% endif %}
           >
@@ -101,17 +108,17 @@
         </div>
         {% endfor %}
 
-        <ul class="menu w-full gap-1 px-0 mt-auto">
+        <ul class="flex w-full flex-col gap-1 px-0 mt-auto">
           {% for item in flat_nav_items %}
           {{ nav_link(item, request) }}
           {% endfor %}
         </ul>
       </div>
-      <div class="border-t border-base-300 p-2" x-data="{ loggingOut: false }">
+      <div class="border-t border-ink-2/10 p-2" x-data="{ loggingOut: false }">
         <button
           id="sidebar-logout-button"
           type="button"
-          class="btn btn-ghost btn-block justify-start"
+          class="flex w-full items-center justify-start rounded-md px-3 py-2 font-body text-sm text-ink-2 hover:bg-mist disabled:opacity-50 {{ FOCUS_RING }}"
           :disabled="loggingOut"
           @click="loggingOut = true; fetch('/api/v1/auth/logout', { method: 'POST' })
             .finally(() => { window.location.href = '/login'; })"
@@ -121,6 +128,5 @@
         </button>
       </div>
     </aside>
-  </div>
 </div>
 {% endblock %}

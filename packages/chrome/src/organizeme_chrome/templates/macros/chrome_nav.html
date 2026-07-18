@@ -11,10 +11,13 @@
     request  — the current Starlette Request, to derive the active/current-page state.
 #}
 {% macro nav_link(item, request) %}
+{% set base = "block rounded-md px-3 py-2 font-body text-sm transition-colors " + FOCUS_RING %}
+{% set active = request.url.path == item.path %}
 <li>
   <a
     href="{{ item.path }}"
-    {% if request.url.path == item.path %}class="active" aria-current="page"{% endif %}
+    class="{{ base }} {{ 'bg-flame-tint text-flame font-medium' if active else 'text-ink-2 hover:bg-mist hover:text-ink' }}"
+    {% if active %}aria-current="page"{% endif %}
   >{{ item.label }}</a>
 </li>
 {% endmacro %}
