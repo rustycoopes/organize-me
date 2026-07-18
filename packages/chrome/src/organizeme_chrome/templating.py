@@ -4,6 +4,7 @@ from organizeme_chrome.cdn import ALPINE_CDN
 from organizeme_chrome.design import (
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
+    DENSITY_BADGE_TEXT,
     DENSITY_CARD_PADDING,
     DENSITY_PADDING,
     FOCUS_RING,
@@ -45,5 +46,6 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["STATUS_VARIANT_CLASSES"] = STATUS_VARIANT_CLASSES
     env.globals["DENSITY_PADDING"] = DENSITY_PADDING
     env.globals["DENSITY_CARD_PADDING"] = DENSITY_CARD_PADDING
+    env.globals["DENSITY_BADGE_TEXT"] = DENSITY_BADGE_TEXT
     env.globals["FOCUS_RING"] = FOCUS_RING
     env.filters["tojson"] = tojson_filter

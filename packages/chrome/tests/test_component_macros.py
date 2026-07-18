@@ -38,6 +38,21 @@ def test_button_renders_a_real_button_by_default() -> None:
     assert "bg-flame" in html  # primary variant, default
 
 
+def test_button_secondary_and_ghost_variants_use_distinct_classes() -> None:
+    secondary = _render(_env(), "components/button.html", "button", "Go", variant="secondary")
+    ghost = _render(_env(), "components/button.html", "button", "Go", variant="ghost")
+
+    assert "bg-cobalt" in secondary
+    assert "border-ink-2/30" in ghost
+
+
+def test_button_rejects_an_unknown_variant() -> None:
+    from jinja2 import UndefinedError
+
+    with pytest.raises(UndefinedError):
+        _render(_env(), "components/button.html", "button", "Go", variant="not-a-variant")
+
+
 def test_button_renders_an_anchor_when_href_is_given() -> None:
     html = _render(_env(), "components/button.html", "button", "Docs", href="/docs")
 

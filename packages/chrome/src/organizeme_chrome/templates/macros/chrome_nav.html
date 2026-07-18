@@ -16,7 +16,7 @@
 <li>
   <a
     href="{{ item.path }}"
-    class="{{ base }} {{ 'bg-flame-tint text-flame font-medium' if active else 'text-ink-2 hover:bg-mist hover:text-ink' }}"
+    class="{{ base }} {{ 'bg-flame-tint text-flame font-medium dark:bg-flame/20' if active else 'text-ink-2 hover:bg-mist hover:text-ink dark:text-paper-2 dark:hover:bg-ink-2 dark:hover:text-paper' }}"
     {% if active %}aria-current="page"{% endif %}
   >{{ item.label }}</a>
 </li>

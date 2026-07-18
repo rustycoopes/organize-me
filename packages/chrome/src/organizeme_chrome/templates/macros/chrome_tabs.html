@@ -27,9 +27,9 @@
 #}
 {% macro settings_tab_bar(tabs, active_var="activeTab") %}
 {% set base = "px-3 py-2 font-body text-sm border-b-2 transition-colors " + FOCUS_RING %}
-{% set inactive = "border-transparent text-ink-2 hover:text-ink hover:border-ink-2/30" %}
+{% set inactive = "border-transparent text-ink-2 hover:text-ink hover:border-ink-2/30 dark:text-paper-2 dark:hover:text-paper dark:hover:border-paper/30" %}
 {% set active = "border-flame text-flame font-medium" %}
-<div role="tablist" class="flex gap-2 border-b border-ink-2/10 mt-2">
+<div role="tablist" class="flex gap-2 border-b border-ink-2/10 dark:border-paper/10 mt-2">
   {% for tab in tabs %}
   <a
     role="tab"

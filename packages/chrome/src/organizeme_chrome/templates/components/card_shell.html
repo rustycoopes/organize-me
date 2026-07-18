@@ -13,8 +13,8 @@
     density — "product" | "marketing" (default "product").
 #}
 {% macro card_shell(title=None, density="product") %}
-<div class="rounded-lg border border-ink-2/10 bg-paper shadow-sm {{ DENSITY_CARD_PADDING[density] }}">
-  {% if title %}<h2 class="mb-3 font-display text-lg font-semibold text-ink">{{ title }}</h2>{% endif %}
+<div class="rounded-lg border border-ink-2/10 bg-paper shadow-sm dark:border-paper/10 dark:bg-ink-2 {{ DENSITY_CARD_PADDING[density] }}">
+  {% if title %}<h2 class="mb-3 font-display text-lg font-semibold text-ink dark:text-paper">{{ title }}</h2>{% endif %}
   {{ caller() }}
 </div>
 {% endmacro %}

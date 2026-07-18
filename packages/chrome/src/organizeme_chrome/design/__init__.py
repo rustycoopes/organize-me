@@ -9,6 +9,7 @@ centralizes sidebar-state logic that `chrome_nav.html` only renders.
 from organizeme_chrome.design.classes import (
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
+    DENSITY_BADGE_TEXT,
     DENSITY_CARD_PADDING,
     DENSITY_PADDING,
     FOCUS_RING,
@@ -18,6 +19,7 @@ from organizeme_chrome.design.classes import (
 __all__ = [
     "BADGE_VARIANT_CLASSES",
     "BUTTON_VARIANT_CLASSES",
+    "DENSITY_BADGE_TEXT",
     "DENSITY_CARD_PADDING",
     "DENSITY_PADDING",
     "FOCUS_RING",
