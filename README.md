@@ -60,6 +60,28 @@ uv run uvicorn app.main:app --reload
 
 The app serves `GET /health` for a liveness check. Local dev connects directly to the Supabase QA database and Upstash Redis via `.env.local` — no local Docker required for either.
 
+### CSS (Tailwind)
+
+The compiled stylesheet (`app/static/css/app.css`) isn't wired into `uvicorn --reload` — run its
+own watcher in a second terminal alongside the app:
+
+```bash
+uv sync --group build           # installs pytailwindcss (build-only; not part of `dev`)
+uv run python scripts/build_css.py --watch
+```
+
+This recompiles on every change to this app's own templates or `packages/chrome`'s shared
+templates/tokens. A one-shot, minified build (what the Docker build stage runs) is the same
+command without `--watch`:
+
+```bash
+uv run python scripts/build_css.py
+```
+
+See [ADR: per-service Tailwind build](docs/adr/design-refresh-per-service-tailwind-build.md) and
+[ADR: dark-mode CSS strategy](docs/adr/design-refresh-dark-mode-css-strategy.md) for why each
+service compiles its own CSS and how dark mode stays DB-driven.
+
 ### Test & type-check
 
 ```bash
@@ -99,7 +121,9 @@ docker run --env-file .env.local -p 8000:8000 organize-me
 
 The container runs the FastAPI app under `supervisord` (a single process now — the Celery worker
 that used to run alongside it was removed in R13 along with the Host's other event-extraction
-code; see `supervisord.conf`).
+code; see `supervisord.conf`). The image build is multi-stage: a build stage compiles
+`app/static/css/app.css` via `pytailwindcss`; only that compiled artifact (never the ~35-40MB
+Tailwind CLI binary or the `build` dependency group) is copied into the runtime stage.
 
 ### CI/CD
 

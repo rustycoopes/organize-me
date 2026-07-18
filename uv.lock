@@ -1009,6 +1009,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+build = [
+    { name = "pytailwindcss" },
+]
 dev = [
     { name = "httpx" },
     { name = "mypy" },
@@ -1030,7 +1033,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.35" },
     { name = "httpx-oauth", specifier = ">=0.16.1" },
     { name = "jinja2", specifier = ">=3.1" },
-    { name = "organizeme-chrome", git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.6.1" },
+    { name = "organizeme-chrome", git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.8.0" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
@@ -1041,6 +1044,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+build = [{ name = "pytailwindcss", specifier = "==0.3.1" }]
 dev = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mypy", specifier = ">=1.13" },
@@ -1053,8 +1057,8 @@ dev = [
 
 [[package]]
 name = "organizeme-chrome"
-version = "0.6.1"
-source = { git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.6.1#28bf503a0868f3241cb388e47a8fbd44b50bd29f" }
+version = "0.8.0"
+source = { git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.8.0#c2b860b6402ac8cd304dabc4623a76b524151517" }
 dependencies = [
     { name = "google-auth" },
     { name = "httpx" },
@@ -1262,6 +1266,15 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography" },
+]
+
+[[package]]
+name = "pytailwindcss"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/27/8a/5ba4a60c6a2f235c9ad93a5e9f29d202ad9e8038e8ea293be31057085cee/pytailwindcss-0.3.1.tar.gz", hash = "sha256:e83c65985f078ff91500f74bca595f615e54059d5afc90b233382e118b509b4d", size = 18712, upload-time = "2026-06-12T13:43:01.804Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/95/9b/362cd1ae308a2fd8a9a58ff089cefd2e49976540765afa4e9a2c013876af/pytailwindcss-0.3.1-py3-none-any.whl", hash = "sha256:31583c5bb7fac66c6e6535992e51630e36788cf6e569f4d294e98962fa034535", size = 7496, upload-time = "2026-06-12T13:43:00.675Z" },
 ]
 
 [[package]]

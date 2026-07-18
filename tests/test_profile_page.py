@@ -39,7 +39,7 @@ async def test_profile_page_defaults_to_light_theme(client: AsyncClient) -> None
     response = await client.get("/profile")
 
     assert response.status_code == 200
-    assert 'data-theme="corporate"' in response.text
+    assert '<html lang="en" class="">' in response.text
 
 
 async def test_profile_page_reflects_dark_mode_after_api_toggle(client: AsyncClient) -> None:
@@ -54,7 +54,7 @@ async def test_profile_page_reflects_dark_mode_after_api_toggle(client: AsyncCli
     response = await client.get("/profile")
 
     assert response.status_code == 200
-    assert 'data-theme="dark"' in response.text
+    assert '<html lang="en" class="dark">' in response.text
 
 
 async def test_profile_page_has_delete_confirmation_modal(client: AsyncClient) -> None:

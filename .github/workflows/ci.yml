@@ -35,7 +35,27 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --group dev
+        run: uv sync --frozen --group dev --group build
+
+      - name: Build Tailwind CSS
+        run: uv run python scripts/build_css.py
+
+      - name: Verify compiled CSS is non-empty and contains the canary utility class
+        # Fails loudly (not silently) if the tokens.css import or the content-scan glob breaks -
+        # `bg-flame` only exists in the compiled output if the "Signal" @theme tokens were
+        # actually picked up, so an accidental drop of the tokens import, a broken @source glob,
+        # or an empty/near-empty build all fail this check instead of shipping unstyled.
+        run: |
+          size=$(stat -c%s app/static/css/app.css)
+          echo "Compiled app.css is ${size} bytes"
+          if [ "$size" -lt 1000 ]; then
+            echo "::error::app.css is suspiciously small (${size} bytes) — Tailwind build likely produced empty/near-empty output"
+            exit 1
+          fi
+          if ! grep -q '\.bg-flame' app/static/css/app.css; then
+            echo "::error::canary class .bg-flame is missing from app.css — design tokens likely failed to compile in"
+            exit 1
+          fi
 
       - name: Run Alembic migrations (Supabase QA)
         run: uv run alembic upgrade head
@@ -44,7 +64,7 @@ jobs:
         run: uv run pytest
 
       - name: Run mypy
-        run: uv run mypy app tests
+        run: uv run mypy app tests scripts
 
   deploy-qa:
     needs: test

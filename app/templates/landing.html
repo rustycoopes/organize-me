@@ -10,74 +10,107 @@
 {% endblock %}
 
 {% block content %}
-<div class="navbar bg-base-100 px-4 md:px-8">
-  <div class="flex-1">
-    <span class="text-xl font-bold">OrganizeMe</span>
-  </div>
-  <div class="flex-none gap-2">
-    <a href="/login" class="btn btn-ghost">Log in</a>
-    <a href="/register" class="btn btn-primary">Sign up</a>
+<div class="flex items-center justify-between px-4 py-4 md:px-8 bg-paper">
+  <span class="font-display text-xl font-bold text-ink">OrganizeMe</span>
+  <div class="flex items-center gap-2">
+    <a href="/login" class="px-4 py-2 rounded-full text-sm font-semibold text-ink hover:bg-paper-2 transition-colors">Log in</a>
+    <a href="/register" class="px-4 py-2 rounded-full text-sm font-semibold bg-flame text-paper hover:opacity-90 transition-opacity">Sign up</a>
   </div>
 </div>
 
-<section id="hero" class="hero min-h-[70vh] bg-base-200">
-  <div class="hero-content text-center">
-    <div class="max-w-2xl">
-      <h1 class="text-4xl md:text-5xl font-bold">
+<section id="hero" class="bg-paper px-4 md:px-8 py-16 md:py-24">
+  <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+    <div class="max-w-xl">
+      <h1 class="font-display text-4xl md:text-5xl font-extrabold text-ink leading-tight">
         Turn your conversations into calendar events — automatically
       </h1>
-      <p class="py-6 text-lg">
+      <p class="mt-6 text-lg text-ink/70">
         OrganizeMe watches your WhatsApp, SMS, or CSV exports, uses AI to find the dates and
         agreements you made, and turns them into calendar events and tasks — no manual re-reading
         required.
       </p>
-      <a href="/register" class="btn btn-primary btn-lg">Get started for free</a>
+      <a
+        href="/register"
+        class="inline-block mt-8 px-8 py-4 rounded-full text-lg font-semibold bg-flame text-paper hover:opacity-90 transition-opacity"
+      >
+        Get started for free
+      </a>
+    </div>
+
+    <!-- Signature moment: a chat message visually resolving into a calendar/event chip. -->
+    <div class="relative flex flex-col items-center gap-3" aria-hidden="true">
+      <div class="self-start bg-mist rounded-2xl rounded-bl-sm px-5 py-3 max-w-xs shadow-sm">
+        <p class="font-body text-sm text-ink">
+          Let's meet Thursday at 3pm for coffee ☕
+        </p>
+      </div>
+
+      <svg class="w-6 h-6 text-cobalt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v14m0 0l-5-5m5 5l5-5" />
+      </svg>
+
+      <div class="self-end flex items-center gap-3 bg-cobalt-tint border border-cobalt/20 rounded-2xl rounded-br-sm px-5 py-3 shadow-sm">
+        <div class="flex flex-col items-center justify-center w-10 h-10 rounded-lg bg-cobalt text-paper leading-none shrink-0">
+          <span class="text-[10px] font-mono uppercase">Jul</span>
+          <span class="text-sm font-mono font-bold">23</span>
+        </div>
+        <div>
+          <p class="font-body text-sm font-semibold text-ink">Coffee</p>
+          <p class="font-mono text-xs text-ink/60 tabular-nums">Thu, Jul 23 · 3:00 PM</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section id="features" class="py-16 px-4 md:px-8 bg-base-100">
+<section id="features" class="py-16 px-4 md:px-8 bg-mist">
   <div class="max-w-5xl mx-auto">
-    <h2 class="text-3xl font-bold text-center mb-12">Everything you need to stop missing plans</h2>
+    <h2 class="font-display text-3xl font-bold text-center text-ink mb-12">
+      Everything you need to stop missing plans
+    </h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h3 class="card-title">Automatic extraction</h3>
-          <p>
-            Connect Dropbox, Google Drive, or S3 and OrganizeMe automatically detects new export
-            files and pulls out agreed dates, events, and tasks using AI.
-          </p>
-        </div>
+      <div class="bg-paper rounded-2xl p-6 shadow-sm">
+        <h3 class="font-display text-lg font-bold text-ink mb-2">Automatic extraction</h3>
+        <p class="font-body text-ink/70">
+          Connect Dropbox, Google Drive, or S3 and OrganizeMe automatically detects new export
+          files and pulls out agreed dates, events, and tasks using AI.
+        </p>
       </div>
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h3 class="card-title">One-click calendar &amp; tasks</h3>
-          <p>
-            Every extracted event links straight to Google Calendar or Google Tasks, pre-filled and
-            ready to add in one click.
-          </p>
-        </div>
+      <div class="bg-paper rounded-2xl p-6 shadow-sm">
+        <h3 class="font-display text-lg font-bold text-ink mb-2">One-click calendar &amp; tasks</h3>
+        <p class="font-body text-ink/70">
+          Every extracted event links straight to Google Calendar or Google Tasks, pre-filled and
+          ready to add in one click.
+        </p>
       </div>
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h3 class="card-title">SMS &amp; email notifications</h3>
-          <p>
-            Get notified the moment new events are found, with a summary and a direct link to your
-            dashboard.
-          </p>
-        </div>
+      <div class="bg-paper rounded-2xl p-6 shadow-sm">
+        <h3 class="font-display text-lg font-bold text-ink mb-2">SMS &amp; email notifications</h3>
+        <p class="font-body text-ink/70">
+          Get notified the moment new events are found, with a summary and a direct link to your
+          dashboard.
+        </p>
       </div>
     </div>
   </div>
 </section>
 
-<section id="cta" class="py-16 px-4 md:px-8 bg-base-200">
+<section id="cta" class="py-16 px-4 md:px-8 bg-ink">
   <div class="max-w-2xl mx-auto text-center">
-    <h2 class="text-3xl font-bold mb-4">Ready to stop missing agreements?</h2>
-    <p class="mb-8 text-lg">Sign up free — no credit card, no invitation needed.</p>
+    <h2 class="font-display text-3xl font-bold text-paper mb-4">Ready to stop missing agreements?</h2>
+    <p class="mb-8 text-lg text-paper/70">Sign up free — no credit card, no invitation needed.</p>
     <div class="flex flex-col sm:flex-row gap-4 justify-center">
-      <a href="/register" class="btn btn-primary btn-lg">Create your free account</a>
-      <a href="/login" class="btn btn-ghost btn-lg">Already have an account? Log in</a>
+      <a
+        href="/register"
+        class="px-8 py-4 rounded-full text-lg font-semibold bg-flame text-paper hover:opacity-90 transition-opacity"
+      >
+        Create your free account
+      </a>
+      <a
+        href="/login"
+        class="px-8 py-4 rounded-full text-lg font-semibold text-paper border border-paper/30 hover:bg-paper/10 transition-colors"
+      >
+        Already have an account? Log in
+      </a>
     </div>
   </div>
 </section>
