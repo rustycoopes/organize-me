@@ -6,6 +6,7 @@ from organizeme_chrome.registry import (
     configure_registry_source,
     get_app,
     list_apps,
+    reset_to_default_registry_source,
 )
 
 
@@ -96,8 +97,6 @@ def test_configure_registry_source_is_what_list_apps_and_get_app_actually_read()
     # APPS literal, is what a consumer that calls configure_registry_source() actually reads. The
     # default source is restored in `finally` so every other test in this file (which relies on
     # the untouched compiled-in fallback) isn't affected by this one's global mutation.
-    from organizeme_chrome.registry import _CompiledRegistrySource
-
     fake_app = AppEntry(
         service_name="fake-app",
         nav=[AppNavItem("/fake", "Fake")],
@@ -110,4 +109,4 @@ def test_configure_registry_source_is_what_list_apps_and_get_app_actually_read()
         with pytest.raises(KeyError):
             get_app("organizeme")
     finally:
-        configure_registry_source(_CompiledRegistrySource())
+        reset_to_default_registry_source()

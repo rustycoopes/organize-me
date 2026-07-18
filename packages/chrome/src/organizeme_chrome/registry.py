@@ -161,6 +161,14 @@ def configure_registry_source(source: RegistrySource) -> None:
     _source = source
 
 
+def reset_to_default_registry_source() -> None:
+    """Restores the default (compiled-in `APPS` literal) source - for tests that call
+    `configure_registry_source()` to exercise a custom source and need to undo that global
+    mutation afterward, without reaching into `_CompiledRegistrySource` directly."""
+    global _source
+    _source = _CompiledRegistrySource()
+
+
 def list_apps() -> list[AppEntry]:
     return _source.get_apps()
 

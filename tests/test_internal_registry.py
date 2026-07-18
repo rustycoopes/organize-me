@@ -3,10 +3,11 @@ OIDC read-token gate (`_verify_registry_read_token`) and the response shape - mi
 event-creator's tests/test_internal_pipeline_api.py for the equivalent `_verify_push_token` gate.
 """
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
-from httpx import AsyncClient, Response
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient, Response
 
 import app.api.internal.registry as internal_registry_module
 from app.core.config import get_settings
@@ -15,6 +16,14 @@ from app.core.registry import APPS
 
 @pytest.fixture(autouse=True)
 def _configure_oidc_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # This module's tests never touch the DB or any of the OAuth/email settings - route through
+    # placeholder values (mirrors event-creator's tests/conftest.py::_env for the same reason) so
+    # Settings() construction succeeds without a real Postgres/Google/Resend credential.
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/testdb")
+    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "test-client-secret")
+    monkeypatch.setenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost/api/v1/auth/google/callback")
     monkeypatch.setenv("REGISTRY_ENDPOINT_URL", "https://organize-me-test.a.run.app")
     monkeypatch.setenv(
         "REGISTRY_INVOKER_SERVICE_ACCOUNT", "invoker@test-project.iam.gserviceaccount.com"
@@ -22,6 +31,18 @@ def _configure_oidc_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncIterator[AsyncClient]:
+    """A DB-free httpx client for this module's tests - GET /internal/app-registry.json never
+    touches the DB, so this deliberately doesn't use conftest.py's `client` fixture (which
+    requires a real, reachable Postgres via its db_session dependency)."""
+    from app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac
 
 
 def _accept_valid_token(monkeypatch: pytest.MonkeyPatch) -> None:

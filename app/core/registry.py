@@ -7,10 +7,12 @@ every other consumer fetches it from `GET /internal/app-registry.json` (see
 
 Importing this module has the side effect of calling `configure_registry_source()` so that
 `organizeme_chrome.list_apps()`/`get_app()` resolve against `APPS` below with no network call -
-see the Host's own `app/core/nav.py` and `app/pages/settings.py`, both unchanged call sites. This
-module is imported first (before any router module) in `app/main.py` specifically so that
-side effect runs before any module-level `get_app()` call elsewhere (e.g.
-`app/pages/settings.py`'s `_EVENT_CREATOR_APP = get_app("event-creator")`) executes.
+see the Host's own `app/core/nav.py` (an unchanged, per-request call site) and
+`app/pages/app_shell.py` (a module-import-time call site: it derives its placeholder routes from
+`get_app("organizeme").nav`, which must exist before the app starts serving, so it can't be
+deferred to per-request). This module is imported first (before any router module) in
+`app/main.py` specifically so that side effect runs before `app_shell.py`'s import-time call.
+`tests/test_registry_wiring.py` asserts this ordering actually holds.
 
 `organizeme_chrome.registry` keeps its own compiled-in `APPS` literal, unchanged, as the
 transitional fallback `RegistrySource` for any consumer that hasn't migrated yet (doc-library,
