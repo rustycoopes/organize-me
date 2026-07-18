@@ -17,4 +17,18 @@ test.describe('Landing page', () => {
       '/login',
     );
   });
+
+  test('serves the compiled stylesheet and no longer references the Tailwind CDN or DaisyUI', async ({
+    page,
+    request,
+  }) => {
+    await page.goto('/');
+
+    const html = await page.content();
+    expect(html).not.toContain('cdn.tailwindcss.com');
+    expect(html.toLowerCase()).not.toContain('daisyui');
+
+    const cssResponse = await request.get('/static/css/app.css');
+    expect(cssResponse.status()).toBe(200);
+  });
 });

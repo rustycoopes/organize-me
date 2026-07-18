@@ -1,0 +1,55 @@
+/* OrganizeMe "Signal" design tokens.
+   Shipped as chrome package data - never compiled here. Each consuming service imports this
+   file into its own Tailwind v4 entry CSS and runs its own `pytailwindcss` build; see
+   docs/adr/design-refresh-per-service-tailwind-build.md in the organize-me repo.
+
+   Font files referenced below are shipped alongside this file as chrome package data
+   (../fonts/*.woff2) and must be copied into each consuming service's own /static mount at
+   build time so these absolute URLs resolve. */
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/static/fonts/bricolage-grotesque-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+
+/* Class-based (not OS-preference-based) dark mode - preserves the existing DB-driven
+   User.dark_mode toggle. See docs/adr/design-refresh-dark-mode-css-strategy.md. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-ink: #14161c;
+  --color-ink-2: #2a2d38;
+  --color-paper: #f6f4ef;
+  --color-paper-2: #eeece4;
+  --color-flame: #ff4b33;
+  --color-flame-tint: #ffe6e1;
+  --color-cobalt: #2f4b7c;
+  --color-cobalt-tint: #e3e9f3;
+  --color-mist: #eef1f5;
+  --color-mist-2: #e2e7ee;
+  --color-sage: #2f7d5c;
+  --color-sage-tint: #e1f0e8;
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}

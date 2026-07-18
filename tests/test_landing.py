@@ -55,3 +55,34 @@ async def test_landing_page_has_meta_description(client: AsyncClient) -> None:
     response = await client.get("/")
 
     assert 'name="description"' in response.text
+
+
+async def test_landing_page_no_longer_references_tailwind_cdn_or_daisyui(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/")
+
+    body = response.text
+    assert "cdn.tailwindcss.com" not in body
+    assert "daisyui" not in body.lower()
+    assert '/static/css/app.css' in body
+
+
+async def test_anonymous_visitor_does_not_get_the_dark_class(client: AsyncClient) -> None:
+    """First instance of the class="dark" tracking pattern - see test_profile_page.py for the
+    authenticated (User.dark_mode-driven) counterpart."""
+    response = await client.get("/")
+
+    assert '<html lang="en" class="">' in response.text
+
+
+async def test_landing_page_hero_has_the_chat_to_calendar_signature_moment(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/")
+
+    body = response.text
+    hero_start = body.index('id="hero"')
+    features_start = body.index('id="features"')
+    hero_section = body[hero_start:features_start]
+    assert "Let&#39;s meet Thursday" in hero_section or "Let's meet Thursday" in hero_section

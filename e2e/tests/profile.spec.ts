@@ -21,8 +21,8 @@ test.describe('Profile', () => {
   test('dark-mode toggle persists server-side across a reload', async ({ page }) => {
     await registerNewUser(page, 'profile-dark');
 
-    // A brand-new account defaults to the light ("corporate") theme.
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'corporate');
+    // A brand-new account defaults to light mode - no "dark" class on <html>.
+    await expect(page.locator('html')).toHaveClass('');
 
     // Toggling fires a PATCH to /users/me; wait for it so the reload reflects saved state.
     const darkToggle = page.locator('input.toggle[type="checkbox"]');
@@ -32,9 +32,9 @@ test.describe('Profile', () => {
     await darkToggle.check();
     await savePatch;
 
-    // On reload the server renders data-theme from the persisted dark_mode flag.
+    // On reload the server renders class="dark" from the persisted dark_mode flag.
     await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).toHaveClass('dark');
     await expect(page.locator('input.toggle[type="checkbox"]')).toBeChecked();
   });
 });
