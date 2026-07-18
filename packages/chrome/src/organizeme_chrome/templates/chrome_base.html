@@ -1,22 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ theme_attr(dark_mode) }}">
+<html lang="en" class="{{ theme_attr(dark_mode) }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}OrganizeMe{% endblock %}</title>
-    <script src="{{ TAILWIND_CDN }}"></script>
     <script defer src="{{ ALPINE_CDN }}"></script>
-    <link
-      href="{{ DAISYUI_CDN }}"
-      rel="stylesheet"
-      type="text/css"
-    />
+    <link href="/static/css/app.css" rel="stylesheet" type="text/css" />
     <!-- Alpine's x-cloak only works if the page supplies this rule itself; without it,
          x-cloak elements flash visibly for one frame before Alpine initializes. -->
     <style>[x-cloak] { display: none !important; }</style>
     {% block head %}{% endblock %}
   </head>
-  <body class="min-h-screen bg-base-200">
+  <body class="min-h-screen bg-paper dark:bg-ink font-body text-ink dark:text-paper">
     {% block content %}{% endblock %}
   </body>
 </html>
