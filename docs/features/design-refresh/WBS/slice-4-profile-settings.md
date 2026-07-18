@@ -29,8 +29,10 @@ the mechanism on the landing page; this slice is the first place a logged-in use
 
 ## Blocked by
 
-- Slice 2 (needs the card/input/button primitives and the restyled chrome shell). Can run in
-  parallel with Slice 3 — different pages, no shared file conflicts.
+- Slice 2 (issue [#223](https://github.com/rustycoopes/organize-me/issues/223)) — needs the
+  card/input/button primitives and the restyled chrome shell. Can run in parallel with Slice 3
+  (issue [#224](https://github.com/rustycoopes/organize-me/issues/224)) — different pages, no
+  shared file conflicts.
 
 ## Acceptance criteria
 

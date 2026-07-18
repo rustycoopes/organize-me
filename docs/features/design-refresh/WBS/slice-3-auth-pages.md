@@ -24,7 +24,8 @@ the new components.
 
 ## Blocked by
 
-- Slice 2 (needs the card/input/button primitives to exist).
+- Slice 2 (issue [#223](https://github.com/rustycoopes/organize-me/issues/223)) — needs the
+  card/input/button primitives to exist.
 
 ## Acceptance criteria
 

@@ -39,8 +39,8 @@ not a structural rewrite.
 
 ## Blocked by
 
-- Slice 1 (needs the compiled build pipeline and token system to exist before any component can be
-  styled against it).
+- Slice 1 (issue [#222](https://github.com/rustycoopes/organize-me/issues/222)) — needs the
+  compiled build pipeline and token system to exist before any component can be styled against it.
 
 ## Acceptance criteria
 
