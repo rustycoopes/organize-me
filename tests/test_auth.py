@@ -191,7 +191,7 @@ async def test_logout_clears_the_cookie(client: AsyncClient) -> None:
     assert follow_up.status_code == 401
 
 
-async def test_register_page_renders_daisyui_form_with_expected_fields(client: AsyncClient) -> None:
+async def test_register_page_renders_form_with_expected_fields(client: AsyncClient) -> None:
     response = await client.get("/register")
 
     assert response.status_code == 200
@@ -201,10 +201,11 @@ async def test_register_page_renders_daisyui_form_with_expected_fields(client: A
     assert 'name="password"' in body
     assert 'type="password"' in body
     assert 'action="/api/v1/auth/register"' in body
-    assert "input-bordered" in body  # DaisyUI form control class
+    assert "input-bordered" not in body  # design-refresh Slice 3: DaisyUI class retired
+    assert "rounded-md border" in body  # shared input component's field class
 
 
-async def test_login_page_renders_daisyui_form_with_expected_fields(client: AsyncClient) -> None:
+async def test_login_page_renders_form_with_expected_fields(client: AsyncClient) -> None:
     response = await client.get("/login")
 
     assert response.status_code == 200
@@ -214,7 +215,8 @@ async def test_login_page_renders_daisyui_form_with_expected_fields(client: Asyn
     assert 'name="password"' in body
     assert 'type="password"' in body
     assert 'action="/api/v1/auth/login"' in body
-    assert "input-bordered" in body
+    assert "input-bordered" not in body
+    assert "rounded-md border" in body
 
 
 async def test_register_page_submits_via_js_and_auto_logs_in(client: AsyncClient) -> None:
@@ -513,7 +515,7 @@ async def test_forgot_password_email_lookup_is_case_insensitive(
     assert fake_email_sender.sent[0]["to"] == email
 
 
-async def test_forgot_password_page_renders_daisyui_form_with_expected_fields(
+async def test_forgot_password_page_renders_form_with_expected_fields(
     client: AsyncClient,
 ) -> None:
     response = await client.get("/forgot-password")
@@ -523,10 +525,11 @@ async def test_forgot_password_page_renders_daisyui_form_with_expected_fields(
     assert 'name="email"' in body
     assert 'type="email"' in body
     assert 'action="/api/v1/auth/forgot-password"' in body
-    assert "input-bordered" in body
+    assert "input-bordered" not in body  # design-refresh Slice 3: DaisyUI class retired
+    assert "rounded-md border" in body  # shared input component's field class
 
 
-async def test_reset_password_page_renders_daisyui_form_with_expected_fields(
+async def test_reset_password_page_renders_form_with_expected_fields(
     client: AsyncClient,
 ) -> None:
     response = await client.get("/reset-password?token=some-token-value")
@@ -539,4 +542,5 @@ async def test_reset_password_page_renders_daisyui_form_with_expected_fields(
     assert 'type="password"' in body
     assert 'name="confirm_password"' in body
     assert 'action="/api/v1/auth/reset-password"' in body
-    assert "input-bordered" in body
+    assert "input-bordered" not in body
+    assert "rounded-md border" in body
