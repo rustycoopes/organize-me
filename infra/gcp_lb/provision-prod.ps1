@@ -39,6 +39,10 @@ $EventCreatorRunService = "event-creator-prod"
 $EventCreatorNegName = "event-creator-prod-neg"
 $BackendEventCreator = "event-creator-backend-prod"
 
+$DocLibraryRunService = "doc-library-prod"
+$DocLibraryNegName = "doc-library-prod-neg"
+$BackendDocLibrary = "doc-library-backend-prod"
+
 $IpV4Name = "organizeme-prod-lb-ipv4"
 $IpV6Name = "organizeme-prod-lb-ipv6"
 $CertName = "organizeme-prod-cert"
@@ -86,7 +90,7 @@ if (-not (Test-GcloudResource @("compute", "ssl-certificates", "describe", $Cert
 }
 Write-Host "NOTE: cert stays PROVISIONING until the A/AAAA records above resolve and Google validates them (can take up to ~24h)."
 
-Write-Host "== 4. Serverless NEGs (organizeme-prod + event-creator-prod) =="
+Write-Host "== 4. Serverless NEGs (organizeme-prod + event-creator-prod + doc-library-prod) =="
 if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $NegName, "--region=$Region"))) {
     gcloud compute network-endpoint-groups create $NegName `
         --region=$Region `
@@ -98,6 +102,12 @@ if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe"
         --region=$Region `
         --network-endpoint-type=serverless `
         --cloud-run-service=$EventCreatorRunService
+}
+if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $DocLibraryNegName, "--region=$Region"))) {
+    gcloud compute network-endpoint-groups create $DocLibraryNegName `
+        --region=$Region `
+        --network-endpoint-type=serverless `
+        --cloud-run-service=$DocLibraryRunService
 }
 
 Write-Host "== 5. Backend services =="
@@ -112,6 +122,11 @@ if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $Back
     gcloud compute backend-services create $BackendEventCreator --global --load-balancing-scheme=EXTERNAL_MANAGED
     gcloud compute backend-services add-backend $BackendEventCreator --global `
         --network-endpoint-group=$EventCreatorNegName --network-endpoint-group-region=$Region
+}
+if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $BackendDocLibrary, "--global"))) {
+    gcloud compute backend-services create $BackendDocLibrary --global --load-balancing-scheme=EXTERNAL_MANAGED
+    gcloud compute backend-services add-backend $BackendDocLibrary --global `
+        --network-endpoint-group=$DocLibraryNegName --network-endpoint-group-region=$Region
 }
 
 Write-Host "== 6. URL map, generated from the R3 app-registry =="
@@ -145,6 +160,7 @@ if (-not (Test-GcloudResource @("compute", "forwarding-rules", "describe", $FwdR
 Write-Host "Done. Once the cert shows ACTIVE (gcloud compute ssl-certificates describe $CertName --global),"
 Write-Host "verify with: curl https://$ProdHost/login"
 Write-Host "verify Event Creator routing with: curl https://$ProdHost/dashboard"
+Write-Host "verify Doc Library routing with: curl https://$ProdHost/doc-library"
 Write-Host ""
 Write-Host "IMPORTANT: this only creates the prod domain — it does not redirect any existing traffic."
 Write-Host "GOOGLE_OAUTH_REDIRECT_URI / GOOGLE_DRIVE_REDIRECT_URI still point at the raw Cloud Run URLs"

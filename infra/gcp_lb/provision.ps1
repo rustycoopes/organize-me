@@ -40,6 +40,10 @@ $EventCreatorRunService = "event-creator-qa"
 $EventCreatorNegName = "event-creator-qa-neg"
 $BackendEventCreator = "event-creator-backend"
 
+$DocLibraryRunService = "doc-library-qa"
+$DocLibraryNegName = "doc-library-qa-neg"
+$BackendDocLibrary = "doc-library-backend"
+
 $IpV4Name = "organizeme-lb-ipv4"
 $IpV6Name = "organizeme-lb-ipv6"
 $CertName = "organizeme-qa-cert"
@@ -87,7 +91,7 @@ if (-not (Test-GcloudResource @("compute", "ssl-certificates", "describe", $Cert
 }
 Write-Host "NOTE: cert stays PROVISIONING until the A/AAAA records above resolve and Google validates them (can take up to ~24h)."
 
-Write-Host "== 4. Serverless NEGs (organizeme-qa + event-creator-qa) =="
+Write-Host "== 4. Serverless NEGs (organizeme-qa + event-creator-qa + doc-library-qa) =="
 if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $NegName, "--region=$Region"))) {
     gcloud compute network-endpoint-groups create $NegName `
         --region=$Region `
@@ -100,8 +104,14 @@ if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe"
         --network-endpoint-type=serverless `
         --cloud-run-service=$EventCreatorRunService
 }
+if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $DocLibraryNegName, "--region=$Region"))) {
+    gcloud compute network-endpoint-groups create $DocLibraryNegName `
+        --region=$Region `
+        --network-endpoint-type=serverless `
+        --cloud-run-service=$DocLibraryRunService
+}
 
-Write-Host "== 5. Backend services (host-backend, organizeme-backend -> organizeme NEG; event-creator-backend -> its own NEG) =="
+Write-Host "== 5. Backend services (host-backend, organizeme-backend -> organizeme NEG; event-creator-backend/doc-library-backend -> their own NEGs) =="
 foreach ($Backend in @($BackendHost, $BackendOrganizeme)) {
     if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $Backend, "--global"))) {
         gcloud compute backend-services create $Backend --global --load-balancing-scheme=EXTERNAL_MANAGED
@@ -113,6 +123,11 @@ if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $Back
     gcloud compute backend-services create $BackendEventCreator --global --load-balancing-scheme=EXTERNAL_MANAGED
     gcloud compute backend-services add-backend $BackendEventCreator --global `
         --network-endpoint-group=$EventCreatorNegName --network-endpoint-group-region=$Region
+}
+if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $BackendDocLibrary, "--global"))) {
+    gcloud compute backend-services create $BackendDocLibrary --global --load-balancing-scheme=EXTERNAL_MANAGED
+    gcloud compute backend-services add-backend $BackendDocLibrary --global `
+        --network-endpoint-group=$DocLibraryNegName --network-endpoint-group-region=$Region
 }
 
 Write-Host "== 6. URL map, generated from the R3 app-registry =="
@@ -151,3 +166,4 @@ if (-not (Test-GcloudResource @("compute", "forwarding-rules", "describe", $FwdR
 Write-Host "Done. Once the cert shows ACTIVE (gcloud compute ssl-certificates describe $CertName --global),"
 Write-Host "verify with: curl https://$QaHost/login"
 Write-Host "verify Event Creator routing with: curl https://$QaHost/dashboard"
+Write-Host "verify Doc Library routing with: curl https://$QaHost/doc-library"
