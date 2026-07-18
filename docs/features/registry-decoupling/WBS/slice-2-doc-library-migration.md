@@ -52,3 +52,40 @@ mechanism generalizes rather than being event-creator-specific.
 - doc-library: same test shape as Slice 1's event-creator tests — `lifespan` startup/shutdown
   task lifecycle, existing sidebar-rendering tests continuing to pass. No new tests needed in
   `packages/chrome/tests/` (the client machinery itself was already covered in Slice 1).
+
+## Delivered (2026-07-18, issue #219, branch `feature/registry-decoupling-slice-2` in
+`doc-library`)
+
+Shipped exactly as planned — a mechanical port of Slice 1's event-creator wiring, confirming the
+mechanism generalizes to a second consumer with no new design decisions:
+
+- `app/core/config.py`: added `registry_host_url`, `registry_refresh_interval_seconds`,
+  `registry_fetch_timeout_seconds` (same defaults as event-creator's Slice 1 fields). No separate
+  "shared runtime service account identity" field was added — as with event-creator's Slice 1,
+  the client mints its OIDC token via the metadata server for whatever service account the Cloud
+  Run revision runs as, so nothing needs to name that identity on the client side; only the Host
+  (organize-me) needs `registry_invoker_service_account` to verify against.
+- `app/core/registry.py` (new): `SELF_APP_ENTRY` (doc-library's own `AppEntry`, copied verbatim
+  from organize-me's compiled-in `APPS` entry for `"doc-library"`), `configure_client_registry_source()`,
+  `start_registry_refresh_task()`/`stop_registry_refresh_task()` — byte-for-byte the same shape as
+  event-creator's Slice 1 module.
+- `app/main.py`: `lifespan` now constructs the `FetchedRegistrySource` and spawns/cancels the
+  background refresh task, alongside the existing DB-engine-disposal shutdown step.
+- `pyproject.toml`: bumped `organizeme-chrome` pin to `chrome-v0.6.1` (the same tag event-creator's
+  Slice 1 used, not the newer `chrome-v0.8.0` which also carries the unrelated design-refresh
+  theme changes doc-library hasn't opted into yet). **Fix made during review:** `httpx` was moved
+  from the `dev` dependency group into `[project.dependencies]` — `app/core/registry.py`'s refresh
+  loop constructs an `httpx.AsyncClient` at runtime, and the import was previously satisfied only
+  incidentally via `organizeme-chrome`'s own transitive `httpx` dependency (code-quality-guardian
+  review finding).
+- CI/deploy (`ci.yml`/`deploy.yml`): looks up organize-me's Cloud Run URL live
+  (`gcloud run services describe organizeme-{qa,prod}`) into `REGISTRY_HOST_URL`, mirroring
+  event-creator's identical Slice 1 step. Verified doc-library's Cloud Run deploy has no
+  `--service-account` override, so it runs as the same shared compute default service account
+  (`170051512639-compute@developer.gserviceaccount.com`) organize-me's endpoint already expects
+  via `registry_invoker_service_account` — no new IAM/identity wiring needed for this slice.
+- Tests: `tests/test_registry_client_wiring.py` (new), 4/4 passing — refresh-task cache update on
+  success, last-known-good retention on a failed fetch, clean cancel on shutdown, cold-start
+  default. mypy --strict clean (38 source files). Full suite blocked locally on no reachable local
+  Postgres (this environment's standing limitation, same as Slice 1); every DB-independent test,
+  including all new ones, passes.
