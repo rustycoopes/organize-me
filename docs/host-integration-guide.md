@@ -608,6 +608,49 @@ not this repo's WBS.
   real data untouched). Unauthenticated requests to the page and both mutation routes continue to
   redirect/401 as expected.
 
+## Slice — registry-decoupling (organize-me#217-#220, done)
+
+Spans four slices across three repos: Slice 1 (Host endpoint + client machinery + event-creator
+migration, #218), Slice 2 (doc-library migration, #219), and Slice 3 (decommission the compiled-in
+fallback + playbook update, #220), tracked in this repo's own
+[`docs/features/registry-decoupling/`](https://github.com/rustycoopes/organize-me/tree/main/docs/features/registry-decoupling)
+PRD/TDD/WBS.
+
+- **Infra:** None new. No new Cloud Run services, DB schemas, or GCP resources — this feature only
+  changes where/how the existing app-registry *data* is read at runtime.
+- **Routing:** None. `infra/gcp_lb/generate_url_map.py` still reads `list_apps()` the same way; it
+  configures the Host's `InProcessRegistrySource` (via `app/core/registry.py`'s import-time side
+  effect) before calling it, so the generated URL map is unaffected by this feature end to end.
+- **Secrets:** None new for the Host's own registry role beyond what Slice 1 introduced
+  (`registry_invoker_service_account`, already covered by the shared compute default service
+  account every consumer already runs as — no new IAM/Secret Manager work per consumer). Each
+  consumer's `REGISTRY_HOST_URL` is looked up live from the Host's Cloud Run URL in CI
+  (`gcloud run services describe organizeme-{qa,prod}`), not stored as a secret.
+- **Interface contract — the new registration flow (supersedes the old one):**
+  - A new hosted app's nav/Settings/API surface is registered by adding one `AppEntry` to the
+    Host's own `app/core/registry.py` `APPS` list (a Host-repo PR) — never by bumping an
+    `organizeme-chrome` pin in every existing consumer repo. See
+    [`how-to-add-a-hosted-app.md`](how-to-add-a-hosted-app.md) step 1 for the full pattern.
+  - Every consumer other than the Host wires `configure_client_registry_source()` +
+    `start_registry_refresh_task()`/`stop_registry_refresh_task()` into its own `lifespan`
+    (`app/core/registry.py` in that consumer's repo — event-creator's and doc-library's copies are
+    both byte-for-byte the same shape) to poll the Host's `GET /internal/app-registry.json` in the
+    background and cache the result. A consumer whose fetches never succeed (Host unreachable, or
+    not yet deployed to that environment) serves its own cold-start `SELF_APP_ENTRY` only — its own
+    nav still renders correctly, just without other apps' entries, never a crash or blank chrome.
+  - **Slice 3's behavior change:** `organizeme_chrome.registry`'s transitional compiled-in `APPS`
+    literal (the old build-time-pin mechanism) is fully deleted. `list_apps()`/`get_app()` now
+    raise `RuntimeError` if called before `configure_registry_source()` — there is no implicit
+    fallback left for an unmigrated or misconfigured consumer to silently rely on. Every real
+    consumer (organize-me, event-creator, doc-library) configures a source at startup, so this
+    only matters if a future consumer's `lifespan`/import-time wiring is missing or ordered wrong
+    (see `tests/test_registry_wiring.py`'s import-ordering guard for the Host's own version of this
+    check).
+  - A hosted app's nav/Settings/API-prefix data changing no longer requires **any** consumer-repo
+    pin bump or redeploy on the consumer's side — only a Host-repo PR + Host redeploy. The
+    `organizeme-chrome` pin now only needs bumping for changes to the shared *mechanism* itself
+    (chrome templates, `jwt_verify`, the registry-client code, theme constants).
+
 ---
 
 ## How to keep this doc current

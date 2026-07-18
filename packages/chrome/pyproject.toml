@@ -1,6 +1,6 @@
 [project]
 name = "organizeme-chrome"
-version = "0.8.0"
+version = "0.9.0"
 description = "Shared chrome (sidebar/header/settings tab-bar), theme, app-registry, and JWT-verify helper for OrganizeMe-hosted apps"
 requires-python = ">=3.12"
 dependencies = [
