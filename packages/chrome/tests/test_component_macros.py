@@ -84,6 +84,42 @@ def test_input_renders_label_and_associated_field() -> None:
     assert "required" in html
 
 
+def test_input_without_error_has_no_invalid_wiring() -> None:
+    html = _render(_env(), "components/input.html", "input", "email", "Email")
+
+    assert 'aria-invalid' not in html
+    assert 'role="alert"' not in html
+
+
+def test_input_error_marks_field_invalid_and_renders_message() -> None:
+    html = _render(
+        _env(), "components/input.html", "input", "password", "Password", error="Too short."
+    )
+
+    assert 'aria-invalid="true"' in html
+    assert 'aria-describedby="field-password-error"' in html
+    assert 'id="field-password-error"' in html
+    assert 'role="alert"' in html
+    assert "Too short." in html
+    assert "border-flame" in html
+
+
+def test_input_renders_optional_minlength_and_autocomplete() -> None:
+    html = _render(
+        _env(),
+        "components/input.html",
+        "input",
+        "password",
+        "Password",
+        type="password",
+        minlength=8,
+        autocomplete="new-password",
+    )
+
+    assert 'minlength="8"' in html
+    assert 'autocomplete="new-password"' in html
+
+
 def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 

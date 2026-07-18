@@ -13,6 +13,8 @@ from organizeme_chrome.design.classes import (
     DENSITY_CARD_PADDING,
     DENSITY_PADDING,
     FOCUS_RING,
+    INPUT_ERROR_BORDER,
+    INPUT_ERROR_MESSAGE_TEXT,
     STATUS_VARIANT_CLASSES,
 )
 
@@ -23,5 +25,7 @@ __all__ = [
     "DENSITY_CARD_PADDING",
     "DENSITY_PADDING",
     "FOCUS_RING",
+    "INPUT_ERROR_BORDER",
+    "INPUT_ERROR_MESSAGE_TEXT",
     "STATUS_VARIANT_CLASSES",
 ]
