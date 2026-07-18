@@ -1,15 +1,12 @@
-"""Theme config: the CDN links and DaisyUI theme-name strings that define OrganizeMe's visual
-theme. There is no tailwind.config.js — the theme *is* these strings — so this module is the
-single owner of them.
+"""Dark/light mode selector.
+
+Python (User.dark_mode, read at request time) is the single source of truth for *which* mode is
+active; the compiled Tailwind CSS (tokens.css's @custom-variant dark) is the source of truth for
+*what each mode looks like*. See docs/adr/design-refresh-dark-mode-css-strategy.md.
 """
 
-TAILWIND_CDN = "https://cdn.tailwindcss.com"
-ALPINE_CDN = "https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
-DAISYUI_CDN = "https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css"
-
-LIGHT_THEME = "corporate"
-DARK_THEME = "dark"
+from typing import Literal
 
 
-def theme_attr(dark_mode: bool) -> str:
-    return DARK_THEME if dark_mode else LIGHT_THEME
+def theme_attr(dark_mode: bool) -> Literal["dark", ""]:
+    return "dark" if dark_mode else ""

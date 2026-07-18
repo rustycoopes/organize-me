@@ -1,8 +1,9 @@
 from jinja2 import ChoiceLoader, Environment, PackageLoader
 
+from organizeme_chrome.cdn import ALPINE_CDN
 from organizeme_chrome.json_filter import tojson_filter
 from organizeme_chrome.registry import get_app
-from organizeme_chrome.theme import ALPINE_CDN, DAISYUI_CDN, TAILWIND_CDN, theme_attr
+from organizeme_chrome.theme import theme_attr
 
 
 def register_chrome(env: Environment, app_service_name: str) -> None:
@@ -30,7 +31,5 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     app = get_app(app_service_name)
     env.globals["settings_tabs"] = app.settings_tabs
     env.globals["theme_attr"] = theme_attr
-    env.globals["TAILWIND_CDN"] = TAILWIND_CDN
     env.globals["ALPINE_CDN"] = ALPINE_CDN
-    env.globals["DAISYUI_CDN"] = DAISYUI_CDN
     env.filters["tojson"] = tojson_filter
