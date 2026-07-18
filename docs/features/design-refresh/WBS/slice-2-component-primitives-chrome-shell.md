@@ -65,3 +65,47 @@ not a structural rewrite.
   remains in the rendered sidebar markup.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-18, issue #223, branch `feature/design-refresh-slice-2-component-primitives`)
+
+Shipped as planned. `packages/chrome` gained `organizeme_chrome/design/` (`classes.py` — Tailwind
+class-name tables for density/variant, keyed off `tokens.css`'s palette) and
+`templates/components/` (`button`, `input`, `badge`, `card_shell`, `status_dot` Jinja macros),
+following the same doc-comment/markup-drift-prevention pattern as the existing `nav_link` macro.
+The marketing-vs-product density split is one component set with an explicit `density` parameter
+per macro call (not two divergent sets), per the ADR and the user's own choice when asked to
+clarify the WBS's "one component set with a variant" instruction.
+
+`chrome_authenticated_base.html`, `macros/chrome_nav.html`, and `macros/chrome_tabs.html` were
+restyled in place: every DaisyUI class (`drawer`/`drawer-toggle`/`drawer-content`/`drawer-side`/
+`drawer-overlay`/`menu`/`btn`/`navbar`/`tabs`/`tab`) is gone, replaced by tokens.css-based Tailwind
+classes. The mobile drawer's open/close mechanism — previously provided by DaisyUI's `.drawer` CSS
+component — was reimplemented from scratch with a plain `peer`/`peer-checked:` pattern (a hidden
+checkbox input plus later-sibling `<label>`s/`<aside>`). DOM structure, element IDs
+(`sidebar-drawer-toggle`, `sidebar-nav`, `nav-group-{service_name}`, `sidebar-logout-button`), and
+`sidebar-nav-groups`' existing Alpine.js wiring (`x-data`, `x-show`, `:aria-expanded`,
+collapsed/stored-collapsed state) are all unchanged.
+
+Released as `chrome-v0.10.1` (superseding an initial `chrome-v0.10.0` tag revised after review, see
+below); organize-me's own `pyproject.toml`/`uv.lock` are repinned to that tag.
+
+Two review agents (code-review-master, code-quality-guardian) ran against the full diff before
+merge. The most significant finding — the restyle introduced zero `dark:` classes anywhere,
+which would have silently broken dark mode for every existing user the moment this merged, per
+`docs/adr/design-refresh-dark-mode-css-strategy.md`'s explicit warning — was fixed inline, with new
+regression tests (`packages/chrome/tests/test_dark_mode_coverage.py`) pinning `dark:` coverage
+across every new/restyled template and class table. The review's other highest-value gap — no
+functional test for the reimplemented drawer mechanism — was also addressed with a new
+mobile-viewport e2e test that opens/closes the drawer via the hamburger and overlay. Minor
+cleanups from review: badge's density text-size now sources from `design/classes.py`
+(`DENSITY_BADGE_TEXT`) like every other axis instead of being computed ad hoc, and a comment ties
+the `lg:pl-64`/`w-64` width pairing together so a future edit to one doesn't silently break the
+other. A lower-priority finding (the `input` macro will need error-state and checkbox support
+before Slice 3/4 need them) was filed as [issue #233](https://github.com/rustycoopes/organize-me/issues/233),
+`Intake`, same `design-refresh`/`slice-2` labels plus `modelsuggested`.
+
+Diverged from the plan in one respect: the e2e "no leftover DaisyUI classes" check initially
+scanned the entire rendered page rather than just the chrome shell, and failed in CI against real
+QA data because `/profile`'s still-DaisyUI `card_page()` content (out of this slice's scope,
+per the TDD) matched `.btn`/`.tab`. Fixed by scoping the check to the sidebar/header/tab-bar
+elements this slice actually restyled.
