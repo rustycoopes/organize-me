@@ -1,10 +1,54 @@
 import html
 import json
+from collections.abc import Iterator
 
+import pytest
 from jinja2 import Environment
 from markupsafe import Markup
 
+from organizeme_chrome.registry import (
+    AppEntry,
+    AppNavItem,
+    SettingsTab,
+    configure_registry_source,
+    reset_registry_source,
+)
 from organizeme_chrome.templating import register_chrome
+
+
+class _FakeSource:
+    def __init__(self, apps: list[AppEntry]) -> None:
+        self._apps = apps
+
+    def get_apps(self) -> list[AppEntry]:
+        return self._apps
+
+
+@pytest.fixture(autouse=True)
+def _configure_sample_registry() -> Iterator[None]:
+    # register_chrome() calls get_app(), which needs a configured RegistrySource - registry-
+    # decoupling Slice 3 (organize-me#220) removed the compiled-in fallback these tests used to
+    # read implicitly.
+    configure_registry_source(
+        _FakeSource(
+            [
+                AppEntry(service_name="organizeme", nav=[], settings_tabs=[]),
+                AppEntry(
+                    service_name="event-creator",
+                    nav=[AppNavItem("/dashboard", "Dashboard")],
+                    settings_tabs=[
+                        SettingsTab("storage", "Storage"),
+                        SettingsTab("notifications", "Notifications"),
+                        SettingsTab("preferences", "Preferences"),
+                    ],
+                ),
+            ]
+        )
+    )
+    try:
+        yield
+    finally:
+        reset_registry_source()
 
 
 def test_tojson_filter_is_registered_and_produces_safe_markup() -> None:

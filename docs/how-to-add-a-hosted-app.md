@@ -20,18 +20,24 @@ automates.
 
 A hosted app is its own repo, its own Cloud Run service(s), and its own DB schema; it never
 handles login, sessions, or passwords; it trusts a Host-issued JWT cookie; and it plugs into the
-Host's sidebar/Settings/Load-Balancer routing entirely by adding one entry to a Python file in
-the Host repo (`packages/chrome/src/organizeme_chrome/registry.py`) and regenerating the LB's
-URL map from it.
+Host's sidebar/Settings/Load-Balancer routing by adding one entry to the Host's own app-registry
+data (`app/core/registry.py` in this repo) and wiring the standard `configure_registry_source()`
+background-refresh client into its own `lifespan` — **not** by bumping a package pin in every
+existing consumer repo (registry-decoupling Slice 3, organize-me#220 retired that older
+mechanism).
 
 ## 1. The Host app-registry entry
 
-`packages/chrome/src/organizeme_chrome/registry.py` is the single source of truth for a hosted
-app's nav items, Settings tabs, and API path prefixes. Rendering (the shared chrome package) and
-the Load Balancer's routing (step 2 below) are both driven from this one list — never
-hand-maintain either separately.
+`app/core/registry.py` (this repo only) is the single source of truth for a hosted app's nav
+items, Settings tabs, and API path prefixes. Rendering (the shared chrome package, in every
+consumer) and the Load Balancer's routing (step 2 below) are both driven from this one list —
+never hand-maintain either separately. The Host serves it at
+`GET /internal/app-registry.json`; every other consumer's own background refresh loop
+(`configure_client_registry_source()` + `start_registry_refresh_task()`, step 3) polls that
+endpoint and caches the result — a hosted app never edits `organizeme_chrome`'s package code to
+add its own nav entry, only this one Host-repo file.
 
-The real `event-creator` entry, as of R13:
+The real `event-creator` entry, as of registry-decoupling Slice 1:
 
 ```python
 AppEntry(
@@ -67,7 +73,8 @@ What each field does:
 
 - **`service_name`** — the Cloud Run backend-service name suffix (`generate_url_map.py` builds
   `{service_name}-backend{-prod suffix}` from it) and the key you pass to
-  `organizeme_chrome.registry.get_app(service_name)`.
+  `organizeme_chrome.registry.get_app(service_name)` (reading whichever `RegistrySource` your app
+  configured — the Host's own in-process one, or every other consumer's fetched one, step 3).
 - **`nav`** — `(path, label)` pairs. These render in the shared sidebar (merged across every
   registered app — see `organizeme_chrome.templating.register_chrome`, which builds
   `nav_items = [item for entry in list_apps() for item in entry.nav]`) **and** become URL-map
@@ -99,8 +106,13 @@ AppEntry(
 ),
 ```
 
-Add it to the `APPS` list in `registry.py`, bump `packages/chrome`'s version, and publish a new
-`chrome-v*` tag (see step 3) — that's the entire Host-side change.
+Add it to the `APPS` list in `app/core/registry.py` and redeploy the Host — that's the entire
+Host-side change. No `packages/chrome` edit, no new `chrome-v*` tag, no consumer-repo pin bump:
+every consumer's background refresh loop (step 3) picks up the new entry from
+`GET /internal/app-registry.json` on its own next poll, without a deploy on its end. You only touch
+`packages/chrome`/cut a new tag for changes to the shared *mechanism* itself (templates, the
+registry-client code, `jwt_verify`, theme constants) — never for adding, removing, or editing a
+hosted app's nav/Settings/API-prefix data.
 
 ## 2. Load-Balancer URL-map regeneration
 
@@ -149,8 +161,11 @@ What it gives you:
   `macros/chrome_tabs.html`) — extend these for every page your app renders; never hand-roll
   sidebar/header markup. `organizeme_chrome.templating.register_chrome(env, app_service_name)`
   wires your Jinja environment up to them and exposes `nav_items`/`settings_tabs`/theme globals.
-- **The app-registry data** (`organizeme_chrome.registry.get_app`/`list_apps`) — read-only from a
-  hosted app's side; only the Host repo edits `registry.py` itself.
+- **The registry-read functions and client machinery** (`organizeme_chrome.registry.get_app`/
+  `list_apps`, `organizeme_chrome.registry_client`'s `FetchedRegistrySource`/
+  `fetch_registry_once`) — the *mechanism*, not the data. The actual app-registry data (nav items,
+  Settings tabs, API prefixes for every hosted app) lives in the Host's own `app/core/registry.py`
+  and is fetched at runtime (step 1) — `packages/chrome` ships no compiled-in copy of it.
 - **The JWT-verify helper** (`organizeme_chrome.jwt_verify`) — see step 4.
 - **Theme constants** (Tailwind/DaisyUI CDN links, `theme_attr`) for a consistent look with zero
   build step.
@@ -162,14 +177,16 @@ to check first. A route that forgets it always renders light-only regardless of 
 Host Profile setting; this shipped unnoticed in `event-creator` for two parity slices before being
 caught.
 
-Bumping the pin is a **deliberate, explicit action in your own repo** — a Host-side chrome edit
-never silently changes what your app renders until you bump and redeploy. This bit an actual
-slice: R6 shipped with a stale pin that silently kept the live URL map on a pre-split registry,
-and again in R11 event-creator's pin had drifted to `chrome-v0.2.0` (missing R7's `api_prefixes`
-field) with zero observable effect until something started depending on the missing field.
-**Lesson: bump the pin in the same PR that needs the new registry data, and don't assume "no
-visible bug" means the pin is current** — verify it explicitly (`grep organizeme-chrome
-pyproject.toml`) when debugging anything registry-related.
+Bumping the pin is a **deliberate, explicit action in your own repo** — a `packages/chrome` code
+change never silently changes what your app runs until you bump and redeploy. Historically (R6,
+R11, pre-registry-decoupling) a stale pin also meant stale *registry data*, since the data itself
+was compiled into the package — that specific failure mode is gone as of registry-decoupling
+Slice 3 (organize-me#220): registry data (nav/Settings/API-prefix entries) now reaches you via the
+background-refresh client (step 1), independent of your `organizeme-chrome` pin entirely. The pin
+still matters for everything else this package ships — templates, `jwt_verify`, the registry
+*client* code itself, theme constants — so still bump and redeploy deliberately whenever you want
+one of those, but you no longer need to touch it just because a hosted app was added or its nav
+changed.
 
 ## 4. The JWT-verify-helper usage pattern
 
@@ -262,7 +279,10 @@ older copy for historical continuity but points here as the canonical one.
    ```
    (one-time manual step, before the first `docker push` in your deploy workflow can succeed).
 4. Pinned `organizeme-chrome` dependency (step 3).
-5. An entry in `registry.py` (step 1) — Host-repo PR, reviewed like any other Host change.
+5. An entry in the Host's `app/core/registry.py` (step 1) — Host-repo PR, reviewed like any other
+   Host change — plus your own repo's `configure_client_registry_source()` +
+   `start_registry_refresh_task()`/`stop_registry_refresh_task()` wiring in your `lifespan` (step
+   3), so your app actually reads that entry (and everyone else's) at runtime.
 6. Own Postgres schema, own independent Alembic history
    (`version_table_schema = <your_schema>`) — never write to another app's schema, and never
    more than a `REFERENCES`-only grant back to `host.users.id` if you need a real FK.
