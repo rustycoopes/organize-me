@@ -75,3 +75,46 @@ None — can start immediately.
 - No visual regression/screenshot tooling (per PRD, out of scope).
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-18, issue #222, branch `feature/design-refresh-slice-1`)
+
+Shipped as planned. `packages/chrome` gained `tokens.css` (the Signal `@theme` palette + font
+stack + `@custom-variant dark`) and self-hosted webfonts (Bricolage Grotesque 700, IBM Plex Sans
+400, JetBrains Mono 400) as package data, a `paths.py` helper (`chrome_package_dir` and friends)
+so consuming services never guess a site-packages path, and a shrunk `theme.py`
+(`theme_attr(dark_mode) -> "dark" | ""`). `chrome_base.html` drops all three CDN tags and switches
+`<html>` from `data-theme="..."` to `class="{{ theme_attr(dark_mode) }}"`. Released as
+`chrome-v0.7.0` (the `chrome-v0.6.x` tags already on the remote belong to the separate, still
+unmerged `registry-decoupling` branch — this slice's version bump deliberately skipped past them
+to avoid a collision).
+
+organize-me's `pyproject.toml` repins to `chrome-v0.7.0` and gained a `build` dependency group
+(`pytailwindcss`). `scripts/build_css.py` generates a Tailwind v4 entry CSS (`@source` globs over
+both organize-me's own templates and chrome's installed templates, `@import` of chrome's
+`tokens.css`) and compiles `app/static/css/app.css`; `scripts/verify_css_build.py` is the shared
+CI canary check (non-empty + `.bg-flame` class present) used by both `ci.yml` and `deploy.yml`.
+The `Dockerfile` is now multi-stage — the builder stage installs the `build` group and runs the
+compile step, the runtime stage only copies in the compiled `app.css` and the fonts, never the
+Tailwind CLI binary or `pytailwindcss` itself. `landing.html` was restyled on the new tokens
+(hero/features/CTA structure unchanged) and gained the chat-bubble-resolving-into-a-calendar-chip
+signature moment as a static (non-animated) illustration.
+
+Diverged from the plan in one respect: `docker build` itself could not be run in this environment
+(no Docker/WSL available) — the pipeline was instead validated by building the actual
+`organizeme-chrome@chrome-v0.7.0` wheel, installing it, and running the real Tailwind v4.3.3 CLI
+binary directly against `scripts/build_css.py`'s generated entry file (producing a 24.5 KB
+`app.css` containing the `.bg-flame` canary class and all three `@font-face` rules), plus rendering
+every touched template directly via Jinja to catch errors independent of the (QA-only, no local
+credentials) database-backed pytest suite. The actual `docker build` and full pytest suite run for
+the first time in CI on this PR.
+
+Two review agents (code-review-master, code-quality-guardian) ran against the full diff; their
+findings were fixed inline before merge: a Playwright assertion that passed trivially
+(`not.toHaveClass('dark')` doesn't reject an empty class), the CI canary check duplicated
+verbatim between `ci.yml`/`deploy.yml` (now `scripts/verify_css_build.py`), the builder Docker
+stage installing the unused `dev` dependency group, a stale Dockerfile comment, `--watch` dumping
+a traceback on Ctrl+C, and `landing.html`'s dark-mode rendering relying on Jinja's implicit
+`Undefined.__bool__()` fallthrough rather than an explicit default. One finding (`packages/chrome`
+tests only run at tag-publish time, not on every PR — a pre-existing structural gap) was filed as
+follow-up [issue #228](https://github.com/rustycoopes/organize-me/issues/228), `Intake` status,
+same `design-refresh`/`slice-1` labels plus `modelsuggested`.
