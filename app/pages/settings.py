@@ -24,11 +24,6 @@ from app.models.user import User
 
 router = APIRouter(tags=["pages"])
 
-# The event-creator app-registry entry (organizeme_chrome.registry) is the single source of truth
-# for which Settings tabs exist and their labels; this page just needs its tab ids to build each
-# tab's HTMX fragment URL (GET /settings/event-creator/{tab.id}).
-_EVENT_CREATOR_APP = get_app("event-creator")
-
 
 @router.get("/settings", response_model=None)
 async def settings_page(
@@ -37,6 +32,16 @@ async def settings_page(
 ) -> HTMLResponse | RedirectResponse:
     if user is None:
         return RedirectResponse("/login", status_code=302)
+    # The event-creator app-registry entry (organizeme_chrome.registry) is the single source of
+    # truth for which Settings tabs exist and their labels; this page just needs its tab ids to
+    # build each tab's HTMX fragment URL (GET /settings/event-creator/{tab.id}). Looked up here,
+    # per request, rather than once at module-import time (registry-decoupling, organize-me#218):
+    # get_app() now resolves against whichever RegistrySource app/core/registry.py configures at
+    # Host startup, and by request time that configuration has always already run - a module-level
+    # call here would instead depend on this module happening to be imported after that
+    # configuration call, which is exactly the kind of import-order dependency this page shouldn't
+    # need to care about.
+    event_creator_app = get_app("event-creator")
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -49,7 +54,7 @@ async def settings_page(
             # packages/chrome/src/organizeme_chrome/templating.py). Jinja2 template context takes
             # precedence over environment globals of the same name, so this overrides it for this
             # page only.
-            "settings_tabs": _EVENT_CREATOR_APP.settings_tabs,
+            "settings_tabs": event_creator_app.settings_tabs,
             **sidebar_nav_context(user, request),
         },
     )

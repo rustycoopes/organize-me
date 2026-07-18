@@ -115,10 +115,16 @@ config there, not a rename, since doc-library has no prior internal-endpoint pat
 
 ### `generate_url_map.py`
 
-Unaffected — confirmed consistent with this design: it's an operator-run local script, never
-inside a live Cloud Run service, and this feature's traffic never touches the Load Balancer at all
-(same as `/internal/pipeline/run` — no NEG/backend-service/URL-map change needed anywhere in this
-feature).
+Unaffected in the sense that matters here: it's an operator-run local script, never inside a live
+Cloud Run service, and this feature's traffic never touches the Load Balancer at all (same as
+`/internal/pipeline/run` — no NEG/backend-service/URL-map change needed anywhere in this feature).
+
+Implementation note (`/to-implementation`): it does gain one line, a side-effect import of
+`app.core.registry` before its existing `from organizeme_chrome.registry import ... list_apps`,
+so its `list_apps()` call resolves against the Host's own `InProcessRegistrySource` (this slice's
+canonical, edited-in-place data) rather than the package's now-secondary compiled-in fallback. Its
+own logic and direct-import shape are otherwise unchanged, which is what "unaffected" above refers
+to.
 
 ### Rollout mechanics
 

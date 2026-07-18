@@ -89,6 +89,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
           GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
           E2E_TEST_MODE: "true"
+          REGISTRY_INVOKER_SERVICE_ACCOUNT: "170051512639-compute@developer.gserviceaccount.com"
           EOF
 
       - name: Build image
@@ -113,6 +114,19 @@ jobs:
             --project=${{ env.GCP_PROJECT_ID }} \
             --env-vars-file=/tmp/cloud-run-env.yaml \
             --set-secrets=JWT_SECRET=jwt-secret-qa:latest \
+            --quiet
+
+      # Registry-decoupling (organize-me#218): mirrors event-creator's own "wire this service's
+      # own URL" follow-up step - REGISTRY_ENDPOINT_URL is the OIDC audience every consumer's
+      # token must be minted for, only known after this deploy.
+      - name: Wire this service's own URL for the registry endpoint's OIDC audience
+        run: |
+          SERVICE_URL=$(gcloud run services describe organizeme-qa \
+            --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} \
+            --format='value(status.url)')
+          gcloud run services update organizeme-qa \
+            --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} \
+            --update-env-vars=REGISTRY_ENDPOINT_URL="${SERVICE_URL}" \
             --quiet
 
   e2e-qa:

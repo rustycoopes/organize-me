@@ -1,6 +1,13 @@
 import pytest
 
-from organizeme_chrome.registry import get_app, list_apps
+from organizeme_chrome.registry import (
+    AppEntry,
+    AppNavItem,
+    configure_registry_source,
+    get_app,
+    list_apps,
+    reset_to_default_registry_source,
+)
 
 
 def test_list_apps_includes_organizeme_and_event_creator() -> None:
@@ -75,3 +82,31 @@ def test_get_app_event_creator_owns_settings_tabs_and_api_prefixes() -> None:
 def test_get_app_raises_for_unknown_service() -> None:
     with pytest.raises(KeyError):
         get_app("does-not-exist")
+
+
+class _FakeSource:
+    def __init__(self, apps: list[AppEntry]) -> None:
+        self._apps = apps
+
+    def get_apps(self) -> list[AppEntry]:
+        return self._apps
+
+
+def test_configure_registry_source_is_what_list_apps_and_get_app_actually_read() -> None:
+    # Registry-decoupling (organize-me#218): confirms the configured source, not the compiled-in
+    # APPS literal, is what a consumer that calls configure_registry_source() actually reads. The
+    # default source is restored in `finally` so every other test in this file (which relies on
+    # the untouched compiled-in fallback) isn't affected by this one's global mutation.
+    fake_app = AppEntry(
+        service_name="fake-app",
+        nav=[AppNavItem("/fake", "Fake")],
+        settings_tabs=[],
+    )
+    configure_registry_source(_FakeSource([fake_app]))
+    try:
+        assert [app.service_name for app in list_apps()] == ["fake-app"]
+        assert get_app("fake-app") is fake_app
+        with pytest.raises(KeyError):
+            get_app("organizeme")
+    finally:
+        reset_to_default_registry_source()

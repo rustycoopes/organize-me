@@ -96,3 +96,46 @@ None — can start immediately.
   sleep — inject a fake interval or drive the loop directly); existing sidebar-rendering page
   tests (the `storedCollapsed`-assertion tests already fixed for the 3-app registry) continue
   passing against whatever `RegistrySource` the test fixtures configure.
+
+## Delivered (2026-07-18, issue #218, branches `feature/registry-decoupling-slice-1` in both
+`organize-me` and `event-creator`)
+
+Shipped as designed, with one deliberate deviation and one fix made during review:
+
+- `organizeme_chrome`: `RegistrySource` protocol, `configure_registry_source()`,
+  `reset_to_default_registry_source()` (added during review so tests — in the package and in
+  downstream consumers — don't reach into the private `_CompiledRegistrySource`), and the new
+  leaf module `registry_client.py` (`fetch_registry_once`, `FetchedRegistrySource`, a metadata-
+  server-backed default `token_provider`). Tagged `chrome-v0.6.1` (0.6.0 shipped first; 0.6.1
+  folded in the review fix above before either tag was consumed by a real pin bump).
+- organize-me (Host): `APPS` forked into `app/core/registry.py` behind `InProcessRegistrySource`,
+  registered as an import-time side effect. Confirmed byte-identical to the package's prior
+  literal. New `GET /internal/app-registry.json` (`app/api/internal/registry.py`) mirrors
+  event-creator's `_verify_push_token` shape exactly, including the 503-when-unconfigured fail-
+  closed behavior. **Deviation from the original plan:** `app/pages/settings.py`'s
+  `get_app("event-creator")` lookup was moved from module-import time to per-request during
+  review (code-review-master flagged the import-order dependency it created as fragile) — the
+  only remaining import-time call site is `app/pages/app_shell.py` (route registration genuinely
+  needs it eager), and `tests/test_registry_wiring.py` now asserts the Host resolves against its
+  own `InProcessRegistrySource` rather than silently falling back to the package's compiled-in
+  literal if that ordering were ever broken.
+- event-creator: `app/core/registry.py`'s `SELF_APP_ENTRY` cold-start default, wired into a
+  `FetchedRegistrySource` via `configure_client_registry_source()`; `lifespan` spawns/cancels the
+  background refresh task. **Fix made during review:** the loop originally slept a full
+  `registry_refresh_interval_seconds` before its *first* fetch attempt, meaning a fresh Cloud Run
+  instance would serve only its self-only default for up to a minute after every cold
+  start/deploy — changed to fetch immediately on startup, then sleep between subsequent attempts.
+- CI/deploy (`ci.yml`/`deploy.yml`, both repos): organize-me captures its own post-deploy URL into
+  `REGISTRY_ENDPOINT_URL` (mirrors the existing `PIPELINE_ENDPOINT_URL` pattern); event-creator
+  looks up organize-me's Cloud Run URL live (`gcloud run services describe organizeme-{qa,prod}`)
+  into `REGISTRY_HOST_URL` rather than hardcoding it, since the exact URL wasn't known without
+  querying GCP directly.
+- Full test suites (both repos) blocked locally on no reachable local Postgres (this
+  environment's standing limitation — see each repo's own conftest.py) beyond what each
+  module's own DB-free fixtures could exercise; every new/changed module was verified via mypy
+  --strict (clean across both repos) and targeted DB-free pytest runs (19/19 organize-me,
+  4/4 event-creator, 38/38 `packages/chrome`). Full CI (with real Supabase QA credentials) is
+  the first complete run of the DB-dependent suites.
+- One suggestion from review was deferred rather than fixed now (not a correctness issue): caching
+  the minted OIDC token instead of re-minting it every refresh cycle — filed as
+  [organize-me#226](https://github.com/rustycoopes/organize-me/issues/226).

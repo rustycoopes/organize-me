@@ -76,3 +76,12 @@ scheduling?
 - A future consumer that isn't FastAPI (or doesn't want a background loop at all — e.g. a one-shot
   CLI script) can still call `fetch_registry_once` directly without inheriting scheduling machinery
   it doesn't want.
+- Each consumer also carries a duplicated *data* copy, not just a duplicated loop: organize-me's
+  own `app/core/registry.py` fork of `APPS`, `organizeme_chrome.registry`'s compiled-in fallback
+  literal, and each fetch-based consumer's own cold-start `AppEntry` (e.g. event-creator's
+  `SELF_APP_ENTRY`) must all be kept in sync by hand until the fallback literal's decommission
+  slice removes the middle one. This is accepted for the same reason as the scheduling-loop
+  duplication above (each consumer needs to be able to vouch for its own surface without a runtime
+  dependency on anything else), but unlike the loop it's a maintenance hazard across *this* slice's
+  implementation specifically — worth flagging explicitly here rather than leaving it implicit in
+  the PRD's "Rollout mechanics" section alone.

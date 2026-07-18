@@ -1,17 +1,21 @@
 [project]
 name = "organizeme-chrome"
-version = "0.5.5"
+version = "0.6.1"
 description = "Shared chrome (sidebar/header/settings tab-bar), theme, app-registry, and JWT-verify helper for OrganizeMe-hosted apps"
 requires-python = ">=3.12"
 dependencies = [
     "jinja2>=3.1",
     "markupsafe>=2.1",
     "pyjwt>=2.9",
+    # registry_client.py (organize-me#218): OIDC token minting + the registry fetch client.
+    "httpx>=0.27",
+    "google-auth>=2.34",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
+    "pytest-asyncio>=0.24",
     "mypy>=1.13",
 ]
 
@@ -21,6 +25,7 @@ python_version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["hatchling"]

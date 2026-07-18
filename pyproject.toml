@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "OrganizeMe — extracts calendar events and tasks from conversation exports via LLM"
 requires-python = ">=3.12"
 dependencies = [
-    "organizeme-chrome @ git+https://github.com/rustycoopes/organize-me@chrome-v0.5.5#subdirectory=packages/chrome",
+    "organizeme-chrome @ git+https://github.com/rustycoopes/organize-me@chrome-v0.6.1#subdirectory=packages/chrome",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "jinja2>=3.1",
@@ -18,6 +18,15 @@ dependencies = [
     "pydantic-settings>=2.14.2",
     "resend>=2.32.2",
     "python-dateutil>=2.9.0.post0",
+    # app/api/internal/registry.py (organize-me#218): OIDC verification of the registry
+    # endpoint's caller, mirroring event-creator's app/api/v1/internal_pipeline.py.
+    "google-auth>=2.35",
+    # Caches the OIDC-verification cert fetch - google-auth's own docs note that
+    # verify_oauth2_token re-fetches Google's public certs on every call by default; wrapping the
+    # session in CacheControl (google.auth.transport.requests already depends on it transitively)
+    # lets repeated verifications reuse cached certs instead of a network round trip every request.
+    "cachecontrol>=0.14",
+    "requests>=2.32",
 ]
 
 [dependency-groups]

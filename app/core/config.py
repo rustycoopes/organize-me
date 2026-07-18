@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     # password-reset token for any registered email. Defaults false so those routes return 404
     # everywhere it isn't explicitly switched on.
     e2e_test_mode: bool = False
+    # Registry-decoupling (organize-me#218): GET /internal/app-registry.json's own OIDC
+    # verification (app/api/internal/registry.py), mirroring event-creator's
+    # pipeline_endpoint_url/pipeline_invoker_service_account pair for /internal/pipeline/run.
+    # registry_endpoint_url is this service's own Cloud Run URL (the OIDC audience a caller's
+    # token must be minted for) - empty default so deploys/local dev that don't set it yet don't
+    # fail Settings construction; the endpoint itself fails closed (503) while unset rather than
+    # accepting unauthenticated requests. registry_invoker_service_account is the shared runtime
+    # service account every hosted app already runs as - every consumer mints its token as this
+    # identity via the metadata server, so this is the one email the endpoint accepts.
+    registry_endpoint_url: str = ""
+    registry_invoker_service_account: str = ""
 
 
 @lru_cache
