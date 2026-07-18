@@ -2,7 +2,16 @@ import { test, expect } from '@playwright/test';
 import { registerNewUser } from '../utils/helpers';
 
 // Documented sidebar order from packages/chrome (organizeme_chrome.registry).
-const EXPECTED_NAV = ['Dashboard', 'Upload', 'Processing', 'Logs', 'Prompt', 'Settings', 'Profile'];
+const EXPECTED_NAV = [
+  'Dashboard',
+  'Upload',
+  'Processing',
+  'Logs',
+  'Prompt',
+  'Doc Library',
+  'Settings',
+  'Profile',
+];
 
 test.describe('Sidebar navigation', () => {
   test('sidebar shows all nav items in order and links work across authenticated routes', async ({
