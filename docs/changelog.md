@@ -26,6 +26,7 @@
 - 2026-07-16 — event-creator#18/#19 Slices 2+3: event-creator reads the Host's real per-user sidebar-group collapse state on every page — [details](features/sidebar-nav-groups/WBS/slice-2-event-creator-sync-pattern.md)
 - 2026-07-18 — #218 Registry decoupling Slice 1: Host endpoint + `organizeme_chrome` client machinery + event-creator migration — [details](features/registry-decoupling/WBS/slice-1-host-endpoint-and-event-creator-migration.md)
 - 2026-07-18 — #219 Registry decoupling Slice 2: doc-library migration — [details](features/registry-decoupling/WBS/slice-2-doc-library-migration.md#delivered-2026-07-18-issue-219-branch-featureregistry-decoupling-slice-2-in-doc-library)
+- 2026-07-18 — #220 Registry decoupling Slice 3: decommission the compiled-in fallback + update the hosted-app playbook (also: event-creator and doc-library adopt the design-refresh Tailwind build pipeline, and a real registry-import-ordering production bug in both consumer repos is fixed) — [details](features/registry-decoupling/WBS/slice-3-decommission-fallback-and-playbook.md#delivered-2026-07-18-issue-220)
 - **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
   Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
   since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API

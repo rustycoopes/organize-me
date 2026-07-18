@@ -57,3 +57,52 @@ folded into whichever consumer migration happens to land last) and TDD "Rollout 
   masking that case.
 - No new runtime test surface beyond that — this slice is a removal + documentation update, not
   new behavior.
+
+## Delivered (2026-07-18, issue #220)
+
+Shipped across four PRs/repos, in this order:
+
+- **organize-me PR #230** (`feature/registry-decoupling-slice-3`) — deleted `APPS`/
+  `_CompiledRegistrySource` from `organizeme_chrome.registry`; `list_apps()`/`get_app()` now raise
+  `RuntimeError` if called before `configure_registry_source()`; rewrote
+  `how-to-add-a-hosted-app.md` and added the `host-integration-guide.md` slice section; bumped
+  `packages/chrome` to `0.9.0`.
+- **`chrome-v0.9.0` tag** cut and published (`publish-chrome.yml`) once #230 merged.
+- **organize-me PR #231** (`feature/registry-decoupling-slice-3-host-pin`) — bumped this repo's own
+  `organizeme-chrome` pin to `chrome-v0.9.0`. No runtime effect (the Host's `InProcessRegistrySource`
+  was already the configured source).
+- **event-creator PR #22** and **doc-library PR #15** (both branch `feature/registry-decoupling-
+  slice-3` in their own repos) — bumped their `organizeme-chrome` pins to `chrome-v0.9.0` and wired
+  an autouse `conftest.py` fixture (`configure_client_registry_source()`) so their own test suites
+  don't rely on the now-deleted fallback.
+
+Two problems surfaced mid-implementation that weren't anticipated by the plan above, both fixed
+before merging:
+
+1. **The design-refresh theme rewrite was coupled to the same tag line.** event-creator and
+   doc-library were both still pinned to `chrome-v0.6.1`, predating the unrelated "design-refresh"
+   visual overhaul (`chrome-v0.7.0`+ replaced the DaisyUI `data-theme` attribute with a Tailwind CSS
+   class, and `chrome_base.html` now requires a compiled stylesheet at `/static/css/app.css`
+   instead of CDN links). There is no tag containing only the registry-fallback removal without
+   also carrying that rewrite. After confirming with the user, both consumer repos adopted
+   organize-me's own design-refresh Slice 1 pattern (`docs/adr/design-refresh-per-service-tailwind-
+   build.md`) as part of these same PRs: a `build` dependency group (`pytailwindcss`), `scripts/
+   build_css.py` + `verify_css_build.py`, a two-stage Dockerfile, CI build/verify steps, a
+   `/static` mount, and updated dark-mode test assertions.
+2. **A real, pre-existing production bug was exposed, not introduced.** Both event-creator's and
+   doc-library's `app/main.py` only called `configure_client_registry_source()` inside `lifespan`
+   — which runs *after* every module-level import completes. Their own page routers transitively
+   import `organizeme_chrome.templating.register_chrome()`, itself a module-level call to
+   `get_app()`, at *import* time. Before this slice, an unconfigured `get_app()` silently degraded
+   to the compiled-in fallback, masking the ordering bug entirely; after the fallback's removal,
+   every container crashed on startup (`RuntimeError: ... not configured`), confirmed via a live
+   doc-library-qa Cloud Run deploy failure. Fixed in both repos the same way organize-me's own Host
+   already does it: `app/core/registry.py` now also configures a source as a module-import-time
+   side effect, and `app/main.py` imports that module first, before any router.
+
+**Verified live** after all four PRs merged and auto-deployed (QA and prod both auto-deploy on
+push to `main`): `/` (organize-me), `/dashboard` (event-creator), and `/doc-library` (doc-library)
+all resolve through the shared LB domain with correct redirect/200 behavior (no crashes), and
+`/static/css/app.css` serves 200 on both `organizeme.qa.russcoopersoftware.com` and
+`organizeme.russcoopersoftware.com` — confirming the compiled design-refresh stylesheet and the
+new no-fallback registry wiring both work end-to-end in every environment.
