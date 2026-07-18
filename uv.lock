@@ -1033,7 +1033,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.35" },
     { name = "httpx-oauth", specifier = ">=0.16.1" },
     { name = "jinja2", specifier = ">=3.1" },
-    { name = "organizeme-chrome", git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.10.1" },
+    { name = "organizeme-chrome", git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.10.2" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
@@ -1057,8 +1057,8 @@ dev = [
 
 [[package]]
 name = "organizeme-chrome"
-version = "0.10.1"
-source = { git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.10.1#31f4cd71fbff47c060ce413d12126c09e76ea6ca" }
+version = "0.10.2"
+source = { git = "https://github.com/rustycoopes/organize-me?subdirectory=packages%2Fchrome&rev=chrome-v0.10.2#be05ed9fdddad1aec9820d4f279d14c919d96b18" }
 dependencies = [
     { name = "google-auth" },
     { name = "httpx" },
