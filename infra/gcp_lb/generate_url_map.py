@@ -13,6 +13,10 @@ Run directly to print the generated URL map as YAML for `gcloud compute url-maps
 
 from dataclasses import dataclass, field
 
+# Side-effect import: configures organizeme_chrome's registry source against the Host's own
+# in-process APPS (registry-decoupling, organize-me#218) before list_apps() below is called -
+# see app/core/registry.py's module docstring.
+from app.core import registry as _registry  # noqa: F401
 from organizeme_chrome.registry import AppEntry, list_apps
 
 HOST_BACKEND = "host-backend"

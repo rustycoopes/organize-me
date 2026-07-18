@@ -2,9 +2,17 @@
 and (from R7) API path prefixes. Rendering (this package's chrome templates) and, from R5 onward,
 the load balancer's path-routing map are both driven from this one list, per the
 platform-restructure design.
+
+Registry-decoupling (organize-me#218): `list_apps()`/`get_app()` no longer read the compiled-in
+`APPS` literal directly - they read whichever `RegistrySource` was registered via
+`configure_registry_source()`. The literal below remains as the *default* source (an unmigrated
+consumer that never calls `configure_registry_source()` keeps today's behavior unchanged) and as
+the Host's (organize-me's) transitional data until this feature's final decommission slice deletes
+it - see docs/features/registry-decoupling/PRD.md "Rollout mechanics."
 """
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -124,12 +132,41 @@ APPS: list[AppEntry] = [
 ]
 
 
+class RegistrySource(Protocol):
+    """Where `list_apps()`/`get_app()` read the current registry from.
+
+    Two implementations exist: `InProcessRegistrySource` (organize-me's own app code - the Host
+    wraps its own in-app `APPS`-equivalent list, no network) and `FetchedRegistrySource`
+    (`organizeme_chrome.registry_client` - every other consumer, backed by a
+    background-refreshed cache). See docs/adr/registry-decoupling-client-boundary.md.
+    """
+
+    def get_apps(self) -> list[AppEntry]: ...
+
+
+class _CompiledRegistrySource:
+    """The default source: today's compiled-in `APPS` literal, unchanged. Used by any consumer
+    that hasn't called `configure_registry_source()` yet (see module docstring)."""
+
+    def get_apps(self) -> list[AppEntry]:
+        return APPS
+
+
+_source: RegistrySource = _CompiledRegistrySource()
+
+
+def configure_registry_source(source: RegistrySource) -> None:
+    """Called once by each app at startup to select where `list_apps()`/`get_app()` read from."""
+    global _source
+    _source = source
+
+
 def list_apps() -> list[AppEntry]:
-    return APPS
+    return _source.get_apps()
 
 
 def get_app(service_name: str) -> AppEntry:
-    for app in APPS:
+    for app in _source.get_apps():
         if app.service_name == service_name:
             return app
     raise KeyError(f"No app registered under service_name={service_name!r}")
