@@ -3,6 +3,7 @@ import json
 from collections.abc import Iterator
 
 import pytest
+from conftest import FakeRegistrySource
 from jinja2 import Environment
 from markupsafe import Markup
 
@@ -16,21 +17,13 @@ from organizeme_chrome.registry import (
 from organizeme_chrome.templating import register_chrome
 
 
-class _FakeSource:
-    def __init__(self, apps: list[AppEntry]) -> None:
-        self._apps = apps
-
-    def get_apps(self) -> list[AppEntry]:
-        return self._apps
-
-
 @pytest.fixture(autouse=True)
 def _configure_sample_registry() -> Iterator[None]:
     # register_chrome() calls get_app(), which needs a configured RegistrySource - registry-
     # decoupling Slice 3 (organize-me#220) removed the compiled-in fallback these tests used to
     # read implicitly.
     configure_registry_source(
-        _FakeSource(
+        FakeRegistrySource(
             [
                 AppEntry(service_name="organizeme", nav=[], settings_tabs=[]),
                 AppEntry(

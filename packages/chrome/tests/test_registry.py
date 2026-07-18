@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
+from conftest import FakeRegistrySource
 
 from organizeme_chrome.registry import (
     AppEntry,
@@ -11,14 +12,6 @@ from organizeme_chrome.registry import (
     list_apps,
     reset_registry_source,
 )
-
-
-class _FakeSource:
-    def __init__(self, apps: list[AppEntry]) -> None:
-        self._apps = apps
-
-    def get_apps(self) -> list[AppEntry]:
-        return self._apps
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +48,7 @@ def _sample_apps() -> list[AppEntry]:
 
 
 def test_list_apps_reads_the_configured_source() -> None:
-    configure_registry_source(_FakeSource(_sample_apps()))
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
 
     service_names = [app.service_name for app in list_apps()]
 
@@ -63,7 +56,7 @@ def test_list_apps_reads_the_configured_source() -> None:
 
 
 def test_get_app_returns_the_matching_entry() -> None:
-    configure_registry_source(_FakeSource(_sample_apps()))
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
 
     app = get_app("doc-library")
 
@@ -73,7 +66,7 @@ def test_get_app_returns_the_matching_entry() -> None:
 
 
 def test_get_app_raises_for_unknown_service() -> None:
-    configure_registry_source(_FakeSource(_sample_apps()))
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
 
     with pytest.raises(KeyError):
         get_app("does-not-exist")
@@ -87,7 +80,7 @@ def test_configure_registry_source_is_what_list_apps_and_get_app_actually_read()
         nav=[AppNavItem("/fake", "Fake")],
         settings_tabs=[],
     )
-    configure_registry_source(_FakeSource([fake_app]))
+    configure_registry_source(FakeRegistrySource([fake_app]))
 
     assert [app.service_name for app in list_apps()] == ["fake-app"]
     assert get_app("fake-app") is fake_app
@@ -106,10 +99,21 @@ def test_get_app_raises_before_any_source_is_configured() -> None:
 
 
 def test_reset_registry_source_clears_a_previously_configured_source() -> None:
-    configure_registry_source(_FakeSource(_sample_apps()))
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
     assert list_apps() != []
 
     reset_registry_source()
 
     with pytest.raises(RuntimeError, match="not configured"):
         list_apps()
+
+
+def test_configure_registry_source_called_twice_fully_replaces_the_first_source() -> None:
+    # Now that there's no compiled-in fallback to catch a stray leftover source, a second
+    # configure_registry_source() call must win outright, not merge with or defer to the first.
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
+
+    other_app = AppEntry(service_name="other-app", nav=[], settings_tabs=[])
+    configure_registry_source(FakeRegistrySource([other_app]))
+
+    assert [app.service_name for app in list_apps()] == ["other-app"]
