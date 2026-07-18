@@ -38,22 +38,33 @@ test.describe('Sidebar navigation', () => {
   }) => {
     await registerNewUser(page, 'sidebar-design');
 
-    // design-refresh Slice 2 restyled the shell onto plain Tailwind + design tokens; DaisyUI's
-    // component classes must be completely gone from the rendered page, not just re-themed.
-    const daisyUiSelector = [
-      '.drawer',
-      '.drawer-toggle',
-      '.drawer-content',
-      '.drawer-side',
-      '.drawer-overlay',
-      '.menu',
-      '.btn',
-      '.navbar',
-      '.tabs',
-      '.tab',
-    ].join(', ');
+    // design-refresh Slice 2 restyled only the chrome shell (sidebar/header/tab-bar) onto plain
+    // Tailwind + design tokens - page *content* (e.g. /profile's card_page()-based layout) is a
+    // later slice's concern and still legitimately uses DaisyUI today, so this check is scoped to
+    // the shell elements this slice actually touched, not the whole page.
+    const daisyUiTokens = [
+      'drawer',
+      'drawer-toggle',
+      'drawer-content',
+      'drawer-side',
+      'drawer-overlay',
+      'menu',
+      'btn',
+      'navbar',
+      'tabs',
+      'tab',
+    ];
 
-    await expect(page.locator(daisyUiSelector)).toHaveCount(0);
+    const shellClassLists = await page
+      .locator('aside, label[for="sidebar-drawer-toggle"], [role="tablist"], #sidebar-nav *')
+      .evaluateAll((elements) => elements.map((el) => el.className));
+
+    for (const classList of shellClassLists) {
+      const classes = String(classList).split(/\s+/);
+      for (const token of daisyUiTokens) {
+        expect(classes).not.toContain(token);
+      }
+    }
   });
 
   test('mobile drawer opens via the hamburger and closes via the overlay (design-refresh)', async ({
