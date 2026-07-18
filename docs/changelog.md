@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-18 — #224 Slice 3: Auth pages restyle (design-refresh) — [details](features/design-refresh/WBS/slice-3-auth-pages.md#delivered-2026-07-18-issue-224-branch-featuredesign-refresh-slice-3)
 - 2026-07-18 — #223 Slice 2: Shared component primitives and chrome shell restyle (design-refresh) — [details](features/design-refresh/WBS/slice-2-component-primitives-chrome-shell.md#delivered-2026-07-18-issue-223-branch-featuredesign-refresh-slice-2-component-primitives)
 - 2026-07-18 — #222 Slice 1: Compiled Tailwind build pipeline, Signal design tokens, and a
   restyled landing page (design-refresh) — [details](features/design-refresh/WBS/slice-1-build-pipeline-tokens-landing.md#delivered-2026-07-18-issue-222-branch-featuredesign-refresh-slice-1)
