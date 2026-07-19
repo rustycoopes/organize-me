@@ -20,11 +20,15 @@
     error       — validation-error message; when set, the field renders in its error state
                   (flame border, `aria-invalid="true"`) with the message shown below it, tied to
                   the input via `aria-describedby`.
-    attrs       — free-form string of extra attributes (e.g. 'x-model="name"'), an escape hatch
-                  for one-off cases the macro doesn't otherwise model.
+    attrs       — free-form string of extra HTML (already-quoted attributes, e.g.
+                  'x-model="name"'), an escape hatch for one-off cases the macro doesn't
+                  otherwise model. Rendered unescaped (`| safe`) since call sites are
+                  developer-authored template literals, never user input — never pass a second
+                  `class="..."` through here, use class_ instead.
+    class_      — extra classes appended to the input (e.g. "mb-2").
 #}
 {% from "components/field_error.html" import field_error %}
-{% macro input(name, label, type="text", value="", placeholder="", id=None, density="product", required=False, minlength=None, autocomplete=None, error=None, attrs=None) %}
+{% macro input(name, label, type="text", value="", placeholder="", id=None, density="product", required=False, minlength=None, autocomplete=None, error=None, attrs=None, class_="") %}
 {% set field_id = id or "field-" + name %}
 {% set error_id = field_id + "-error" %}
 <div class="flex flex-col gap-1">
@@ -41,8 +45,8 @@
     {% if minlength %}minlength="{{ minlength }}"{% endif %}
     {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
     {% if error %}aria-invalid="true" aria-describedby="{{ error_id }}"{% endif %}
-    {% if attrs %}{{ attrs }}{% endif %}
-    class="rounded-md border {{ INPUT_DEFAULT_FILL }} font-body text-ink placeholder:text-ink-2/60 dark:text-paper dark:placeholder:text-paper-2/60 {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}{{ INPUT_DEFAULT_BORDER }}{% endif %}"
+    {% if attrs %}{{ attrs | safe }}{% endif %}
+    class="rounded-md border {{ INPUT_DEFAULT_FILL }} font-body text-ink placeholder:text-ink-2/60 dark:text-paper dark:placeholder:text-paper-2/60 {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}{{ INPUT_DEFAULT_BORDER }}{% endif %} {{ class_ }}"
   />
   {% if error %}{{ field_error(error_id, error) }}{% endif %}
 </div>

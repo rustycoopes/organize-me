@@ -24,7 +24,12 @@ def _render(env: Environment, template: str, macro: str, *args: object, **kwargs
 
 
 def _env() -> Environment:
-    env = Environment()
+    # autoescape=True matches the host app's real environment (app/core/templating.py uses
+    # Jinja2Templates' select_autoescape(), which is on for .html templates) - a macro param
+    # that only round-trips correctly under autoescape=False would pass here but break in
+    # production, which is exactly how the `attrs` param's missing `| safe` slipped through
+    # before this was added.
+    env = Environment(autoescape=True)
     register_chrome(env, app_service_name="organizeme")
     return env
 
@@ -96,6 +101,35 @@ def test_button_attrs_passthrough_renders_free_form_attribute() -> None:
     )
 
     assert '@click="doThing"' in html
+
+
+def test_button_x_bind_disabled_alone_derives_the_default_dim_class() -> None:
+    html = _render(
+        _env(), "components/button.html", "button", "Save", type="submit", x_bind_disabled="saving"
+    )
+
+    assert ':disabled="saving"' in html
+    assert ":class=\"{ 'opacity-50 cursor-not-allowed': saving }\"" in html
+
+
+def test_button_href_with_call_block_renders_rich_content_instead_of_label() -> None:
+    env = _env()
+    button = getattr(env.get_template("components/button.html").module, "button")
+
+    html = str(
+        button(
+            href="/api/v1/auth/google",
+            variant="ghost",
+            class_="w-full",
+            caller=lambda: Markup("<svg></svg>Sign in with Google"),
+        )
+    )
+
+    assert "<a" in html
+    assert 'href="/api/v1/auth/google"' in html
+    assert "w-full" in html
+    assert "<svg></svg>Sign in with Google" in html
+    assert "None" not in html
 
 
 def test_button_class_appends_to_variant_classes() -> None:
@@ -180,6 +214,13 @@ def test_input_attrs_passthrough_renders_free_form_attribute() -> None:
     )
 
     assert 'x-model="name"' in html
+
+
+def test_input_class_appends_to_default_classes() -> None:
+    html = _render(_env(), "components/input.html", "input", "name", "Name", class_="mb-2")
+
+    assert "mb-2" in html
+    assert "rounded-md" in html
 
 
 def test_alert_static_message_uses_variant_classes_and_icon() -> None:

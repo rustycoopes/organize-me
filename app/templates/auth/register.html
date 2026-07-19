@@ -83,7 +83,7 @@
     {{ input("email", label="Email", type="email", id="email", required=True, placeholder="you@example.com", autocomplete="email", density="marketing") }}
     {{ input("password", label="Password", type="password", id="password", required=True, minlength=8, placeholder="At least 8 characters", autocomplete="new-password", density="marketing") }}
 
-    {% call button(type="submit", density="marketing", x_bind_disabled="submitting", x_bind_class="{ 'opacity-50 cursor-not-allowed': submitting }") %}
+    {% call button(type="submit", density="marketing", x_bind_disabled="submitting") %}
       <span x-show="!submitting">Register</span>
       <span x-show="submitting" x-cloak>Creating account...</span>
     {% endcall %}

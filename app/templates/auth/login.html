@@ -67,7 +67,7 @@
       <a href="/forgot-password" class="self-end font-body text-sm text-cobalt hover:underline dark:text-cobalt {{ FOCUS_RING }} rounded-sm">Forgot password?</a>
     </div>
 
-    {% call button(type="submit", density="marketing", x_bind_disabled="submitting", x_bind_class="{ 'opacity-50 cursor-not-allowed': submitting }") %}
+    {% call button(type="submit", density="marketing", x_bind_disabled="submitting") %}
       <span x-show="!submitting">Log in</span>
       <span x-show="submitting" x-cloak>Logging in...</span>
     {% endcall %}
