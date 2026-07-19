@@ -4,12 +4,19 @@
   Usage:
     {% from "components/badge.html" import badge %}
     {{ badge("New", variant="primary") }}
+    {{ badge(name | to_initials, class_="mr-1", attrs='title="' ~ name ~ '" tabindex="0"') }}
 
   Parameters
     label   — visible badge text.
     variant — "neutral" | "primary" | "secondary" | "success" (default "neutral").
     density — "product" | "marketing" (default "product").
+    attrs   — free-form string of extra HTML (already-quoted attributes, e.g. 'title="..."'), an
+              escape hatch for one-off cases the macro doesn't otherwise model. Rendered
+              unescaped (`| safe`) since call sites are developer-authored template literals,
+              never user input directly — never pass a second `class="..."` through here, use
+              class_ instead, and never interpolate unescaped user-controlled text into it.
+    class_  — extra classes appended to the badge (e.g. "mr-1").
 #}
-{% macro badge(label, variant="neutral", density="product") %}
-<span class="inline-flex items-center rounded-full px-2 py-0.5 font-body font-medium {{ DENSITY_BADGE_TEXT[density] }} {{ BADGE_VARIANT_CLASSES[variant] }}">{{ label }}</span>
+{% macro badge(label, variant="neutral", density="product", attrs=None, class_="") %}
+<span class="inline-flex items-center rounded-full px-2 py-0.5 font-body font-medium {{ DENSITY_BADGE_TEXT[density] }} {{ BADGE_VARIANT_CLASSES[variant] }} {{ class_ }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</span>
 {% endmacro %}

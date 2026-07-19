@@ -2,6 +2,7 @@ from organizeme_chrome.design import (
     ALERT_VARIANT_CLASSES,
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
+    LINK_CLASSES,
     STATUS_VARIANT_CLASSES,
     TABLE_BODY_ROW_CLASSES,
     TABLE_HEAD_ROW_CLASSES,
@@ -52,3 +53,7 @@ def test_alert_variant_classes_carry_dark_mode_classes() -> None:
 def test_table_row_classes_carry_dark_mode_classes() -> None:
     assert "dark:" in TABLE_HEAD_ROW_CLASSES
     assert "dark:" in TABLE_BODY_ROW_CLASSES
+
+
+def test_link_classes_carry_dark_mode_classes() -> None:
+    assert "dark:" in LINK_CLASSES
