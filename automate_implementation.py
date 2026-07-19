@@ -83,7 +83,7 @@ def wait_for_issue_closure(issue_number: int, repo: str = "organize-me", timeout
     return False
 
 
-def run_implementation(issue_number: int, auto_mode: bool = False) -> bool:
+def run_implementation(issue_number: str, auto_mode: bool = False) -> bool:
     """
     Spawn an interactive Claude session for this issue.
 
@@ -92,7 +92,7 @@ def run_implementation(issue_number: int, auto_mode: bool = False) -> bool:
         auto_mode: If True, enable Claude auto mode
 
     Returns:
-        True if session completed successfully, False otherwise
+        True if session completed successfully, False otherwisecalude
     """
     print(f"\n{'='*70}")
     print(f"STARTING: Issue #{issue_number}")
@@ -101,14 +101,22 @@ def run_implementation(issue_number: int, auto_mode: bool = False) -> bool:
     print(f"{'='*70}\n")
 
     try:
-        # Spawn interactive Claude session with the to-implementation skill
+            # Spawn interactive Claude session with the to-implementation skill
         cmd = ["claude"]
         if auto_mode:
-            cmd.append("/auto")
-        cmd.extend(["/to-implementation", str(issue_number)])
+            cmd.append("--permission-mode")
+            cmd.append("auto")
+        cmd.append("/to-implementation")
+        cmd.append(f"{issue_number}")
+        
+        cmdString = f'claude "/to-implementation {issue_number}" --permission-mode auto --remote-control claudecode'
+        print(cmdString)
+        # print(f"[DEBUG] Running: {cmd}")
+
 
         process = subprocess.Popen(
-            cmd,
+            cmdString,
+            shell=True,
             # Don't capture I/O - let it be fully interactive in the terminal
             stdin=None,
             stdout=None,
@@ -161,7 +169,7 @@ def process_issues(issues: list[int], repo: str = "organize-me", skip_wait: bool
         print(f"\n[{idx}/{total}] Processing issue #{issue_num}...")
 
         # Run the implementation session
-        session_ok = run_implementation(issue_num, auto_mode=auto_mode)
+        session_ok = run_implementation(f"rustycoopes/{repo}#{issue_num}", auto_mode=auto_mode)
 
         if not session_ok:
             print(f"✗ Session failed for issue #{issue_num}")

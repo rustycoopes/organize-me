@@ -3,6 +3,8 @@
 {% from "components/alert.html" import alert %}
 {% from "components/status_dot.html" import status_dot %}
 {% from "components/toggle.html" import toggle %}
+{% from "components/input.html" import input %}
+{% from "components/button.html" import button %}
 
 {% block title %}Your profile — OrganizeMe{% endblock %}
 
@@ -74,58 +76,16 @@
   {{ alert(variant="info", x_show="success", x_text="'Changes saved.'", class_="-mt-2") }}
   {{ alert(variant="danger", x_show="error", class_="-mt-2") }}
 
-  {% set field_input_classes = "rounded-md border " + INPUT_DEFAULT_BORDER + " " + INPUT_DEFAULT_FILL + " font-body text-ink placeholder:text-ink-2/60 dark:text-paper dark:placeholder:text-paper-2/60 " + FOCUS_RING + " " + DENSITY_PADDING['product'] %}
   {% call card_shell(title="Personal details", density="product") %}
     <form class="flex flex-col gap-4" @submit.prevent="save">
-      <div class="flex flex-col gap-1">
-        <label for="name" class="font-body text-sm font-medium text-ink dark:text-paper">Name</label>
-        <input
-          type="text"
-          name="name"
-          id="name"
-          x-model="name"
-          placeholder="Your name"
-          class="{{ field_input_classes }}"
-        />
-      </div>
+      {{ input("name", label="Name", id="name", placeholder="Your name", attrs='x-model="name"') }}
+      {{ input("email", label="Email", type="email", id="email", required=True, autocomplete="email", placeholder="you@example.com", attrs='x-model="email"') }}
+      {{ input("phone_number", label="Phone number", type="tel", id="phone_number", placeholder="+1 555 555 5555", attrs='x-model="phone_number"') }}
 
-      <div class="flex flex-col gap-1">
-        <label for="email" class="font-body text-sm font-medium text-ink dark:text-paper">
-          Email <span aria-hidden="true" class="text-flame">*</span>
-        </label>
-        <input
-          type="email"
-          name="email"
-          id="email"
-          x-model="email"
-          required
-          autocomplete="email"
-          placeholder="you@example.com"
-          class="{{ field_input_classes }}"
-        />
-      </div>
-
-      <div class="flex flex-col gap-1">
-        <label for="phone_number" class="font-body text-sm font-medium text-ink dark:text-paper">Phone number</label>
-        <input
-          type="tel"
-          name="phone_number"
-          id="phone_number"
-          x-model="phone_number"
-          placeholder="+1 555 555 5555"
-          class="{{ field_input_classes }}"
-        />
-      </div>
-
-      <button
-        type="submit"
-        :disabled="saving"
-        class="inline-flex items-center justify-center gap-2 self-start rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['primary'] }}"
-        :class="{ 'opacity-50 cursor-not-allowed': saving }"
-      >
+      {% call button(type="submit", class_="self-start", x_bind_disabled="saving") %}
         <span x-show="!saving">Save changes</span>
         <span x-show="saving" x-cloak>Saving...</span>
-      </button>
+      {% endcall %}
     </form>
   {% endcall %}
 
@@ -147,13 +107,7 @@
     <p class="mb-3 font-body text-sm text-ink-2 dark:text-paper-2">
       Deleting your account permanently removes it and all associated data. This cannot be undone.
     </p>
-    <button
-      type="button"
-      class="inline-flex items-center justify-center gap-2 rounded-md border border-flame font-body font-medium text-flame transition-colors hover:bg-flame-tint dark:hover:bg-flame/10 {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }}"
-      @click="$refs.deleteModal.showModal()"
-    >
-      Delete account
-    </button>
+    {{ button("Delete account", variant="danger", attrs='@click="$refs.deleteModal.showModal()"') }}
   {% endcall %}
 
   <dialog
@@ -166,27 +120,14 @@
       irreversible and cannot be undone.
     </p>
     <div class="mt-4 flex justify-end gap-2">
-      <button
-        type="button"
-        class="inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['ghost'] }}"
-        @click="$refs.deleteModal.close()"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        id="confirm-delete-account-button"
-        :disabled="deleting"
-        class="inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['primary'] }}"
-        :class="{ 'opacity-50 cursor-not-allowed': deleting }"
-        @click="deleteAccount"
-      >
+      {{ button("Cancel", variant="ghost", attrs='@click="$refs.deleteModal.close()"') }}
+      {% call button(id="confirm-delete-account-button", x_bind_disabled="deleting", attrs='@click="deleteAccount"') %}
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
           <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
         </svg>
         <span x-show="!deleting">Delete permanently</span>
         <span x-show="deleting" x-cloak>Deleting...</span>
-      </button>
+      {% endcall %}
     </div>
   </dialog>
 </div>

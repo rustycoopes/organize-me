@@ -57,6 +57,10 @@ BUTTON_VARIANT_CLASSES: dict[str, str] = {
         "bg-ink/5 text-ink border border-ink/30 hover:bg-ink/10 "
         "dark:bg-paper/10 dark:text-paper dark:border-paper/40 dark:hover:bg-paper/15"
     ),
+    # Outline-only destructive action (e.g. profile's "Delete account" trigger) - reuses flame,
+    # the same token STATUS_VARIANT_CLASSES/ALERT_VARIANT_CLASSES use for "danger", rather than
+    # introducing a second red into the palette.
+    "danger": "border border-flame text-flame hover:bg-flame-tint dark:hover:bg-flame/10",
 }
 
 BADGE_VARIANT_CLASSES: dict[str, str] = {
