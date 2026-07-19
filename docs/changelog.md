@@ -121,6 +121,14 @@
   change was needed there. Branch `restructure/r12-flip-prod-redirect-uris`.
 
 ### Fixed
+- 2026-07-19 — doc-library#18: Doc Library's sidebar in QA showed only itself, never
+  organize-me/event-creator — the registry refresh loop's `google.auth.transport.requests` OIDC
+  token minting hard-imports `requests`, which neither `organizeme-chrome` nor doc-library declared
+  as a dependency, so every refresh raised `ImportError`, silently caught and logged, leaving the
+  app stuck on its self-only cold-start default. Fixed in doc-library by declaring `requests>=2.32`
+  (event-creator already had it for an unrelated reason). Live QA verification after redeploy
+  surfaced a second, separate symptom — the refresh loop now produces no log output at all instead
+  of visibly failing — tracked in doc-library#22.
 - **Issue #200 — Google Drive connect failed with `Error 400: redirect_uri_mismatch`.** Both the
   Host's (this repo) and event-creator's copies of the Google Drive OAuth connect flow
   (`storage_google_drive.py`) built the callback `redirect_uri` dynamically from the incoming
