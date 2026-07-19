@@ -13,6 +13,7 @@ from organizeme_chrome.design import (
     INPUT_DEFAULT_FILL,
     INPUT_ERROR_BORDER,
     INPUT_ERROR_MESSAGE_TEXT,
+    LINK_CLASSES,
     STATUS_VARIANT_CLASSES,
     TABLE_BODY_CELL_CLASSES,
     TABLE_BODY_ROW_CLASSES,
@@ -63,6 +64,7 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["INPUT_DEFAULT_FILL"] = INPUT_DEFAULT_FILL
     env.globals["INPUT_ERROR_BORDER"] = INPUT_ERROR_BORDER
     env.globals["INPUT_ERROR_MESSAGE_TEXT"] = INPUT_ERROR_MESSAGE_TEXT
+    env.globals["LINK_CLASSES"] = LINK_CLASSES
     env.globals["TABLE_CLASSES"] = TABLE_CLASSES
     env.globals["TABLE_HEAD_ROW_CLASSES"] = TABLE_HEAD_ROW_CLASSES
     env.globals["TABLE_HEAD_CELL_CLASSES"] = TABLE_HEAD_CELL_CLASSES

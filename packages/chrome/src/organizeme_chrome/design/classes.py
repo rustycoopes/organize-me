@@ -95,3 +95,13 @@ TABLE_HEAD_ROW_CLASSES = "border-b border-ink-2/30 bg-mist dark:border-paper-2/3
 TABLE_HEAD_CELL_CLASSES = "px-3 py-2 font-medium text-ink-2 dark:text-paper-2"
 TABLE_BODY_ROW_CLASSES = "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10"
 TABLE_BODY_CELL_CLASSES = "px-3 py-2 align-middle"
+
+# Inline text-link treatment (event-creator#29) - the one color decision in event-creator's
+# events_panel.html that wasn't already pulled from a named constant here, duplicated verbatim at
+# two call sites. Carries FOCUS_RING/rounded-sm, matching organize-me's own text-cobalt link
+# convention (see e.g. app/templates/auth/login.html's "Forgot password?"/"Register" links).
+LINK_CLASSES = (
+    "font-medium text-cobalt underline-offset-2 hover:underline dark:text-cobalt "
+    + FOCUS_RING
+    + " rounded-sm"
+)

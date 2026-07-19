@@ -258,11 +258,43 @@ def test_alert_neutral_variant_uses_mist() -> None:
     assert "bg-mist" in html
 
 
+def test_alert_call_block_renders_rich_content_instead_of_message() -> None:
+    env = _env()
+    alert = getattr(env.get_template("components/alert.html").module, "alert")
+
+    html = str(
+        alert(
+            variant="danger",
+            caller=lambda: Markup('Processing failed. <a href="/logs">View the logs</a>.'),
+        )
+    )
+
+    assert 'Processing failed. <a href="/logs">View the logs</a>.' in html
+    assert 'role="alert"' in html
+    assert "None" not in html
+
+
 def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 
     assert "New" in html
     assert "bg-flame-tint" in html
+
+
+def test_badge_class_appends_to_variant_classes() -> None:
+    html = _render(_env(), "components/badge.html", "badge", "AB", class_="mr-1")
+
+    assert "mr-1" in html
+    assert "bg-mist" in html  # still carries the neutral (default) variant's own classes
+
+
+def test_badge_attrs_passthrough_renders_free_form_attribute() -> None:
+    html = _render(
+        _env(), "components/badge.html", "badge", "AB", attrs='title="Alice Baker" tabindex="0"'
+    )
+
+    assert 'title="Alice Baker"' in html
+    assert 'tabindex="0"' in html
 
 
 def test_status_dot_hides_status_text_when_no_label_given() -> None:
