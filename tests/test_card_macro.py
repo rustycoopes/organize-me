@@ -1,8 +1,8 @@
-"""Regression tests for the shared DaisyUI card/card-body page shell.
+"""Regression tests for the shared card/card-body page shell.
 
-These tests pin the rendered structure produced by the card_page Jinja macro
-so that any future refactor of the macro or the templates that use it is caught
-immediately rather than only in E2E.
+These tests pin the rendered structure produced by the card_page (profile) and card_shell
+(auth pages, design-refresh) Jinja macros so that any future refactor of the macro or the
+templates that use it is caught immediately rather than only in E2E.
 """
 import uuid
 
@@ -15,7 +15,7 @@ def unique_email() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Unauthenticated auth pages
+# Unauthenticated auth pages (design-refresh Slice 3: rebuilt on card_shell, no card_page/DaisyUI)
 # ---------------------------------------------------------------------------
 
 
@@ -27,23 +27,25 @@ def unique_email() -> str:
         ("/forgot-password", "Forgot your password?"),
     ],
 )
-async def test_auth_page_has_card_wrapper(
+async def test_auth_page_has_card_shell_wrapper(
     client: AsyncClient, path: str, expected_title: str
 ) -> None:
     response = await client.get(path)
 
     assert response.status_code == 200
     body = response.text
-    assert "card-body" in body
+    assert "card_page" not in body
+    assert "card-body" not in body
     assert f">{expected_title}</h1>" in body
 
 
-async def test_reset_password_page_has_card_wrapper(client: AsyncClient) -> None:
+async def test_reset_password_page_has_card_shell_wrapper(client: AsyncClient) -> None:
     response = await client.get("/reset-password?token=dummy")
 
     assert response.status_code == 200
     body = response.text
-    assert "card-body" in body
+    assert "card_page" not in body
+    assert "card-body" not in body
     assert ">Reset your password</h1>" in body
 
 
@@ -52,8 +54,27 @@ async def test_auth_pages_card_title_is_h1(client: AsyncClient) -> None:
     for path, title in [("/login", "Log in"), ("/register", "Create your account")]:
         response = await client.get(path)
         body = response.text
-        assert f'class="card-title"' in body
-        assert f"<h1" in body
+        assert f">{title}</h1>" in body
+
+
+async def test_auth_pages_have_no_daisyui_classes(client: AsyncClient) -> None:
+    daisyui_tokens = ["card-body", "card-title", "btn-primary", "input-bordered", "alert-error", "alert-info"]
+    for path in ["/login", "/register", "/forgot-password"]:
+        response = await client.get(path)
+        body = response.text
+        for token in daisyui_tokens:
+            assert token not in body, f"{path} still contains DaisyUI class {token!r}"
+
+    reset_response = await client.get("/reset-password?token=dummy")
+    for token in daisyui_tokens:
+        assert token not in reset_response.text, f"/reset-password still contains DaisyUI class {token!r}"
+
+
+async def test_auth_pages_use_marketing_density_card_padding(client: AsyncClient) -> None:
+    """Auth pages use the marketing/first-impression density variant, not product's tighter one."""
+    for path in ["/login", "/register", "/forgot-password"]:
+        response = await client.get(path)
+        assert "p-6" in response.text  # DENSITY_CARD_PADDING["marketing"]
 
 
 # ---------------------------------------------------------------------------

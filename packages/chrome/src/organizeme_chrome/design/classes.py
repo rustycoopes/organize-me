@@ -27,6 +27,12 @@ FOCUS_RING = (
     "focus-visible:outline-flame"
 )
 
+# input's error state (see docs/features/design-refresh/WBS/slice-3-auth-pages.md and
+# issue #233) reuses flame - the same token STATUS_VARIANT_CLASSES uses for "danger" - rather
+# than introducing a second red into the palette.
+INPUT_ERROR_BORDER = "border-flame dark:border-flame"
+INPUT_ERROR_MESSAGE_TEXT = "text-flame dark:text-flame"
+
 # Every color pairing here also carries its dark: variant (per
 # docs/adr/design-refresh-dark-mode-css-strategy.md) - tokens.css's palette has no light/dark pair
 # built in, so each component must state its own dark:-prefixed classes rather than relying on a
@@ -53,4 +59,9 @@ STATUS_VARIANT_CLASSES: dict[str, str] = {
     "info": "bg-cobalt",
     "danger": "bg-flame",
     "neutral": "bg-ink-2/40 dark:bg-paper-2/40",
+}
+
+ALERT_VARIANT_CLASSES: dict[str, str] = {
+    "danger": "border-flame/30 bg-flame-tint text-flame dark:border-flame/40 dark:bg-flame/10",
+    "info": "border-cobalt/30 bg-cobalt-tint text-cobalt dark:border-cobalt/40 dark:bg-cobalt/10",
 }

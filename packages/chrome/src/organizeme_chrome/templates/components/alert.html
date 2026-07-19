@@ -1,0 +1,43 @@
+{#
+  alert — inline status banner for form/page-level messages (errors, info), with an icon and
+  role="alert"/aria-live wiring baked in so the message is never color-only.
+
+  Usage (static message):
+    {% from "components/alert.html" import alert %}
+    {{ alert("Could not save changes.", variant="danger") }}
+
+  Usage (Alpine-driven dynamic message — the banner's own visibility and text both come from an
+  Alpine expression, e.g. an `error`/`info` string in the surrounding x-data):
+    {{ alert(variant="danger", x_show="error", x_text="error") }}
+
+  Parameters
+    message  — static message text (escaped). Ignored when x_text is given.
+    variant  — "danger" | "info" (default "danger").
+    x_show   — optional Alpine expression controlling visibility (adds x-show + x-cloak).
+    x_text   — optional Alpine expression for the message text (adds x-text); defaults to x_show's
+               expression when x_show is given and x_text isn't set separately, since the common
+               case is one variable driving both.
+    id       — optional element id.
+    class_   — extra classes appended to the banner (e.g. spacing utilities like "mb-2").
+#}
+{% macro alert(message="", variant="danger", x_show=None, x_text=None, id=None, class_="") %}
+{% set text_expr = x_text or x_show %}
+<div
+  role="alert"
+  aria-live="polite"
+  {% if id %}id="{{ id }}"{% endif %}
+  {% if x_show %}x-show="{{ x_show }}" x-cloak{% endif %}
+  class="flex items-center gap-2 rounded-md border px-4 py-3 font-body text-sm {{ ALERT_VARIANT_CLASSES[variant] }} {{ class_ }}"
+>
+  {% if variant == "info" %}
+  <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
+    <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.25v3.25a.75.75 0 0 0 1.5 0v-4A.75.75 0 0 0 10 9H9Z" clip-rule="evenodd" />
+  </svg>
+  {% else %}
+  <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
+    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+  </svg>
+  {% endif %}
+  {% if text_expr %}<span x-text="{{ text_expr }}"></span>{% else %}<span>{{ message }}</span>{% endif %}
+</div>
+{% endmacro %}

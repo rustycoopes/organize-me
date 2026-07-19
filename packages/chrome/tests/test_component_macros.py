@@ -84,6 +84,65 @@ def test_input_renders_label_and_associated_field() -> None:
     assert "required" in html
 
 
+def test_input_without_error_has_no_invalid_wiring() -> None:
+    html = _render(_env(), "components/input.html", "input", "email", "Email")
+
+    assert 'aria-invalid' not in html
+    assert 'role="alert"' not in html
+
+
+def test_input_error_marks_field_invalid_and_renders_message() -> None:
+    html = _render(
+        _env(), "components/input.html", "input", "password", "Password", error="Too short."
+    )
+
+    assert 'aria-invalid="true"' in html
+    assert 'aria-describedby="field-password-error"' in html
+    assert 'id="field-password-error"' in html
+    assert 'role="alert"' in html
+    assert "Too short." in html
+    assert "border-flame" in html
+
+
+def test_input_renders_optional_minlength_and_autocomplete() -> None:
+    html = _render(
+        _env(),
+        "components/input.html",
+        "input",
+        "password",
+        "Password",
+        type="password",
+        minlength=8,
+        autocomplete="new-password",
+    )
+
+    assert 'minlength="8"' in html
+    assert 'autocomplete="new-password"' in html
+
+
+def test_alert_static_message_uses_variant_classes_and_icon() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Could not save.", variant="danger")
+
+    assert 'role="alert"' in html
+    assert "Could not save." in html
+    assert "bg-flame-tint" in html
+    assert "<svg" in html
+
+
+def test_alert_x_show_wires_visibility_and_defaults_x_text_to_it() -> None:
+    html = _render(_env(), "components/alert.html", "alert", variant="danger", x_show="error")
+
+    assert 'x-show="error"' in html
+    assert "x-cloak" in html
+    assert 'x-text="error"' in html
+
+
+def test_alert_info_variant_uses_cobalt() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Saved.", variant="info")
+
+    assert "bg-cobalt-tint" in html
+
+
 def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 

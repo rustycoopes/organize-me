@@ -2,12 +2,15 @@ from jinja2 import ChoiceLoader, Environment, PackageLoader
 
 from organizeme_chrome.cdn import ALPINE_CDN
 from organizeme_chrome.design import (
+    ALERT_VARIANT_CLASSES,
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
     DENSITY_BADGE_TEXT,
     DENSITY_CARD_PADDING,
     DENSITY_PADDING,
     FOCUS_RING,
+    INPUT_ERROR_BORDER,
+    INPUT_ERROR_MESSAGE_TEXT,
     STATUS_VARIANT_CLASSES,
 )
 from organizeme_chrome.json_filter import tojson_filter
@@ -41,6 +44,7 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["settings_tabs"] = app.settings_tabs
     env.globals["theme_attr"] = theme_attr
     env.globals["ALPINE_CDN"] = ALPINE_CDN
+    env.globals["ALERT_VARIANT_CLASSES"] = ALERT_VARIANT_CLASSES
     env.globals["BUTTON_VARIANT_CLASSES"] = BUTTON_VARIANT_CLASSES
     env.globals["BADGE_VARIANT_CLASSES"] = BADGE_VARIANT_CLASSES
     env.globals["STATUS_VARIANT_CLASSES"] = STATUS_VARIANT_CLASSES
@@ -48,4 +52,6 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["DENSITY_CARD_PADDING"] = DENSITY_CARD_PADDING
     env.globals["DENSITY_BADGE_TEXT"] = DENSITY_BADGE_TEXT
     env.globals["FOCUS_RING"] = FOCUS_RING
+    env.globals["INPUT_ERROR_BORDER"] = INPUT_ERROR_BORDER
+    env.globals["INPUT_ERROR_MESSAGE_TEXT"] = INPUT_ERROR_MESSAGE_TEXT
     env.filters["tojson"] = tojson_filter
