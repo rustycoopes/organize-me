@@ -112,13 +112,25 @@ function Start-Implementation {
     Write-Host ""
 
     try {
-        # Use & (call operator) to properly invoke claude with arguments
+        # The slash command + argument must be passed as a single string,
+        # not as separate positional args, or claude only sees the first token.
+        $prompt = "/to-implementation $IssueNumber"
+
+        $argList = New-Object System.Collections.Generic.List[string]
         if ($AutoMode) {
-            & claude /auto /to-implementation $IssueNumber
-        } else {
-            & claude /to-implementation $IssueNumber
+            $argList.Add("--permission-mode")
+            $argList.Add("auto")
         }
-        $exitCode = $LASTEXITCODE
+        $argList.Add($prompt)
+
+        Write-Host "[DEBUG] Running: claude $($argList -join ' ')"
+
+        # Start-Process -NoNewWindow keeps claude attached to this console so
+        # it renders its interactive UI; the call operator (&) was found to
+        # hang silently for this CLI's raw-mode/ink rendering.
+        $process = Start-Process -FilePath "claude" -ArgumentList $argList -NoNewWindow -PassThru -Wait
+        $exitCode = $process.ExitCode
+        Write-Host "[DEBUG] Exit code: $exitCode"
 
         if ($exitCode -eq 0 -or $exitCode -eq $null) {
             Write-Host ""
