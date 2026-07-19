@@ -21,6 +21,7 @@
 
 ### Added
 - 2026-07-19 — #241 Slice 6: Consistent button/input macro adoption (design-refresh) — [details](features/design-refresh/WBS/slice-6-consistent-button-macro-adoption.md#delivered-2026-07-19-issue-241-branch-featureslice-6-button-input-macro-adoption)
+- 2026-07-19 — event-creator#25 Audit registry-client cold-start fallback for the same self-only-sidebar risk as doc-library#18 — verified-unaffected (event-creator declared `requests` since Slice 1, doc-library didn't) — [details](https://github.com/rustycoopes/event-creator/issues/25#issuecomment-5016582528)
 - 2026-07-19 — #240 Slice 5: Component contrast hardening + missing primitives (design-refresh) — [details](features/design-refresh/WBS/slice-5-component-contrast-hardening.md#delivered-2026-07-19-issue-240-branch-fixslice-5-component-contrast-hardening)
 - 2026-07-18 — #225 Slice 4: Profile and Settings shell restyle (design-refresh) — [details](features/design-refresh/WBS/slice-4-profile-settings.md#delivered-2026-07-18-issue-225-branch-featuredesign-refresh-slice-4-profile-settings)
 - 2026-07-18 — #224 Slice 3: Auth pages restyle (design-refresh) — [details](features/design-refresh/WBS/slice-3-auth-pages.md#delivered-2026-07-18-issue-224-branch-featuredesign-refresh-slice-3)
