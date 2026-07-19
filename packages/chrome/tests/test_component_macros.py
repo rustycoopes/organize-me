@@ -175,6 +175,15 @@ def test_card_shell_renders_title_and_caller_body() -> None:
     assert "<p>Body</p>" in html
 
 
+def test_card_shell_omits_heading_when_no_title() -> None:
+    env = _env()
+    card_shell = getattr(env.get_template("components/card_shell.html").module, "card_shell")
+
+    html = str(card_shell(caller=lambda: Markup("<p>Body</p>")))
+
+    assert "<h2" not in html
+
+
 def test_select_renders_label_and_options() -> None:
     html = _render(
         _env(),
@@ -193,6 +202,20 @@ def test_select_renders_label_and_options() -> None:
     assert "required" in html
     assert '<option value="open">Open</option>' in html
     assert '<option value="closed" selected>Closed</option>' in html
+
+
+def test_select_matches_option_value_across_str_and_int_types() -> None:
+    html = _render(
+        _env(),
+        "components/select.html",
+        "select",
+        "priority",
+        "Priority",
+        options=[(1, "Low"), (2, "High")],
+        value="2",
+    )
+
+    assert '<option value="2" selected>High</option>' in html
 
 
 def test_select_without_error_has_no_invalid_wiring() -> None:
@@ -267,12 +290,3 @@ def test_toggle_wires_alpine_model_and_change() -> None:
 
     assert 'x-model="dark_mode"' in html
     assert '@change="toggleDarkMode"' in html
-
-
-def test_card_shell_omits_heading_when_no_title() -> None:
-    env = _env()
-    card_shell = getattr(env.get_template("components/card_shell.html").module, "card_shell")
-
-    html = str(card_shell(caller=lambda: Markup("<p>Body</p>")))
-
-    assert "<h2" not in html
