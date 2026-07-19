@@ -9,6 +9,8 @@ from organizeme_chrome.design import (
     DENSITY_CARD_PADDING,
     DENSITY_PADDING,
     FOCUS_RING,
+    INPUT_DEFAULT_BORDER,
+    INPUT_DEFAULT_FILL,
     INPUT_ERROR_BORDER,
     INPUT_ERROR_MESSAGE_TEXT,
     STATUS_VARIANT_CLASSES,
@@ -52,6 +54,8 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["DENSITY_CARD_PADDING"] = DENSITY_CARD_PADDING
     env.globals["DENSITY_BADGE_TEXT"] = DENSITY_BADGE_TEXT
     env.globals["FOCUS_RING"] = FOCUS_RING
+    env.globals["INPUT_DEFAULT_BORDER"] = INPUT_DEFAULT_BORDER
+    env.globals["INPUT_DEFAULT_FILL"] = INPUT_DEFAULT_FILL
     env.globals["INPUT_ERROR_BORDER"] = INPUT_ERROR_BORDER
     env.globals["INPUT_ERROR_MESSAGE_TEXT"] = INPUT_ERROR_MESSAGE_TEXT
     env.filters["tojson"] = tojson_filter

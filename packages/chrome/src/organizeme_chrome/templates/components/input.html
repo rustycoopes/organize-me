@@ -38,7 +38,7 @@
     {% if minlength %}minlength="{{ minlength }}"{% endif %}
     {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
     {% if error %}aria-invalid="true" aria-describedby="{{ error_id }}"{% endif %}
-    class="rounded-md border bg-paper font-body text-ink placeholder:text-ink-2/60 dark:bg-ink-2 dark:text-paper dark:placeholder:text-paper-2/60 {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}border-ink-2/30 dark:border-paper/30{% endif %}"
+    class="rounded-md border {{ INPUT_DEFAULT_FILL }} font-body text-ink placeholder:text-ink-2/60 dark:text-paper dark:placeholder:text-paper-2/60 {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}{{ INPUT_DEFAULT_BORDER }}{% endif %}"
   />
   {% if error %}
   <p id="{{ error_id }}" role="alert" class="flex items-center gap-1 font-body text-sm {{ INPUT_ERROR_MESSAGE_TEXT }}">

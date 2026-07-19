@@ -43,7 +43,8 @@ def test_button_secondary_and_ghost_variants_use_distinct_classes() -> None:
     ghost = _render(_env(), "components/button.html", "button", "Go", variant="ghost")
 
     assert "bg-cobalt" in secondary
-    assert "border-ink-2/30" in ghost
+    assert "border-ink/30" in ghost
+    assert "bg-ink/5" in ghost
 
 
 def test_button_rejects_an_unknown_variant() -> None:
@@ -172,6 +173,100 @@ def test_card_shell_renders_title_and_caller_body() -> None:
 
     assert "Storage" in html
     assert "<p>Body</p>" in html
+
+
+def test_select_renders_label_and_options() -> None:
+    html = _render(
+        _env(),
+        "components/select.html",
+        "select",
+        "status",
+        "Status",
+        options=[("open", "Open"), ("closed", "Closed")],
+        value="closed",
+        required=True,
+    )
+
+    assert 'for="field-status"' in html
+    assert 'id="field-status"' in html
+    assert 'name="status"' in html
+    assert "required" in html
+    assert '<option value="open">Open</option>' in html
+    assert '<option value="closed" selected>Closed</option>' in html
+
+
+def test_select_without_error_has_no_invalid_wiring() -> None:
+    html = _render(
+        _env(), "components/select.html", "select", "status", "Status", options=[("open", "Open")]
+    )
+
+    assert "aria-invalid" not in html
+    assert 'role="alert"' not in html
+
+
+def test_select_error_marks_field_invalid_and_renders_message() -> None:
+    html = _render(
+        _env(),
+        "components/select.html",
+        "select",
+        "status",
+        "Status",
+        options=[("open", "Open")],
+        error="Pick a status.",
+    )
+
+    assert 'aria-invalid="true"' in html
+    assert 'aria-describedby="field-status-error"' in html
+    assert 'role="alert"' in html
+    assert "Pick a status." in html
+    assert "border-flame" in html
+
+
+def test_toggle_renders_checkbox_with_derived_id() -> None:
+    html = _render(_env(), "components/toggle.html", "toggle", "notifications")
+
+    assert 'type="checkbox"' in html
+    assert 'id="field-notifications"' in html
+    assert 'name="notifications"' in html
+    assert "\n    checked" not in html
+
+
+def test_toggle_checked_sets_native_attribute() -> None:
+    html = _render(_env(), "components/toggle.html", "toggle", "notifications", checked=True)
+
+    assert "\n    checked" in html
+
+
+def test_toggle_without_label_renders_bare_control() -> None:
+    html = _render(_env(), "components/toggle.html", "toggle", "dark_mode", id="dark-mode-toggle")
+
+    assert "<label" not in html
+    assert 'id="dark-mode-toggle"' in html
+
+
+def test_toggle_with_label_wraps_control() -> None:
+    html = _render(
+        _env(), "components/toggle.html", "toggle", "notifications", label="Email notifications"
+    )
+
+    assert "<label" in html
+    assert "Email notifications" in html
+    assert 'for="field-notifications"' in html
+
+
+def test_toggle_wires_alpine_model_and_change() -> None:
+    html = _render(
+        _env(),
+        "components/toggle.html",
+        "toggle",
+        "dark_mode",
+        id="dark-mode-toggle",
+        x_model="dark_mode",
+        on_change="toggleDarkMode",
+    )
+
+    assert 'x-model="dark_mode"' in html
+    assert '@change="toggleDarkMode"' in html
 
 
 def test_card_shell_omits_heading_when_no_title() -> None:
