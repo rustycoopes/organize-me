@@ -101,3 +101,11 @@ here, since it's a shared-component-library gap spanning beyond this slice's two
 page parametrized tests from Slice 3 remain in the same file). `e2e/tests/profile.spec.ts` and
 `e2e/tests/account-deletion.spec.ts` selectors were updated for the removed DaisyUI classes
 (`input.toggle` → `#dark-mode-toggle`, `dialog button.btn-error` → `#confirm-delete-account-button`).
+
+CI's `pytest` job then caught a second gap the local review missed entirely: `tests/test_profile_page.py`
+(a file distinct from `test_card_macro.py`, not surfaced by the `card_page`-focused grep sweep done
+during implementation) pinned two more pieces of the old markup — a static `value="{{ email }}"`
+attribute (removed when the fields became purely Alpine `x-model`-bound) and DaisyUI's
+`class="modal"` on the delete-confirmation dialog. Fixed by asserting against the JSON blob in
+`x-data` (`&#34;email&#34;: &#34;...&#34;`) and the new `<dialog x-ref="deleteModal">` markup instead,
+each re-verified against a real template render before pushing.
