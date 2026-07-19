@@ -1,0 +1,47 @@
+{#
+  select — shared dropdown primitive with an associated <label>, following input.html's shape.
+
+  Usage:
+    {% from "components/select.html" import select %}
+    {{ select("status", label="Status", options=[("open", "Open"), ("closed", "Closed")]) }}
+
+  Parameters
+    name        — form field name; also used to derive the id (`field-<name>`) unless overridden.
+    label       — visible <label> text.
+    options     — iterable of (value, label) tuples rendered as <option>s.
+    value       — currently-selected value; matched against each option's value by string
+                  comparison, so numeric/string values (e.g. 1 vs "1") still match correctly.
+    id          — optional element id override.
+    density     — "product" | "marketing" (default "product").
+    required    — marks the field required (HTML attribute + visual indicator).
+    error       — validation-error message; when set, the field renders in its error state
+                  (flame border, `aria-invalid="true"`) with the message shown below it, tied to
+                  the select via `aria-describedby`.
+#}
+{% from "components/field_error.html" import field_error %}
+{% macro select(name, label, options, value="", id=None, density="product", required=False, error=None) %}
+{% set field_id = id or "field-" + name %}
+{% set error_id = field_id + "-error" %}
+<div class="flex flex-col gap-1">
+  <label for="{{ field_id }}" class="font-body text-sm font-medium text-ink dark:text-paper">
+    {{ label }}{% if required %} <span aria-hidden="true" class="text-flame">*</span>{% endif %}
+  </label>
+  <div class="relative">
+    <select
+      id="{{ field_id }}"
+      name="{{ name }}"
+      {% if required %}required{% endif %}
+      {% if error %}aria-invalid="true" aria-describedby="{{ error_id }}"{% endif %}
+      class="w-full appearance-none rounded-md border pr-8 {{ INPUT_DEFAULT_FILL }} font-body text-ink dark:text-paper {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}{{ INPUT_DEFAULT_BORDER }}{% endif %}"
+    >
+      {% for opt_value, opt_label in options %}
+      <option value="{{ opt_value }}"{% if opt_value|string == value|string %} selected{% endif %}>{{ opt_label }}</option>
+      {% endfor %}
+    </select>
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-2 dark:text-paper-2">
+      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+    </svg>
+  </div>
+  {% if error %}{{ field_error(error_id, error) }}{% endif %}
+</div>
+{% endmacro %}

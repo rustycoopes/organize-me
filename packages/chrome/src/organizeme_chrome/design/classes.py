@@ -33,6 +33,14 @@ FOCUS_RING = (
 INPUT_ERROR_BORDER = "border-flame dark:border-flame"
 INPUT_ERROR_MESSAGE_TEXT = "text-flame dark:text-flame"
 
+# Default (non-error) field border/fill, shared by input.html and select.html - see issue #240.
+# A 30%-opacity border with a fill matching the page's own background (bg-paper on Paper) reads as
+# invisible in practice even though the token looks fine in isolation; paper-2/ink-2 fills actually
+# differ in lightness from the Paper/Ink page backgrounds they sit on, and the border opacity is
+# raised so the boundary itself is visible without a fill difference to lean on.
+INPUT_DEFAULT_BORDER = "border-ink-2/40 dark:border-paper/40"
+INPUT_DEFAULT_FILL = "bg-paper-2 dark:bg-ink-2"
+
 # Every color pairing here also carries its dark: variant (per
 # docs/adr/design-refresh-dark-mode-css-strategy.md) - tokens.css's palette has no light/dark pair
 # built in, so each component must state its own dark:-prefixed classes rather than relying on a
@@ -41,9 +49,13 @@ INPUT_ERROR_MESSAGE_TEXT = "text-flame dark:text-flame"
 BUTTON_VARIANT_CLASSES: dict[str, str] = {
     "primary": "bg-flame text-paper hover:bg-flame/90",
     "secondary": "bg-cobalt text-paper hover:bg-cobalt/90",
+    # A transparent fill with a 30%-opacity border was indistinguishable from Paper/Mist page
+    # backgrounds (both near-identical lightness) - see issue #240. An alpha-blended ink/paper
+    # tint (rather than a literal bg-paper-2/bg-mist-2 fill) contrasts against either page
+    # background without needing to know which one the button happens to sit on.
     "ghost": (
-        "bg-transparent text-ink border border-ink-2/30 hover:bg-mist "
-        "dark:text-paper dark:border-paper/30 dark:hover:bg-ink-2"
+        "bg-ink/5 text-ink border border-ink/30 hover:bg-ink/10 "
+        "dark:bg-paper/10 dark:text-paper dark:border-paper/40 dark:hover:bg-paper/15"
     ),
 }
 

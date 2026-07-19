@@ -87,3 +87,47 @@ root-cause chain (this is one of several tracks from that pass; sibling tracks l
   review, not just run the test suite.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-19, issue #240, branch `fix/slice-5-component-contrast-hardening`)
+
+- `BUTTON_VARIANT_CLASSES["ghost"]` reworked from a transparent fill with a 30%-opacity border to
+  an alpha-blended ink/paper tint (`bg-ink/5 border-ink/30` light, `bg-paper/10 border-paper/40`
+  dark) — contrasts against either `Paper` or `Mist` page background without needing to know which
+  one it sits on.
+- New shared `INPUT_DEFAULT_BORDER`/`INPUT_DEFAULT_FILL` constants in `design/classes.py`, used by
+  both `input.html` and the new `select.html`, and by `profile.html`'s own hand-rolled
+  `field_input_classes` (which duplicates `input.html`'s markup because its fields need Alpine
+  `x-model`) — same contrast fix applied everywhere the pattern existed, not just in the shared
+  macro.
+- New `templates/components/select.html` macro (`select`), following `input.html`'s
+  `name`/`label`/`density`/`required`/`error` parameter shape, plus an `options` param of
+  `(value, label)` tuples. No consuming page uses it yet — closes the primitive gap ahead of
+  Event Creator's dashboard-restyle slice.
+- New `templates/components/toggle.html` macro (`toggle`), generalizing `profile.html`'s
+  hand-written dark-mode switch (track+thumb, `checked:bg-flame`/`before:translate-x-5`) into a
+  reusable primitive with an optional attached `<label>` (bare-control mode when omitted, so a
+  caller can compose it into a custom layout) and optional Alpine `x_model`/`on_change` params.
+  `profile.html`'s dark-mode field now calls `toggle("dark_mode", id="dark-mode-toggle",
+  x_model="dark_mode", on_change="toggleDarkMode")` — identical `id`/`x-model`/`@change` wiring,
+  no behavioral change, verified by a direct template render (not just the macro's own unit
+  tests) and confirmed the `e2e/tests/profile.spec.ts` locator (`#dark-mode-toggle`) still
+  resolves.
+- New shared `templates/components/field_error.html` macro (`field_error`), factored out of
+  `input.html`/`select.html`'s previously-duplicated error-message markup during code review
+  (code-quality-guardian finding), so a future a11y/copy change to the error state can't drift
+  between the two.
+- `select()`'s option-match comparison does `opt_value|string == value|string` rather than a raw
+  `==`, so numeric option values (e.g. `1`) still match a string-typed `value` (e.g. `"1"`)
+  instead of silently leaving nothing selected (code-review-master finding).
+- Contrast fix verified visually (not just as token values) by rendering the actual compiled
+  Tailwind output in both light/dark mode against both `Paper` and `Mist` backgrounds — ghost
+  button, input, select, and toggle are all clearly visible in every combination.
+- `packages/chrome` bumped `0.10.3` → `0.11.1` (tags `chrome-v0.11.0`, `chrome-v0.11.1`); root
+  `pyproject.toml`/`uv.lock` repinned to `chrome-v0.11.1`.
+- Diverged from the plan only in scope, not approach: also fixed `profile.html`'s duplicated
+  hand-rolled input classes (same contrast bug, not called out explicitly in the issue) since it
+  was the identical defect the issue was filed against.
+- `packages/chrome`'s own test suite (77 tests, includes 9 new select/toggle tests) and `mypy
+  --strict` are green. Root app's `pytest`/`mypy` also pass for everything not gated on a live
+  Supabase connection; DB-dependent tests couldn't be exercised in this environment (no local
+  `.env` credentials configured) — pre-existing environment gap, unrelated to this change.

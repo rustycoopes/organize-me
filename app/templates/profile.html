@@ -2,6 +2,7 @@
 {% from "components/card_shell.html" import card_shell %}
 {% from "components/alert.html" import alert %}
 {% from "components/status_dot.html" import status_dot %}
+{% from "components/toggle.html" import toggle %}
 
 {% block title %}Your profile — OrganizeMe{% endblock %}
 
@@ -73,7 +74,7 @@
   {{ alert(variant="info", x_show="success", x_text="'Changes saved.'", class_="-mt-2") }}
   {{ alert(variant="danger", x_show="error", class_="-mt-2") }}
 
-  {% set field_input_classes = "rounded-md border border-ink-2/30 bg-paper font-body text-ink placeholder:text-ink-2/60 dark:border-paper/30 dark:bg-ink-2 dark:text-paper dark:placeholder:text-paper-2/60 " + FOCUS_RING + " " + DENSITY_PADDING['product'] %}
+  {% set field_input_classes = "rounded-md border " + INPUT_DEFAULT_BORDER + " " + INPUT_DEFAULT_FILL + " font-body text-ink placeholder:text-ink-2/60 dark:text-paper dark:placeholder:text-paper-2/60 " + FOCUS_RING + " " + DENSITY_PADDING['product'] %}
   {% call card_shell(title="Personal details", density="product") %}
     <form class="flex flex-col gap-4" @submit.prevent="save">
       <div class="flex flex-col gap-1">
@@ -137,13 +138,7 @@
       <div class="flex items-center gap-3">
         <span x-show="dark_mode" x-cloak>{{ status_dot("success", label="Enabled") }}</span>
         <span x-show="!dark_mode" x-cloak>{{ status_dot("neutral", label="Disabled") }}</span>
-        <input
-          type="checkbox"
-          id="dark-mode-toggle"
-          x-model="dark_mode"
-          @change="toggleDarkMode"
-          class="relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-mist transition-colors before:absolute before:left-1 before:top-1 before:h-4 before:w-4 before:rounded-full before:bg-paper before:transition-transform checked:bg-flame checked:before:translate-x-5 dark:bg-ink-2 {{ FOCUS_RING }}"
-        />
+        {{ toggle("dark_mode", id="dark-mode-toggle", x_model="dark_mode", on_change="toggleDarkMode") }}
       </div>
     </div>
   {% endcall %}

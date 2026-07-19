@@ -1,0 +1,42 @@
+{#
+  toggle — boolean track+thumb switch, generalized from profile.html's hand-written dark-mode
+  field so every boolean input in the app gets the same visual treatment instead of a raw
+  checkbox.
+
+  Usage (bare control, caller supplies its own label/layout):
+    {% from "components/toggle.html" import toggle %}
+    {{ toggle("dark_mode", id="dark-mode-toggle", x_model="dark_mode", on_change="toggleDarkMode") }}
+
+  Usage (with an attached <label>):
+    {{ toggle("notifications", label="Email notifications", checked=True) }}
+
+  Parameters
+    name       — form field name; also used to derive the id (`field-<name>`) unless overridden.
+    checked    — initial checked state (HTML attribute); omit when an Alpine x_model drives state,
+                 since the reactive value should own it instead of a static attribute.
+    id         — optional element id override.
+    label      — optional visible <label> text; when omitted, only the bare <input> is rendered
+                 so a caller can compose it into its own layout (e.g. alongside a description).
+    x_model    — optional Alpine expression (adds x-model) for reactive two-way binding.
+    on_change  — optional Alpine expression (adds @change).
+#}
+{% macro toggle(name, checked=False, id=None, label=None, x_model=None, on_change=None) %}
+{% set field_id = id or "field-" + name %}
+{% set control %}<input
+    type="checkbox"
+    id="{{ field_id }}"
+    name="{{ name }}"
+    {% if checked %}checked{% endif %}
+    {% if x_model %}x-model="{{ x_model }}"{% endif %}
+    {% if on_change %}@change="{{ on_change }}"{% endif %}
+    class="relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-mist transition-colors before:absolute before:left-1 before:top-1 before:h-4 before:w-4 before:rounded-full before:bg-paper before:transition-transform checked:bg-flame checked:before:translate-x-5 dark:bg-ink-2 {{ FOCUS_RING }}"
+  />{% endset %}
+{% if label %}
+<div class="inline-flex items-center gap-3">
+  <label for="{{ field_id }}" class="cursor-pointer font-body text-sm font-medium text-ink dark:text-paper">{{ label }}</label>
+  {{ control }}
+</div>
+{% else %}
+{{ control }}
+{% endif %}
+{% endmacro %}
