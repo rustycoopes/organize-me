@@ -246,6 +246,18 @@ def test_alert_info_variant_uses_cobalt() -> None:
     assert "bg-cobalt-tint" in html
 
 
+def test_alert_success_variant_uses_sage() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Done.", variant="success")
+
+    assert "bg-sage-tint" in html
+
+
+def test_alert_neutral_variant_uses_mist() -> None:
+    html = _render(_env(), "components/alert.html", "alert", "Waiting.", variant="neutral")
+
+    assert "bg-mist" in html
+
+
 def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 

@@ -80,4 +80,18 @@ STATUS_VARIANT_CLASSES: dict[str, str] = {
 ALERT_VARIANT_CLASSES: dict[str, str] = {
     "danger": "border-flame/30 bg-flame-tint text-flame dark:border-flame/40 dark:bg-flame/10",
     "info": "border-cobalt/30 bg-cobalt-tint text-cobalt dark:border-cobalt/40 dark:bg-cobalt/10",
+    # Added for event-creator#26's run-status banner (success/waiting states) - reuses sage/mist
+    # the same way BADGE_VARIANT_CLASSES["success"] and STATUS_VARIANT_CLASSES["neutral"] do.
+    "success": "border-sage/30 bg-sage-tint text-sage dark:border-sage/40 dark:bg-sage/10",
+    "neutral": "border-ink-2/20 bg-mist text-ink-2 dark:border-paper-2/20 dark:bg-ink-2 dark:text-paper-2",
 }
+
+# Table primitive (event-creator#26): header/row/border treatment that used to come from
+# DaisyUI's `.table` class. No <table> macro exists here because column count/content varies per
+# caller; these are raw class strings applied directly to <table>/<thead>/<tr>/<th>/<td>, the same
+# way FOCUS_RING/DENSITY_PADDING are consumed without a wrapping macro.
+TABLE_CLASSES = "w-full text-left font-body text-sm border-collapse"
+TABLE_HEAD_ROW_CLASSES = "border-b border-ink-2/30 bg-mist dark:border-paper-2/30 dark:bg-ink-2"
+TABLE_HEAD_CELL_CLASSES = "px-3 py-2 font-medium text-ink-2 dark:text-paper-2"
+TABLE_BODY_ROW_CLASSES = "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10"
+TABLE_BODY_CELL_CLASSES = "px-3 py-2 align-middle"

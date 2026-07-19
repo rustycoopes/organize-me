@@ -14,6 +14,11 @@ from organizeme_chrome.design import (
     INPUT_ERROR_BORDER,
     INPUT_ERROR_MESSAGE_TEXT,
     STATUS_VARIANT_CLASSES,
+    TABLE_BODY_CELL_CLASSES,
+    TABLE_BODY_ROW_CLASSES,
+    TABLE_CLASSES,
+    TABLE_HEAD_CELL_CLASSES,
+    TABLE_HEAD_ROW_CLASSES,
 )
 from organizeme_chrome.json_filter import tojson_filter
 from organizeme_chrome.registry import get_app
@@ -58,4 +63,9 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["INPUT_DEFAULT_FILL"] = INPUT_DEFAULT_FILL
     env.globals["INPUT_ERROR_BORDER"] = INPUT_ERROR_BORDER
     env.globals["INPUT_ERROR_MESSAGE_TEXT"] = INPUT_ERROR_MESSAGE_TEXT
+    env.globals["TABLE_CLASSES"] = TABLE_CLASSES
+    env.globals["TABLE_HEAD_ROW_CLASSES"] = TABLE_HEAD_ROW_CLASSES
+    env.globals["TABLE_HEAD_CELL_CLASSES"] = TABLE_HEAD_CELL_CLASSES
+    env.globals["TABLE_BODY_ROW_CLASSES"] = TABLE_BODY_ROW_CLASSES
+    env.globals["TABLE_BODY_CELL_CLASSES"] = TABLE_BODY_CELL_CLASSES
     env.filters["tojson"] = tojson_filter

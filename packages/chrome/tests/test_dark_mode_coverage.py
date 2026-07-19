@@ -1,7 +1,10 @@
 from organizeme_chrome.design import (
+    ALERT_VARIANT_CLASSES,
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
     STATUS_VARIANT_CLASSES,
+    TABLE_BODY_ROW_CLASSES,
+    TABLE_HEAD_ROW_CLASSES,
 )
 from organizeme_chrome.paths import chrome_templates_dir
 
@@ -40,3 +43,12 @@ def test_badge_variant_classes_carry_dark_mode_classes() -> None:
 
 def test_status_variant_classes_carry_dark_mode_classes() -> None:
     assert any("dark:" in classes for classes in STATUS_VARIANT_CLASSES.values())
+
+
+def test_alert_variant_classes_carry_dark_mode_classes() -> None:
+    assert all("dark:" in classes for classes in ALERT_VARIANT_CLASSES.values())
+
+
+def test_table_row_classes_carry_dark_mode_classes() -> None:
+    assert "dark:" in TABLE_HEAD_ROW_CLASSES
+    assert "dark:" in TABLE_BODY_ROW_CLASSES
