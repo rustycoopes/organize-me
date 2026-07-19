@@ -20,12 +20,16 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-18 — #225 Slice 4: Profile and Settings shell restyle (design-refresh) — [details](features/design-refresh/WBS/slice-4-profile-settings.md#delivered-2026-07-18-issue-225-branch-featuredesign-refresh-slice-4-profile-settings)
+- 2026-07-18 — #224 Slice 3: Auth pages restyle (design-refresh) — [details](features/design-refresh/WBS/slice-3-auth-pages.md#delivered-2026-07-18-issue-224-branch-featuredesign-refresh-slice-3)
+- 2026-07-18 — #223 Slice 2: Shared component primitives and chrome shell restyle (design-refresh) — [details](features/design-refresh/WBS/slice-2-component-primitives-chrome-shell.md#delivered-2026-07-18-issue-223-branch-featuredesign-refresh-slice-2-component-primitives)
 - 2026-07-18 — #222 Slice 1: Compiled Tailwind build pipeline, Signal design tokens, and a
   restyled landing page (design-refresh) — [details](features/design-refresh/WBS/slice-1-build-pipeline-tokens-landing.md#delivered-2026-07-18-issue-222-branch-featuredesign-refresh-slice-1)
 - 2026-07-16 — #212 Slice 1: Grouped, collapsible sidebar in organize-me (Host) — [details](features/sidebar-nav-groups/WBS/slice-1-host-sidebar-groups.md)
 - 2026-07-16 — event-creator#18/#19 Slices 2+3: event-creator reads the Host's real per-user sidebar-group collapse state on every page — [details](features/sidebar-nav-groups/WBS/slice-2-event-creator-sync-pattern.md)
 - 2026-07-18 — #218 Registry decoupling Slice 1: Host endpoint + `organizeme_chrome` client machinery + event-creator migration — [details](features/registry-decoupling/WBS/slice-1-host-endpoint-and-event-creator-migration.md)
 - 2026-07-18 — #219 Registry decoupling Slice 2: doc-library migration — [details](features/registry-decoupling/WBS/slice-2-doc-library-migration.md#delivered-2026-07-18-issue-219-branch-featureregistry-decoupling-slice-2-in-doc-library)
+- 2026-07-18 — #220 Registry decoupling Slice 3: decommission the compiled-in fallback + update the hosted-app playbook (also: event-creator and doc-library adopt the design-refresh Tailwind build pipeline, and a real registry-import-ordering production bug in both consumer repos is fixed) — [details](features/registry-decoupling/WBS/slice-3-decommission-fallback-and-playbook.md#delivered-2026-07-18-issue-220)
 - **Issue #168 — Slice R13: Host Cleanup + "How to Add a Hosted App" Playbook.** Removed the
   Host's now-dead event-extraction code now that `event-creator` fully owns it (stable in prod
   since R12): the page modules (`app/pages/{dashboard,upload,processing,logs,prompt}.py`), API

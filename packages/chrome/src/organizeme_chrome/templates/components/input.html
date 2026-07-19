@@ -1,0 +1,52 @@
+{#
+  input — shared text-input primitive with an associated <label>.
+
+  Usage:
+    {% from "components/input.html" import input %}
+    {{ input("email", label="Email", type="email", required=True) }}
+    {{ input("password", label="Password", type="password", error="Incorrect email or password.") }}
+
+  Parameters
+    name        — form field name; also used to derive the id (`field-<name>`) unless overridden.
+    label       — visible <label> text.
+    type        — HTML input type (default "text").
+    value       — initial value.
+    placeholder — placeholder text.
+    id          — optional element id override.
+    density     — "product" | "marketing" (default "product").
+    required    — marks the field required (HTML attribute + visual indicator).
+    minlength   — optional HTML `minlength` attribute.
+    autocomplete — optional HTML `autocomplete` attribute (e.g. "email", "new-password").
+    error       — validation-error message; when set, the field renders in its error state
+                  (flame border, `aria-invalid="true"`) with the message shown below it, tied to
+                  the input via `aria-describedby`.
+#}
+{% macro input(name, label, type="text", value="", placeholder="", id=None, density="product", required=False, minlength=None, autocomplete=None, error=None) %}
+{% set field_id = id or "field-" + name %}
+{% set error_id = field_id + "-error" %}
+<div class="flex flex-col gap-1">
+  <label for="{{ field_id }}" class="font-body text-sm font-medium text-ink dark:text-paper">
+    {{ label }}{% if required %} <span aria-hidden="true" class="text-flame">*</span>{% endif %}
+  </label>
+  <input
+    id="{{ field_id }}"
+    name="{{ name }}"
+    type="{{ type }}"
+    value="{{ value }}"
+    placeholder="{{ placeholder }}"
+    {% if required %}required{% endif %}
+    {% if minlength %}minlength="{{ minlength }}"{% endif %}
+    {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+    {% if error %}aria-invalid="true" aria-describedby="{{ error_id }}"{% endif %}
+    class="rounded-md border bg-paper font-body text-ink placeholder:text-ink-2/60 dark:bg-ink-2 dark:text-paper dark:placeholder:text-paper-2/60 {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}border-ink-2/30 dark:border-paper/30{% endif %}"
+  />
+  {% if error %}
+  <p id="{{ error_id }}" role="alert" class="flex items-center gap-1 font-body text-sm {{ INPUT_ERROR_MESSAGE_TEXT }}">
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
+      <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+    </svg>
+    {{ error }}
+  </p>
+  {% endif %}
+</div>
+{% endmacro %}

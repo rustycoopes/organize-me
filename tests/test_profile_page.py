@@ -26,8 +26,10 @@ async def test_profile_page_renders_current_values_for_logged_in_user(
 
     assert response.status_code == 200
     body = response.text
-    assert f'value="{email}"' in body
-    assert "input-bordered" in body
+    # design-refresh Slice 4: profile.html no longer renders a static value="..." attribute -
+    # the fields are Alpine x-model-bound to profile_data, seeded via the JSON blob in x-data.
+    assert f'&#34;email&#34;: &#34;{email}&#34;' in body
+    assert 'id="email"' in body
 
 
 async def test_profile_page_defaults_to_light_theme(client: AsyncClient) -> None:
@@ -67,5 +69,6 @@ async def test_profile_page_has_delete_confirmation_modal(client: AsyncClient) -
 
     assert response.status_code == 200
     body = response.text
-    assert 'class="modal"' in body
+    assert '<dialog' in body
+    assert 'x-ref="deleteModal"' in body
     assert "Delete permanently" in body

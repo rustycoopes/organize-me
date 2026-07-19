@@ -1,0 +1,15 @@
+{#
+  badge — small inline label, e.g. for status/category tags.
+
+  Usage:
+    {% from "components/badge.html" import badge %}
+    {{ badge("New", variant="primary") }}
+
+  Parameters
+    label   — visible badge text.
+    variant — "neutral" | "primary" | "secondary" | "success" (default "neutral").
+    density — "product" | "marketing" (default "product").
+#}
+{% macro badge(label, variant="neutral", density="product") %}
+<span class="inline-flex items-center rounded-full px-2 py-0.5 font-body font-medium {{ DENSITY_BADGE_TEXT[density] }} {{ BADGE_VARIANT_CLASSES[variant] }}">{{ label }}</span>
+{% endmacro %}

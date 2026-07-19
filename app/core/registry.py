@@ -14,12 +14,12 @@ deferred to per-request). This module is imported first (before any router modul
 `app/main.py` specifically so that side effect runs before `app_shell.py`'s import-time call.
 `tests/test_registry_wiring.py` asserts this ordering actually holds.
 
-`organizeme_chrome.registry` keeps its own compiled-in `APPS` literal, unchanged, as the
-transitional fallback `RegistrySource` for any consumer that hasn't migrated yet (doc-library,
-until its own Slice 2) - see docs/features/registry-decoupling/PRD.md "Rollout mechanics". The
-list below is a genuine data fork from that literal, not a re-export; once every consumer has
-migrated off the compiled-in fallback, a follow-up decommission slice deletes it from the package
-entirely, leaving this module as the sole place `APPS` is authored.
+Registry-decoupling Slice 3 (organize-me#220) deleted `organizeme_chrome.registry`'s transitional
+compiled-in `APPS` literal entirely, now that organize-me, event-creator, and doc-library are all
+confirmed on this runtime-authored model - see docs/features/registry-decoupling/PRD.md "Rollout
+mechanics". This module is now the sole place `APPS` is authored for the Host; every other
+consumer authors its own equivalent list in its own repo (e.g. event-creator's/doc-library's own
+`app/core/registry.py` `SELF_APP_ENTRY`).
 """
 
 from organizeme_chrome.registry import (

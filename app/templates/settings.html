@@ -1,5 +1,6 @@
 {% extends "chrome_authenticated_base.html" %}
 {% from "macros/chrome_tabs.html" import settings_tab_bar %}
+{% from "components/card_shell.html" import card_shell %}
 
 {% block title %}Settings — OrganizeMe{% endblock %}
 
@@ -12,11 +13,11 @@
 {% endblock %}
 
 {% block page %}
-<div class="flex justify-center">
-  <div class="card w-full max-w-lg bg-base-100 shadow-xl">
-    <div class="card-body" x-data="{ activeTab: '{{ settings_tabs[0].id if settings_tabs else '' }}' }">
-      <h1 class="card-title">Settings</h1>
+<div class="mx-auto flex max-w-2xl flex-col gap-6">
+  <h1 class="font-display text-2xl font-semibold text-ink dark:text-paper">Settings</h1>
 
+  {% call card_shell(density="product") %}
+    <div x-data="{ activeTab: '{{ settings_tabs[0].id if settings_tabs else '' }}' }">
       {# Tab list driven by the app-registry's settings_tabs (organizeme_chrome.registry) — R7
          moved Storage/Notifications/Preferences to the event-creator entry; the Host renders
          only this tab-bar chrome, no Event-Creator chrome code. #}
@@ -39,10 +40,11 @@
         hx-trigger="load"
         hx-swap="innerHTML"
       >
-        <span class="loading loading-spinner loading-sm"></span>
+        <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-ink-2/30 border-t-flame dark:border-paper/30 dark:border-t-flame" aria-hidden="true"></span>
+        <span class="sr-only">Loading…</span>
       </div>
       {% endfor %}
     </div>
-  </div>
+  {% endcall %}
 </div>
 {% endblock %}

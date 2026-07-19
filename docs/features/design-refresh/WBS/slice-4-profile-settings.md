@@ -57,4 +57,55 @@ the mechanism on the landing page; this slice is the first place a logged-in use
 - Existing E2E specs (`profile.spec.ts`, `account-deletion.spec.ts`, `sidebar.spec.ts`) stay the
   functional regression backstop.
 
-<!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+## Delivered (2026-07-18, issue #225, branch `feature/design-refresh-slice-4-profile-settings`)
+
+`app/templates/profile.html` and `app/templates/settings.html` rebuilt on the Slice 2 primitives
+(`card_shell`, `alert`, `status_dot`, plus hand-rolled markup using the exposed
+`FOCUS_RING`/`DENSITY_PADDING`/`BUTTON_VARIANT_CLASSES` globals for elements needing Alpine
+bindings the shared macros' fixed parameter lists can't express — the same idiom Slice 3's
+`login.html`/`register.html` already established). `macros/ui.html`'s `card_page()` macro is
+deleted; no remaining callers.
+
+Profile gained three distinct `card_shell` sections (Personal details / Appearance / Danger zone)
+instead of one flat card, per PRD story 11. The dark-mode toggle now pairs a plain-Tailwind
+checkbox with a `status_dot` reflecting Enabled/Disabled state, per PRD story 13's
+not-color-only requirement. Fixed a real (pre-existing, unrelated-to-scope-until-now) dark-mode
+bug along the way: `toggleDarkMode()` was still setting the pre-design-refresh
+`document.documentElement.dataset.theme`, which does nothing under the Slice-1 `dark:`-class
+strategy — it now toggles `classList` directly, matching `theme_attr()`'s server-rendered class.
+The delete-account confirmation is now a native `<dialog>` styled with a `[&::backdrop]:` arbitrary
+variant instead of DaisyUI's `.modal`.
+
+Diverged from the plan in one place: mid-review, `code-review-master` caught that the confirmation
+`<dialog>` had been placed as a sibling *after* the closing tag of the Alpine `x-data` root div
+rather than nested inside it — Alpine directives don't resolve across that boundary, so
+`x-ref="deleteModal"`, `$refs.deleteModal.close()`, and the confirm button's `deleteAccount()`
+call would have silently failed. Fixed before merge (dialog moved back inside the `x-data` scope)
+and reconfirmed via a template-render smoke test asserting the dialog is a structural descendant
+of the root div, since the DB-backed pytest suite and the live-QA Playwright suite can't run in
+this sandbox (no local Supabase/JWT secrets, per `docs/secrets-and-accounts.md`) — both run in CI
+on push instead. Also fixed a test that asserted the literal substring `"toggle"` never appears in
+the page, which would have failed on the correct, non-DaisyUI `toggleDarkMode()`/
+`dark-mode-toggle` identifiers; narrowed to check for the DaisyUI `class="toggle` attribute value
+instead.
+
+`code-quality-guardian`'s one actionable finding (the three profile form inputs shared one
+233-character class string copy-pasted verbatim) was applied — extracted to a single
+`field_input_classes` Jinja variable. Its other finding — no `"danger"` entry exists in
+`BUTTON_VARIANT_CLASSES`, so the destructive delete-confirmation button is styled identically to
+an ordinary primary action beyond an added warning icon — was filed as
+[#238](https://github.com/rustycoopes/organize-me/issues/238) (`modelsuggested`) rather than fixed
+here, since it's a shared-component-library gap spanning beyond this slice's two pages.
+
+`tests/test_card_macro.py`'s profile/settings section was rewritten (not fully retired — the auth-
+page parametrized tests from Slice 3 remain in the same file). `e2e/tests/profile.spec.ts` and
+`e2e/tests/account-deletion.spec.ts` selectors were updated for the removed DaisyUI classes
+(`input.toggle` → `#dark-mode-toggle`, `dialog button.btn-error` → `#confirm-delete-account-button`).
+
+CI's `pytest` job then caught a second gap the local review missed entirely: `tests/test_profile_page.py`
+(a file distinct from `test_card_macro.py`, not surfaced by the `card_page`-focused grep sweep done
+during implementation) pinned two more pieces of the old markup — a static `value="{{ email }}"`
+attribute (removed when the fields became purely Alpine `x-model`-bound) and DaisyUI's
+`class="modal"` on the delete-confirmation dialog. Fixed by asserting against the JSON blob in
+`x-data` (`&#34;email&#34;: &#34;...&#34;`) and the new `<dialog x-ref="deleteModal">` markup instead,
+each re-verified against a real template render before pushing.

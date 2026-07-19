@@ -1,112 +1,119 @@
+from collections.abc import Iterator
+
 import pytest
+from conftest import FakeRegistrySource
 
 from organizeme_chrome.registry import (
     AppEntry,
     AppNavItem,
+    SettingsTab,
     configure_registry_source,
     get_app,
     list_apps,
-    reset_to_default_registry_source,
+    reset_registry_source,
 )
 
 
-def test_list_apps_includes_organizeme_and_event_creator() -> None:
+@pytest.fixture(autouse=True)
+def _reset_source_after_each_test() -> Iterator[None]:
+    # Registry-decoupling Slice 3 (organize-me#220): there is no compiled-in default anymore, so
+    # every test in this file must configure its own source and this fixture guarantees no test
+    # leaks a configured source into the next one.
+    try:
+        yield
+    finally:
+        reset_registry_source()
+
+
+def _sample_apps() -> list[AppEntry]:
+    return [
+        AppEntry(
+            service_name="organizeme",
+            nav=[AppNavItem("/settings", "Settings"), AppNavItem("/profile", "Profile")],
+            settings_tabs=[],
+        ),
+        AppEntry(
+            service_name="event-creator",
+            nav=[AppNavItem("/dashboard", "Dashboard")],
+            settings_tabs=[SettingsTab("storage", "Storage")],
+            api_prefixes=["/api/v1/events"],
+        ),
+        AppEntry(
+            service_name="doc-library",
+            nav=[AppNavItem("/doc-library", "Doc Library")],
+            settings_tabs=[],
+            api_prefixes=["/api/v1/doc-links", "/doc-library/fragments"],
+        ),
+    ]
+
+
+def test_list_apps_reads_the_configured_source() -> None:
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
+
     service_names = [app.service_name for app in list_apps()]
 
-    assert "organizeme" in service_names
-    assert "event-creator" in service_names
-    assert "doc-library" in service_names
-
-
-def test_get_app_doc_library_owns_its_own_nav_and_api_prefixes() -> None:
-    # Slice 2 (issue #2): a brand-new hosted app, not a migration off the Host.
-    app = get_app("doc-library")
-
-    assert [item.path for item in app.nav] == ["/doc-library"]
-    assert [item.label for item in app.nav] == ["Doc Library"]
-    assert app.settings_tabs == []
-    assert app.api_prefixes == ["/api/v1/doc-links", "/doc-library/fragments"]
+    assert service_names == ["organizeme", "event-creator", "doc-library"]
 
 
 def test_get_app_returns_the_matching_entry() -> None:
-    app = get_app("organizeme")
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
 
-    assert app.service_name == "organizeme"
-    # R11 (QA cutover, #166): Upload/Processing/Logs/Prompt moved to "event-creator" below - the
-    # Host now owns only its own auth-adjacent pages.
-    assert [item.path for item in app.nav] == [
-        "/settings",
-        "/profile",
-    ]
-    # R7: Storage/Notifications/Preferences moved to "event-creator" — the Host still renders the
-    # Settings shell but no longer owns any tab's content.
-    assert app.settings_tabs == []
-    assert app.api_prefixes == []
+    app = get_app("doc-library")
 
-
-def test_get_app_event_creator_owns_dashboard_and_r11_migrated_pages() -> None:
-    # R6: /dashboard is served by the independent event-creator service, not the Host. R11:
-    # Upload/Processing/Logs/Prompt join it, completing the parity slices' (R7-R9) routing cutover.
-    app = get_app("event-creator")
-
-    assert [item.path for item in app.nav] == [
-        "/dashboard",
-        "/upload",
-        "/processing",
-        "/logs",
-        "/prompt",
-    ]
-
-
-def test_get_app_event_creator_owns_settings_tabs_and_api_prefixes() -> None:
-    # R7: storage-connection + settings functionality migrated into Event Creator. R11: the
-    # Upload/Processing/Logs/Prompt route surface's own API/fragment paths join the same list.
-    app = get_app("event-creator")
-
-    assert [tab.id for tab in app.settings_tabs] == ["storage", "notifications", "preferences"]
-    assert [tab.label for tab in app.settings_tabs] == ["Storage", "Notifications", "Preferences"]
-    assert app.api_prefixes == [
-        "/api/v1/storage-config",
-        "/api/v1/user-settings",
-        "/settings/event-creator",
-        "/api/v1/events",
-        "/api/v1/llm-prompt",
-        "/api/v1/upload",
-        "/api/v1/import-pending-files",
-        "/api/v1/processing-runs",
-        "/processing-runs",
-        "/api/html/processing-runs",
-    ]
+    assert app.service_name == "doc-library"
+    assert [item.path for item in app.nav] == ["/doc-library"]
+    assert app.api_prefixes == ["/api/v1/doc-links", "/doc-library/fragments"]
 
 
 def test_get_app_raises_for_unknown_service() -> None:
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
+
     with pytest.raises(KeyError):
         get_app("does-not-exist")
 
 
-class _FakeSource:
-    def __init__(self, apps: list[AppEntry]) -> None:
-        self._apps = apps
-
-    def get_apps(self) -> list[AppEntry]:
-        return self._apps
-
-
 def test_configure_registry_source_is_what_list_apps_and_get_app_actually_read() -> None:
-    # Registry-decoupling (organize-me#218): confirms the configured source, not the compiled-in
-    # APPS literal, is what a consumer that calls configure_registry_source() actually reads. The
-    # default source is restored in `finally` so every other test in this file (which relies on
-    # the untouched compiled-in fallback) isn't affected by this one's global mutation.
+    # Registry-decoupling (organize-me#218): confirms the configured source, not some other
+    # global state, is what a consumer reads.
     fake_app = AppEntry(
         service_name="fake-app",
         nav=[AppNavItem("/fake", "Fake")],
         settings_tabs=[],
     )
-    configure_registry_source(_FakeSource([fake_app]))
-    try:
-        assert [app.service_name for app in list_apps()] == ["fake-app"]
-        assert get_app("fake-app") is fake_app
-        with pytest.raises(KeyError):
-            get_app("organizeme")
-    finally:
-        reset_to_default_registry_source()
+    configure_registry_source(FakeRegistrySource([fake_app]))
+
+    assert [app.service_name for app in list_apps()] == ["fake-app"]
+    assert get_app("fake-app") is fake_app
+
+
+def test_list_apps_raises_before_any_source_is_configured() -> None:
+    # Registry-decoupling Slice 3 (organize-me#220): a genuine behavior change - Slices 1-2 relied
+    # on the now-deleted compiled-in fallback masking this case entirely.
+    with pytest.raises(RuntimeError, match="not configured"):
+        list_apps()
+
+
+def test_get_app_raises_before_any_source_is_configured() -> None:
+    with pytest.raises(RuntimeError, match="not configured"):
+        get_app("organizeme")
+
+
+def test_reset_registry_source_clears_a_previously_configured_source() -> None:
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
+    assert list_apps() != []
+
+    reset_registry_source()
+
+    with pytest.raises(RuntimeError, match="not configured"):
+        list_apps()
+
+
+def test_configure_registry_source_called_twice_fully_replaces_the_first_source() -> None:
+    # Now that there's no compiled-in fallback to catch a stray leftover source, a second
+    # configure_registry_source() call must win outright, not merge with or defer to the first.
+    configure_registry_source(FakeRegistrySource(_sample_apps()))
+
+    other_app = AppEntry(service_name="other-app", nav=[], settings_tabs=[])
+    configure_registry_source(FakeRegistrySource([other_app]))
+
+    assert [app.service_name for app in list_apps()] == ["other-app"]
