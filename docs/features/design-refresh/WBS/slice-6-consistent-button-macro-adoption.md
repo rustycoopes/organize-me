@@ -53,12 +53,12 @@ missed for so long elsewhere in this codebase.
 
 ## Acceptance criteria
 
-- [ ] Zero occurrences of `BUTTON_VARIANT_CLASSES[`/`DENSITY_PADDING[` (or equivalent hand-assembly
+- [x] Zero occurrences of `BUTTON_VARIANT_CLASSES[`/`DENSITY_PADDING[` (or equivalent hand-assembly
       of macro internals) in `app/templates/**` outside of pages that have a genuine, documented
       reason the macro can't yet express (none expected after this slice).
-- [ ] `login.html`, `register.html`, `profile.html` render identically (visually and behaviorally —
+- [x] `login.html`, `register.html`, `profile.html` render identically (visually and behaviorally —
       submitting state, disabled state, spinner-swap text) to before the conversion.
-- [ ] No regression in `auth.spec.ts`, `profile.spec.ts`, or `account-deletion.spec.ts`.
+- [x] No regression in `auth.spec.ts`, `profile.spec.ts`, or `account-deletion.spec.ts`.
 
 ## Testing
 
@@ -68,3 +68,47 @@ missed for so long elsewhere in this codebase.
   `x_bind_disabled`/`x_bind_class`/`attrs` parameters.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-19, issue #241, branch `feature/slice-6-button-input-macro-adoption`)
+
+- `packages/chrome/src/organizeme_chrome/templates/components/button.html` (`button` macro)
+  extended with: `x_bind_disabled` (Alpine `:disabled`), `x_bind_class` (Alpine `:class`, now
+  auto-derived from `x_bind_disabled` as `{ 'opacity-50 cursor-not-allowed': <expr> }` unless a
+  caller sets it explicitly — removes four copy-pasted occurrences of that literal string across
+  the converted templates), `attrs` (free-form escape hatch for one-off attributes like `@click`),
+  `class_` (extra classes), and `{% call %}`-block support so rich content (icons, multiple
+  `x-show` spans for spinner-swap text) no longer requires a plain-string `label`. A new `"danger"`
+  variant was added to `BUTTON_VARIANT_CLASSES` (`design/classes.py`) for the outline-red
+  "Delete account" trigger button, which didn't fit any existing variant.
+- `input.html` (`input` macro) gained the same `attrs` escape hatch (for `profile.html`'s
+  `x-model` bindings) and a `class_` param, added for parity with `button`/`alert`'s existing
+  convention even though no current caller needs it yet.
+- `login.html`'s submit button and Google sign-in link, `register.html`'s submit button and
+  Google sign-in link, and `profile.html`'s save/delete-trigger/cancel/confirm-delete buttons and
+  name/email/phone inputs all now call the shared macros. `profile.html`'s local
+  `field_input_classes` Jinja variable was removed.
+- Full audit (`grep -rn "BUTTON_VARIANT_CLASSES\[" app/templates`, same for `DENSITY_PADDING['`)
+  confirms these three files were the only hand-rolled call sites in the Host — nothing else
+  needed conversion.
+- **Diverged from the plan / caught in review**: the initial pass rendered `attrs`, `x_bind_disabled`,
+  and `x_bind_class` without `| safe`. Under the chrome test harness's plain `Environment()` (no
+  autoescape) this looked correct, but the Host's real environment
+  (`app/core/templating.py`'s `Jinja2Templates` → `select_autoescape()`) HTML-entity-escapes
+  unmarked interpolations — which would have silently broken `profile.html`'s `x-model` bindings
+  and all of its `@click` handlers in production despite every macro test passing. Caught by
+  code-review-master's review pass (independently verified by rendering through the real
+  `select_autoescape()` path before fixing), not by the test suite itself — the chrome test
+  harness's `_env()` now uses `autoescape=True` to match production and prevent a repeat.
+  All of these params are developer-authored template literals, never user input, so `| safe` is
+  the correct fix rather than a workaround.
+- `packages/chrome` bumped `0.11.1` → `0.12.1` (tags `chrome-v0.12.0`, `chrome-v0.12.1` — the
+  latter is the autoescape fix); root `pyproject.toml`/`uv.lock` repinned to `chrome-v0.12.1`.
+- `packages/chrome`'s own suite (86 tests, includes 13 new/extended macro tests) and `mypy --strict`
+  are green. All three converted templates were rendered directly (bypassing the DB-dependent app
+  test fixtures, which need Supabase QA credentials not available in this environment — same
+  pre-existing gap noted in slice-5's delivery) through the real `select_autoescape()` path to
+  confirm ids, `x-model` wiring, `@click` handlers, and Alpine `:class`/`:disabled` bindings all
+  survive unbroken. Root app's DB-dependent `pytest` suite (`test_auth.py`, `test_profile_page.py`,
+  etc.) could not be exercised locally for the same reason; CI runs them against the real QA
+  Supabase instance.
+
