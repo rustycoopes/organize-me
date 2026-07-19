@@ -25,7 +25,7 @@ test.describe('Profile', () => {
     await expect(page.locator('html')).toHaveClass('');
 
     // Toggling fires a PATCH to /users/me; wait for it so the reload reflects saved state.
-    const darkToggle = page.locator('input.toggle[type="checkbox"]');
+    const darkToggle = page.locator('#dark-mode-toggle');
     const savePatch = page.waitForResponse(
       (r) => r.url().includes('/api/v1/users/me') && r.request().method() === 'PATCH',
     );
@@ -35,6 +35,6 @@ test.describe('Profile', () => {
     // On reload the server renders class="dark" from the persisted dark_mode flag.
     await page.reload();
     await expect(page.locator('html')).toHaveClass('dark');
-    await expect(page.locator('input.toggle[type="checkbox"]')).toBeChecked();
+    await expect(page.locator('#dark-mode-toggle')).toBeChecked();
   });
 });

@@ -1,7 +1,7 @@
-"""Regression tests for the shared card/card-body page shell.
+"""Regression tests for the shared card_shell-based page shell.
 
-These tests pin the rendered structure produced by the card_page (profile) and card_shell
-(auth pages, design-refresh) Jinja macros so that any future refactor of the macro or the
+These tests pin the rendered structure produced by the card_shell (auth pages, profile,
+settings — design-refresh) Jinja macro so that any future refactor of the macro or the
 templates that use it is caught immediately rather than only in E2E.
 """
 import uuid
@@ -77,36 +77,53 @@ async def test_auth_pages_use_marketing_density_card_padding(client: AsyncClient
         assert "p-6" in response.text  # DENSITY_CARD_PADDING["marketing"]
 
 
-# ---------------------------------------------------------------------------
-# Profile page (requires authentication)
-# ---------------------------------------------------------------------------
-
-
-async def test_profile_page_has_card_wrapper(client: AsyncClient) -> None:
+async def register_and_login(client: AsyncClient) -> None:
     email = unique_email()
     password = "correct-horse-battery"
     await client.post("/api/v1/auth/register", data={"email": email, "password": password})
     await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+
+
+# ---------------------------------------------------------------------------
+# Profile page (requires authentication, design-refresh Slice 4: rebuilt on card_shell)
+# ---------------------------------------------------------------------------
+
+
+async def test_profile_page_has_multiple_card_sections(client: AsyncClient) -> None:
+    """Profile shows real visual hierarchy - several distinct card_shell sections, not one
+    flat card of inputs."""
+    await register_and_login(client)
 
     response = await client.get("/profile")
 
     assert response.status_code == 200
     body = response.text
-    assert "card-body" in body
     assert ">Your profile</h1>" in body
+    assert ">Personal details</h2>" in body
+    assert ">Appearance</h2>" in body
+    assert ">Danger zone</h2>" in body
 
 
-async def test_profile_page_card_has_wide_max_width(client: AsyncClient) -> None:
-    """Profile card uses max-w-lg (wider than the auth pages' max-w-sm)."""
-    email = unique_email()
-    password = "correct-horse-battery"
-    await client.post("/api/v1/auth/register", data={"email": email, "password": password})
-    await client.post("/api/v1/auth/login", data={"email": email, "password": password})
+async def test_profile_page_has_no_daisyui_classes(client: AsyncClient) -> None:
+    await register_and_login(client)
 
     response = await client.get("/profile")
 
     assert response.status_code == 200
-    assert "max-w-lg" in response.text
+    body = response.text
+    assert "card_page" not in body
+    assert 'class="toggle' not in body  # DaisyUI's toggle class; "toggleDarkMode"/"dark-mode-toggle" legitimately contain the substring
+    for token in ["card-body", "card-title", "btn-primary", "btn-error", "input-bordered", "alert-error", "modal-box"]:
+        assert token not in body, f"/profile still contains DaisyUI class {token!r}"
+
+
+async def test_profile_dark_mode_toggle_has_no_daisyui_class(client: AsyncClient) -> None:
+    await register_and_login(client)
+
+    response = await client.get("/profile")
+
+    assert response.status_code == 200
+    assert 'id="dark-mode-toggle"' in response.text
 
 
 async def test_login_page_card_uses_standard_max_width(client: AsyncClient) -> None:
@@ -115,3 +132,30 @@ async def test_login_page_card_uses_standard_max_width(client: AsyncClient) -> N
 
     assert response.status_code == 200
     assert "max-w-sm" in response.text
+
+
+# ---------------------------------------------------------------------------
+# Settings page (requires authentication, design-refresh Slice 4: rebuilt on card_shell)
+# ---------------------------------------------------------------------------
+
+
+async def test_settings_page_has_card_shell_wrapper(client: AsyncClient) -> None:
+    await register_and_login(client)
+
+    response = await client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.text
+    assert ">Settings</h1>" in body
+    assert "card_page" not in body
+    for token in ["card-body", "card-title", "loading-spinner"]:
+        assert token not in body, f"/settings still contains DaisyUI class {token!r}"
+
+
+async def test_settings_tab_bar_still_renders(client: AsyncClient) -> None:
+    await register_and_login(client)
+
+    response = await client.get("/settings")
+
+    assert response.status_code == 200
+    assert 'role="tablist"' in response.text

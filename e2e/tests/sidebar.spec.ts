@@ -39,9 +39,9 @@ test.describe('Sidebar navigation', () => {
     await registerNewUser(page, 'sidebar-design');
 
     // design-refresh Slice 2 restyled only the chrome shell (sidebar/header/tab-bar) onto plain
-    // Tailwind + design tokens - page *content* (e.g. /profile's card_page()-based layout) is a
-    // later slice's concern and still legitimately uses DaisyUI today, so this check is scoped to
-    // the shell elements this slice actually touched, not the whole page.
+    // Tailwind + design tokens - page *content* was a later slice's concern (now also migrated,
+    // see Slice 4), so this check is scoped to the shell elements this slice actually touched,
+    // not the whole page.
     const daisyUiTokens = [
       'drawer',
       'drawer-toggle',

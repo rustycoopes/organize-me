@@ -1,5 +1,7 @@
 {% extends "chrome_authenticated_base.html" %}
-{% from "macros/ui.html" import card_page %}
+{% from "components/card_shell.html" import card_shell %}
+{% from "components/alert.html" import alert %}
+{% from "components/status_dot.html" import status_dot %}
 
 {% block title %}Your profile — OrganizeMe{% endblock %}
 
@@ -38,7 +40,7 @@
       }
     },
     async toggleDarkMode() {
-      document.documentElement.dataset.theme = this.dark_mode ? "dark" : "corporate";
+      document.documentElement.classList.toggle("dark", this.dark_mode);
       try {
         await fetch("/api/v1/users/me", {
           method: "PATCH",
@@ -64,107 +66,132 @@
       }
     },
   }'
+  class="mx-auto flex max-w-2xl flex-col gap-6"
 >
-{% call card_page("Your profile", max_width="max-w-lg", outer_classes="flex justify-center") %}
+  <h1 class="font-display text-2xl font-semibold text-ink dark:text-paper">Your profile</h1>
 
-      <div role="alert" class="alert alert-success mt-2" x-show="success" x-cloak>
-        <span>Changes saved.</span>
-      </div>
-      <div role="alert" class="alert alert-error mt-2" x-show="error" x-cloak>
-        <span x-text="error"></span>
-      </div>
+  {{ alert(variant="info", x_show="success", x_text="'Changes saved.'", class_="-mt-2") }}
+  {{ alert(variant="danger", x_show="error", class_="-mt-2") }}
 
-      <form class="flex flex-col gap-4 mt-2" @submit.prevent="save">
-        <label class="form-control w-full">
-          <div class="label"><span class="label-text">Name</span></div>
-          <input
-            type="text"
-            name="name"
-            id="name"
-            x-model="name"
-            value="{{ profile_data.name }}"
-            placeholder="Your name"
-            class="input input-bordered w-full"
-          />
-        </label>
-
-        <label class="form-control w-full">
-          <div class="label"><span class="label-text">Email</span></div>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            x-model="email"
-            required
-            autocomplete="email"
-            value="{{ profile_data.email }}"
-            placeholder="you@example.com"
-            class="input input-bordered w-full"
-          />
-        </label>
-
-        <label class="form-control w-full">
-          <div class="label"><span class="label-text">Phone number</span></div>
-          <input
-            type="tel"
-            name="phone_number"
-            id="phone_number"
-            x-model="phone_number"
-            value="{{ profile_data.phone_number }}"
-            placeholder="+1 555 555 5555"
-            class="input input-bordered w-full"
-          />
-        </label>
-
-        <button type="submit" class="btn btn-primary mt-2" :disabled="saving">
-          <span x-show="!saving">Save changes</span>
-          <span x-show="saving" x-cloak>Saving...</span>
-        </button>
-      </form>
-
-      <div class="divider"></div>
-
-      <div class="form-control">
-        <label class="label cursor-pointer justify-start gap-4">
-          <input
-            type="checkbox"
-            class="toggle"
-            x-model="dark_mode"
-            @change="toggleDarkMode"
-          />
-          <span class="label-text">Dark mode</span>
-        </label>
+  {% set field_input_classes = "rounded-md border border-ink-2/30 bg-paper font-body text-ink placeholder:text-ink-2/60 dark:border-paper/30 dark:bg-ink-2 dark:text-paper dark:placeholder:text-paper-2/60 " + FOCUS_RING + " " + DENSITY_PADDING['product'] %}
+  {% call card_shell(title="Personal details", density="product") %}
+    <form class="flex flex-col gap-4" @submit.prevent="save">
+      <div class="flex flex-col gap-1">
+        <label for="name" class="font-body text-sm font-medium text-ink dark:text-paper">Name</label>
+        <input
+          type="text"
+          name="name"
+          id="name"
+          x-model="name"
+          placeholder="Your name"
+          class="{{ field_input_classes }}"
+        />
       </div>
 
-      <div class="divider"></div>
+      <div class="flex flex-col gap-1">
+        <label for="email" class="font-body text-sm font-medium text-ink dark:text-paper">
+          Email <span aria-hidden="true" class="text-flame">*</span>
+        </label>
+        <input
+          type="email"
+          name="email"
+          id="email"
+          x-model="email"
+          required
+          autocomplete="email"
+          placeholder="you@example.com"
+          class="{{ field_input_classes }}"
+        />
+      </div>
 
+      <div class="flex flex-col gap-1">
+        <label for="phone_number" class="font-body text-sm font-medium text-ink dark:text-paper">Phone number</label>
+        <input
+          type="tel"
+          name="phone_number"
+          id="phone_number"
+          x-model="phone_number"
+          placeholder="+1 555 555 5555"
+          class="{{ field_input_classes }}"
+        />
+      </div>
+
+      <button
+        type="submit"
+        :disabled="saving"
+        class="inline-flex items-center justify-center gap-2 self-start rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['primary'] }}"
+        :class="{ 'opacity-50 cursor-not-allowed': saving }"
+      >
+        <span x-show="!saving">Save changes</span>
+        <span x-show="saving" x-cloak>Saving...</span>
+      </button>
+    </form>
+  {% endcall %}
+
+  {% call card_shell(title="Appearance", density="product") %}
+    <div class="flex items-center justify-between">
       <div>
-        <button type="button" class="btn btn-error btn-outline" @click="$refs.deleteModal.showModal()">
-          Delete account
-        </button>
+        <label for="dark-mode-toggle" class="cursor-pointer font-body text-sm font-medium text-ink dark:text-paper">Dark mode</label>
+        <p class="font-body text-sm text-ink-2 dark:text-paper-2">Use a dark color scheme across OrganizeMe.</p>
       </div>
-
-{% endcall %}
-
-  <dialog class="modal" x-ref="deleteModal">
-    <div class="modal-box">
-      <h3 class="text-lg font-bold">Delete your account?</h3>
-      <p class="py-4">
-        This will permanently delete your account and all associated data. This action is
-        irreversible and cannot be undone.
-      </p>
-      <div class="modal-action">
-        <button type="button" class="btn" @click="$refs.deleteModal.close()">Cancel</button>
-        <button
-          type="button"
-          class="btn btn-error"
-          :disabled="deleting"
-          @click="deleteAccount"
-        >
-          <span x-show="!deleting">Delete permanently</span>
-          <span x-show="deleting" x-cloak>Deleting...</span>
-        </button>
+      <div class="flex items-center gap-3">
+        <span x-show="dark_mode" x-cloak>{{ status_dot("success", label="Enabled") }}</span>
+        <span x-show="!dark_mode" x-cloak>{{ status_dot("neutral", label="Disabled") }}</span>
+        <input
+          type="checkbox"
+          id="dark-mode-toggle"
+          x-model="dark_mode"
+          @change="toggleDarkMode"
+          class="relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-mist transition-colors before:absolute before:left-1 before:top-1 before:h-4 before:w-4 before:rounded-full before:bg-paper before:transition-transform checked:bg-flame checked:before:translate-x-5 dark:bg-ink-2 {{ FOCUS_RING }}"
+        />
       </div>
+    </div>
+  {% endcall %}
+
+  {% call card_shell(title="Danger zone", density="product") %}
+    <p class="mb-3 font-body text-sm text-ink-2 dark:text-paper-2">
+      Deleting your account permanently removes it and all associated data. This cannot be undone.
+    </p>
+    <button
+      type="button"
+      class="inline-flex items-center justify-center gap-2 rounded-md border border-flame font-body font-medium text-flame transition-colors hover:bg-flame-tint dark:hover:bg-flame/10 {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }}"
+      @click="$refs.deleteModal.showModal()"
+    >
+      Delete account
+    </button>
+  {% endcall %}
+
+  <dialog
+    x-ref="deleteModal"
+    class="rounded-lg border border-ink-2/10 bg-paper p-6 shadow-xl dark:border-paper/10 dark:bg-ink-2 [&::backdrop]:bg-ink/40 dark:[&::backdrop]:bg-ink/60"
+  >
+    <h3 class="font-display text-lg font-semibold text-ink dark:text-paper">Delete your account?</h3>
+    <p class="mt-2 max-w-sm font-body text-sm text-ink-2 dark:text-paper-2">
+      This will permanently delete your account and all associated data. This action is
+      irreversible and cannot be undone.
+    </p>
+    <div class="mt-4 flex justify-end gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['ghost'] }}"
+        @click="$refs.deleteModal.close()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        id="confirm-delete-account-button"
+        :disabled="deleting"
+        class="inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors {{ FOCUS_RING }} {{ DENSITY_PADDING['product'] }} {{ BUTTON_VARIANT_CLASSES['primary'] }}"
+        :class="{ 'opacity-50 cursor-not-allowed': deleting }"
+        @click="deleteAccount"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+        </svg>
+        <span x-show="!deleting">Delete permanently</span>
+        <span x-show="deleting" x-cloak>Deleting...</span>
+      </button>
     </div>
   </dialog>
 </div>

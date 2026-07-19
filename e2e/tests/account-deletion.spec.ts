@@ -12,9 +12,9 @@ test.describe('Account deletion', () => {
 
     // Open the confirmation modal (an HTML <dialog>, not a blocking browser confirm) and confirm.
     // "Delete account" is plain-text; the confirm button wraps its label in x-show spans, so
-    // target it by class within the dialog.
+    // target it by id within the dialog.
     await page.getByRole('button', { name: 'Delete account' }).click();
-    await page.locator('dialog button.btn-error').click();
+    await page.locator('#confirm-delete-account-button').click();
 
     // Deletion redirects to /login...
     await expect(page).toHaveURL(/\/login$/);
