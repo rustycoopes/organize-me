@@ -7,21 +7,36 @@
     {{ button("Save", type="submit") }}
     {{ button("Docs", href="/docs", variant="ghost", density="marketing") }}
 
+    Rich content (icons, spinner-swap text) uses a {% call %} block instead of the label arg:
+    {% call button(type="submit", x_bind_disabled="submitting", x_bind_class="{ 'opacity-50 cursor-not-allowed': submitting }") %}
+      <span x-show="!submitting">Save</span>
+      <span x-show="submitting" x-cloak>Saving...</span>
+    {% endcall %}
+
   Parameters
-    label     — visible button text.
-    href      — if set, renders an <a> styled as a button instead of a <button>.
-    variant   — "primary" | "secondary" | "ghost" (default "primary").
-    density   — "product" | "marketing" (default "product") — see
-                docs/adr/design-refresh-shared-component-library.md for the density split.
-    type      — HTML button type, ignored when href is set (default "button").
-    disabled  — disables a <button>; ignored for <a>, which has no native disabled state.
-    id        — optional element id.
+    label            — visible button text; omit (leave None) and use {% call %} instead for
+                       content the label string can't express (icons, multiple x-show spans).
+    href             — if set, renders an <a> styled as a button instead of a <button>.
+    variant          — "primary" | "secondary" | "ghost" | "danger" (default "primary").
+    density          — "product" | "marketing" (default "product") — see
+                       docs/adr/design-refresh-shared-component-library.md for the density split.
+    type             — HTML button type, ignored when href is set (default "button").
+    disabled         — disables a <button>; ignored for <a>, which has no native disabled state.
+    id               — optional element id.
+    x_bind_disabled  — Alpine `:disabled` expression (e.g. "submitting"), for buttons whose
+                       disabled state is reactive rather than server-rendered.
+    x_bind_class     — Alpine `:class` expression (e.g.
+                       "{ 'opacity-50 cursor-not-allowed': saving }"), for the submitting/saving
+                       spinner-swap pattern.
+    attrs            — free-form string of extra attributes (e.g. '@click="doThing"'), an escape
+                       hatch for one-off cases the macro doesn't otherwise model.
+    class_           — extra classes appended to the button/anchor (e.g. "w-full").
 #}
-{% macro button(label, href=None, variant="primary", density="product", type="button", disabled=False, id=None) %}
-{% set classes = "inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors " + FOCUS_RING + " " + DENSITY_PADDING[density] + " " + BUTTON_VARIANT_CLASSES[variant] %}
+{% macro button(label=None, href=None, variant="primary", density="product", type="button", disabled=False, id=None, x_bind_disabled=None, x_bind_class=None, attrs=None, class_="") %}
+{% set classes = "inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors " + FOCUS_RING + " " + DENSITY_PADDING[density] + " " + BUTTON_VARIANT_CLASSES[variant] + " " + class_ %}
 {% if href %}
-<a{% if id %} id="{{ id }}"{% endif %} href="{{ href }}" class="{{ classes }}">{{ label }}</a>
+<a{% if id %} id="{{ id }}"{% endif %} href="{{ href }}" class="{{ classes }}"{% if attrs %} {{ attrs }}{% endif %}>{% if label %}{{ label }}{% endif %}{% if caller %}{{ caller() }}{% endif %}</a>
 {% else %}
-<button{% if id %} id="{{ id }}"{% endif %} type="{{ type }}" class="{{ classes }}{% if disabled %} opacity-50 cursor-not-allowed{% endif %}"{% if disabled %} disabled{% endif %}>{{ label }}</button>
+<button{% if id %} id="{{ id }}"{% endif %} type="{{ type }}" class="{{ classes }}{% if disabled %} opacity-50 cursor-not-allowed{% endif %}"{% if disabled %} disabled{% endif %}{% if x_bind_disabled %} :disabled="{{ x_bind_disabled }}"{% endif %}{% if x_bind_class %} :class="{{ x_bind_class }}"{% endif %}{% if attrs %} {{ attrs }}{% endif %}>{% if label %}{{ label }}{% endif %}{% if caller %}{{ caller() }}{% endif %}</button>
 {% endif %}
 {% endmacro %}

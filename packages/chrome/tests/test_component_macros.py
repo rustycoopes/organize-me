@@ -68,6 +68,59 @@ def test_button_disabled_sets_native_attribute() -> None:
     assert "disabled" in html
 
 
+def test_button_danger_variant_uses_flame_outline() -> None:
+    html = _render(_env(), "components/button.html", "button", "Delete account", variant="danger")
+
+    assert "border-flame" in html
+    assert "text-flame" in html
+
+
+def test_button_x_bind_disabled_and_x_bind_class_render_alpine_bindings() -> None:
+    html = _render(
+        _env(),
+        "components/button.html",
+        "button",
+        "Save",
+        type="submit",
+        x_bind_disabled="submitting",
+        x_bind_class="{ 'opacity-50 cursor-not-allowed': submitting }",
+    )
+
+    assert ':disabled="submitting"' in html
+    assert ":class=\"{ 'opacity-50 cursor-not-allowed': submitting }\"" in html
+
+
+def test_button_attrs_passthrough_renders_free_form_attribute() -> None:
+    html = _render(
+        _env(), "components/button.html", "button", "Cancel", attrs='@click="doThing"'
+    )
+
+    assert '@click="doThing"' in html
+
+
+def test_button_class_appends_to_variant_classes() -> None:
+    html = _render(_env(), "components/button.html", "button", "Go", class_="w-full")
+
+    assert "w-full" in html
+    assert "bg-flame" in html  # still carries the primary variant's own classes
+
+
+def test_button_call_block_renders_rich_content_without_a_label() -> None:
+    env = _env()
+    button = getattr(env.get_template("components/button.html").module, "button")
+
+    html = str(
+        button(
+            type="submit",
+            x_bind_disabled="saving",
+            caller=lambda: Markup("<span>Save changes</span>"),
+        )
+    )
+
+    assert "<span>Save changes</span>" in html
+    assert "None" not in html
+
+
 def test_button_density_changes_padding_scale() -> None:
     product = _render(_env(), "components/button.html", "button", "Go", density="product")
     marketing = _render(_env(), "components/button.html", "button", "Go", density="marketing")
@@ -119,6 +172,14 @@ def test_input_renders_optional_minlength_and_autocomplete() -> None:
 
     assert 'minlength="8"' in html
     assert 'autocomplete="new-password"' in html
+
+
+def test_input_attrs_passthrough_renders_free_form_attribute() -> None:
+    html = _render(
+        _env(), "components/input.html", "input", "name", "Name", attrs='x-model="name"'
+    )
+
+    assert 'x-model="name"' in html
 
 
 def test_alert_static_message_uses_variant_classes_and_icon() -> None:
