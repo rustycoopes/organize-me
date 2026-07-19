@@ -20,6 +20,8 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-19 — event-creator#26 Adopt the shared OrganizeMe design system on the Dashboard and Processing pages — [details](https://github.com/rustycoopes/event-creator/pull/28)
+- 2026-07-19 — #244 Add alert success/neutral variants + table primitive classes (`organizeme_chrome`, chrome-v0.13.0) — unblocks event-creator#26 — [details](https://github.com/rustycoopes/organize-me/pull/244)
 - 2026-07-19 — #241 Slice 6: Consistent button/input macro adoption (design-refresh) — [details](features/design-refresh/WBS/slice-6-consistent-button-macro-adoption.md#delivered-2026-07-19-issue-241-branch-featureslice-6-button-input-macro-adoption)
 - 2026-07-19 — event-creator#25 Audit registry-client cold-start fallback for the same self-only-sidebar risk as doc-library#18 — verified-unaffected (event-creator declared `requests` since Slice 1, doc-library didn't) — [details](https://github.com/rustycoopes/event-creator/issues/25#issuecomment-5016582528)
 - 2026-07-19 — #240 Slice 5: Component contrast hardening + missing primitives (design-refresh) — [details](features/design-refresh/WBS/slice-5-component-contrast-hardening.md#delivered-2026-07-19-issue-240-branch-fixslice-5-component-contrast-hardening)
