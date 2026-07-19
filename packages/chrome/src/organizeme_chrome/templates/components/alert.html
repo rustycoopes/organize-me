@@ -12,7 +12,7 @@
 
   Parameters
     message  — static message text (escaped). Ignored when x_text is given.
-    variant  — "danger" | "info" (default "danger").
+    variant  — "danger" | "info" | "success" | "neutral" (default "danger").
     x_show   — optional Alpine expression controlling visibility (adds x-show + x-cloak).
     x_text   — optional Alpine expression for the message text (adds x-text); defaults to x_show's
                expression when x_show is given and x_text isn't set separately, since the common
@@ -29,9 +29,13 @@
   {% if x_show %}x-show="{{ x_show }}" x-cloak{% endif %}
   class="flex items-center gap-2 rounded-md border px-4 py-3 font-body text-sm {{ ALERT_VARIANT_CLASSES[variant] }} {{ class_ }}"
 >
-  {% if variant == "info" %}
+  {% if variant == "info" or variant == "neutral" %}
   <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
     <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.25v3.25a.75.75 0 0 0 1.5 0v-4A.75.75 0 0 0 10 9H9Z" clip-rule="evenodd" />
+  </svg>
+  {% elif variant == "success" %}
+  <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
   </svg>
   {% else %}
   <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0">
