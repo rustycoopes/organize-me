@@ -68,9 +68,12 @@ BUTTON_VARIANT_CLASSES: dict[str, str] = {
 }
 
 # page_header's pill background (event-creator's Dashboard heading blended into the data below
-# it) - reuses BADGE_VARIANT_CLASSES["neutral"]'s bg-mist/dark:bg-ink-2 tint rather than a new
-# color, just at pill/rounded-full shape and heading-scale padding instead of badge scale.
-PAGE_HEADER_WRAP_CLASSES = "inline-flex items-center rounded-full bg-mist px-4 py-1.5 dark:bg-ink-2"
+# it). Confirmed live on QA (organizeme.qa) that dark:bg-ink-2 here was literally invisible -
+# card_shell's own dark background is ALSO dark:bg-ink-2, so a 100%-opaque fill of the same token
+# painted on top of itself produces zero contrast (same class of bug as issue #240's ghost-button
+# fix). Uses that same alpha-blended-over-paper idiom instead, which contrasts regardless of the
+# surface it sits on.
+PAGE_HEADER_WRAP_CLASSES = "inline-flex items-center rounded-full bg-mist px-4 py-1.5 dark:bg-paper/10"
 PAGE_HEADER_TEXT_CLASSES = "font-display text-2xl font-semibold text-ink dark:text-paper"
 
 BADGE_VARIANT_CLASSES: dict[str, str] = {
@@ -106,9 +109,13 @@ TABLE_HEAD_CELL_CLASSES = "px-3 py-2 font-medium text-ink-2 dark:text-paper-2"
 TABLE_BODY_ROW_CLASSES = "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10"
 # Opt-in zebra striping - a separate constant rather than folding into TABLE_BODY_ROW_CLASSES since
 # not every table wants it; callers pick whichever fits (see event-creator's dashboard events
-# table, which asked for alternating rows to make dense data easier to scan).
+# table, which asked for alternating rows to make dense data easier to scan). dark:even:bg-ink-2/40
+# was confirmed live on QA to have zero visible effect: card_shell's own dark background is ALSO
+# dark:bg-ink-2, so blending that same color over itself at any opacity is a no-op (same bug as
+# page_header's pill, see its comment above) - dark:even:bg-paper/5 lightens instead, visible
+# regardless of the surface underneath.
 TABLE_BODY_ROW_ZEBRA_CLASSES = (
-    "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10 even:bg-mist/40 dark:even:bg-ink-2/40"
+    "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10 even:bg-mist/40 dark:even:bg-paper/5"
 )
 TABLE_BODY_CELL_CLASSES = "px-3 py-2 align-middle"
 
