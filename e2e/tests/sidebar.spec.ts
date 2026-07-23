@@ -26,8 +26,13 @@ test.describe('Sidebar navigation', () => {
     await expect(navLinks).toHaveText(EXPECTED_NAV);
 
     // Navigate to two different authenticated routes via the sidebar and confirm they render
-    // (rather than bouncing to /login).
-    await page.locator('#sidebar-nav').getByRole('link', { name: 'Dashboard' }).click();
+    // (rather than bouncing to /login). exact: true is required now that "HA Dashboard" also
+    // exists in the sidebar - Playwright's getByRole name matching is substring by default, so
+    // { name: 'Dashboard' } alone matches both links.
+    await page
+      .locator('#sidebar-nav')
+      .getByRole('link', { name: 'Dashboard', exact: true })
+      .click();
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
