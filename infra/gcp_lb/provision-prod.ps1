@@ -43,6 +43,10 @@ $DocLibraryRunService = "doc-library-prod"
 $DocLibraryNegName = "doc-library-prod-neg"
 $BackendDocLibrary = "doc-library-backend-prod"
 
+$HaDashboardRunService = "ha-dashboard-prod"
+$HaDashboardNegName = "ha-dashboard-prod-neg"
+$BackendHaDashboard = "ha-dashboard-backend-prod"
+
 $IpV4Name = "organizeme-prod-lb-ipv4"
 $IpV6Name = "organizeme-prod-lb-ipv6"
 $CertName = "organizeme-prod-cert"
@@ -90,7 +94,7 @@ if (-not (Test-GcloudResource @("compute", "ssl-certificates", "describe", $Cert
 }
 Write-Host "NOTE: cert stays PROVISIONING until the A/AAAA records above resolve and Google validates them (can take up to ~24h)."
 
-Write-Host "== 4. Serverless NEGs (organizeme-prod + event-creator-prod + doc-library-prod) =="
+Write-Host "== 4. Serverless NEGs (organizeme-prod + event-creator-prod + doc-library-prod + ha-dashboard-prod) =="
 if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $NegName, "--region=$Region"))) {
     gcloud compute network-endpoint-groups create $NegName `
         --region=$Region `
@@ -108,6 +112,12 @@ if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe"
         --region=$Region `
         --network-endpoint-type=serverless `
         --cloud-run-service=$DocLibraryRunService
+}
+if (-not (Test-GcloudResource @("compute", "network-endpoint-groups", "describe", $HaDashboardNegName, "--region=$Region"))) {
+    gcloud compute network-endpoint-groups create $HaDashboardNegName `
+        --region=$Region `
+        --network-endpoint-type=serverless `
+        --cloud-run-service=$HaDashboardRunService
 }
 
 Write-Host "== 5. Backend services =="
@@ -127,6 +137,11 @@ if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $Back
     gcloud compute backend-services create $BackendDocLibrary --global --load-balancing-scheme=EXTERNAL_MANAGED
     gcloud compute backend-services add-backend $BackendDocLibrary --global `
         --network-endpoint-group=$DocLibraryNegName --network-endpoint-group-region=$Region
+}
+if (-not (Test-GcloudResource @("compute", "backend-services", "describe", $BackendHaDashboard, "--global"))) {
+    gcloud compute backend-services create $BackendHaDashboard --global --load-balancing-scheme=EXTERNAL_MANAGED
+    gcloud compute backend-services add-backend $BackendHaDashboard --global `
+        --network-endpoint-group=$HaDashboardNegName --network-endpoint-group-region=$Region
 }
 
 Write-Host "== 6. URL map, generated from the R3 app-registry =="
@@ -161,6 +176,7 @@ Write-Host "Done. Once the cert shows ACTIVE (gcloud compute ssl-certificates de
 Write-Host "verify with: curl https://$ProdHost/login"
 Write-Host "verify Event Creator routing with: curl https://$ProdHost/dashboard"
 Write-Host "verify Doc Library routing with: curl https://$ProdHost/doc-library"
+Write-Host "verify HA Dashboard routing with: curl https://$ProdHost/ha-dashboard"
 Write-Host ""
 Write-Host "IMPORTANT: this only creates the prod domain — it does not redirect any existing traffic."
 Write-Host "GOOGLE_OAUTH_REDIRECT_URI / GOOGLE_DRIVE_REDIRECT_URI still point at the raw Cloud Run URLs"

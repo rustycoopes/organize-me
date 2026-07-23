@@ -156,7 +156,8 @@ rejected, and why the host URL specifically isn't encrypted) in the
 - `POST /settings/ha-dashboard/ha-dashboard` — upserts the requesting user's credential row
   (`user_id` from `current_user_id`) after independently re-validating.
 
-Registry entry (`organize-me`'s `packages/chrome/src/organizeme_chrome/registry.py`):
+Registry entry (`organize-me`'s `app/core/registry.py` `APPS` list — registry-decoupling moved
+this out of the versioned `organizeme_chrome` package; see `docs/how-to-add-a-hosted-app.md`):
 
 ```python
 AppEntry(

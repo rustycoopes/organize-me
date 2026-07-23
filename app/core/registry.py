@@ -76,6 +76,12 @@ APPS: list[AppEntry] = [
         settings_tabs=[],
         api_prefixes=["/api/v1/doc-links", "/doc-library/fragments"],
     ),
+    AppEntry(
+        service_name="ha-dashboard",
+        nav=[AppNavItem("/ha-dashboard", "HA Dashboard")],
+        settings_tabs=[SettingsTab("ha-dashboard", "HA Dashboard")],
+        api_prefixes=["/ha-dashboard/tiles", "/settings/ha-dashboard"],
+    ),
 ]
 
 
