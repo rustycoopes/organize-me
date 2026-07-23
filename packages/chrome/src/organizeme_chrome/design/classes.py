@@ -71,9 +71,11 @@ BUTTON_VARIANT_CLASSES: dict[str, str] = {
 # it). Confirmed live on QA (organizeme.qa) that dark:bg-ink-2 here was literally invisible -
 # card_shell's own dark background is ALSO dark:bg-ink-2, so a 100%-opaque fill of the same token
 # painted on top of itself produces zero contrast (same class of bug as issue #240's ghost-button
-# fix). Uses that same alpha-blended-over-paper idiom instead, which contrasts regardless of the
-# surface it sits on.
-PAGE_HEADER_WRAP_CLASSES = "inline-flex items-center rounded-full bg-mist px-4 py-1.5 dark:bg-paper/10"
+# fix). First fix used an alpha-blended-over-paper tint (dark:bg-paper/10), but that read as too
+# light against the paper-colored heading text sitting on top of it - swapped for a solid dark-ink
+# fill instead, which is darker than card_shell's own ink-2 background (clearly separated) and
+# gives paper-colored text maximum contrast.
+PAGE_HEADER_WRAP_CLASSES = "inline-flex items-center rounded-full bg-mist px-4 py-1.5 dark:bg-ink"
 PAGE_HEADER_TEXT_CLASSES = "font-display text-2xl font-semibold text-ink dark:text-paper"
 
 BADGE_VARIANT_CLASSES: dict[str, str] = {
@@ -104,7 +106,10 @@ ALERT_VARIANT_CLASSES: dict[str, str] = {
 # caller; these are raw class strings applied directly to <table>/<thead>/<tr>/<th>/<td>, the same
 # way FOCUS_RING/DENSITY_PADDING are consumed without a wrapping macro.
 TABLE_CLASSES = "w-full text-left font-body text-sm border-collapse"
-TABLE_HEAD_ROW_CLASSES = "border-b border-ink-2/30 bg-mist dark:border-paper-2/30 dark:bg-ink-2"
+# dark:bg-ink-2 used to match card_shell's own dark background exactly, so the header row read as
+# barely-there against the card. Solid dark:bg-ink (darker than the card) makes the header band
+# clearly distinct instead.
+TABLE_HEAD_ROW_CLASSES = "border-b border-ink-2/30 bg-mist dark:border-paper-2/30 dark:bg-ink"
 TABLE_HEAD_CELL_CLASSES = "px-3 py-2 font-medium text-ink-2 dark:text-paper-2"
 TABLE_BODY_ROW_CLASSES = "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10"
 # Opt-in zebra striping - a separate constant rather than folding into TABLE_BODY_ROW_CLASSES since

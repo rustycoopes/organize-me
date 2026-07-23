@@ -479,3 +479,11 @@ def test_toggle_wires_alpine_model_and_change() -> None:
 
     assert 'x-model="dark_mode"' in html
     assert '@change="toggleDarkMode"' in html
+
+
+def test_toggle_attrs_passthrough_renders_free_form_attribute() -> None:
+    html = _render(
+        _env(), "components/toggle.html", "toggle", "reviewed", attrs='aria-label="Reviewed"'
+    )
+
+    assert 'aria-label="Reviewed"' in html
