@@ -17,9 +17,14 @@
     error       — validation-error message; when set, the field renders in its error state
                   (flame border, `aria-invalid="true"`) with the message shown below it, tied to
                   the select via `aria-describedby`.
+    attrs       — free-form string of extra HTML (already-quoted attributes, e.g.
+                  'x-model="provider"'), an escape hatch for one-off cases the macro doesn't
+                  otherwise model, matching input.html/button.html/badge.html's own attrs param.
+                  Rendered unescaped (`| safe`) since call sites are developer-authored template
+                  literals, never user input.
 #}
 {% from "components/field_error.html" import field_error %}
-{% macro select(name, label, options, value="", id=None, density="product", required=False, error=None) %}
+{% macro select(name, label, options, value="", id=None, density="product", required=False, error=None, attrs=None) %}
 {% set field_id = id or "field-" + name %}
 {% set error_id = field_id + "-error" %}
 <div class="flex flex-col gap-1">
@@ -32,6 +37,7 @@
       name="{{ name }}"
       {% if required %}required{% endif %}
       {% if error %}aria-invalid="true" aria-describedby="{{ error_id }}"{% endif %}
+      {% if attrs %}{{ attrs | safe }}{% endif %}
       class="w-full appearance-none rounded-md border pr-8 {{ INPUT_DEFAULT_FILL }} font-body text-ink dark:text-paper {{ FOCUS_RING }} {{ DENSITY_PADDING[density] }} {% if error %}{{ INPUT_ERROR_BORDER }}{% else %}{{ INPUT_DEFAULT_BORDER }}{% endif %}"
     >
       {% for opt_value, opt_label in options %}

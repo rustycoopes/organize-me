@@ -399,6 +399,20 @@ def test_select_error_marks_field_invalid_and_renders_message() -> None:
     assert "border-flame" in html
 
 
+def test_select_attrs_passthrough_renders_free_form_attribute() -> None:
+    html = _render(
+        _env(),
+        "components/select.html",
+        "select",
+        "provider",
+        "Provider",
+        options=[("google_drive", "Google Drive")],
+        attrs='x-model="provider"',
+    )
+
+    assert 'x-model="provider"' in html
+
+
 def test_toggle_renders_checkbox_with_derived_id() -> None:
     html = _render(_env(), "components/toggle.html", "toggle", "notifications")
 
