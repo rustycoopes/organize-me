@@ -47,7 +47,7 @@ def check_issue_closed(issue_number: int, repo: str = "organize-me") -> bool:
         )
         if result.returncode == 0:
             data = json.loads(result.stdout)
-            return data.get("state") == "CLOSED"
+            return data.get("state") == "Done"
     except Exception as e:
         print(f"Warning: Could not check issue status: {e}")
     return False
