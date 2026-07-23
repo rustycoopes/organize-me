@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { registerNewUser } from '../utils/helpers';
 
-// Documented sidebar order from packages/chrome (organizeme_chrome.registry).
+// Documented sidebar order from app/core/registry.py's APPS list (registry-decoupling moved this
+// out of packages/chrome - see that module's docstring). Grouped apps render in APPS order;
+// "organizeme"'s own nav (Settings, Profile) is flat and always renders last.
 const EXPECTED_NAV = [
   'Dashboard',
   'Upload',
@@ -9,6 +11,7 @@ const EXPECTED_NAV = [
   'Logs',
   'Prompt',
   'Doc Library',
+  'HA Dashboard',
   'Settings',
   'Profile',
 ];
