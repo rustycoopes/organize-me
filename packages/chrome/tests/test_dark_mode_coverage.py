@@ -3,8 +3,11 @@ from organizeme_chrome.design import (
     BADGE_VARIANT_CLASSES,
     BUTTON_VARIANT_CLASSES,
     LINK_CLASSES,
+    PAGE_HEADER_TEXT_CLASSES,
+    PAGE_HEADER_WRAP_CLASSES,
     STATUS_VARIANT_CLASSES,
     TABLE_BODY_ROW_CLASSES,
+    TABLE_BODY_ROW_ZEBRA_CLASSES,
     TABLE_HEAD_ROW_CLASSES,
 )
 from organizeme_chrome.paths import chrome_templates_dir
@@ -53,7 +56,13 @@ def test_alert_variant_classes_carry_dark_mode_classes() -> None:
 def test_table_row_classes_carry_dark_mode_classes() -> None:
     assert "dark:" in TABLE_HEAD_ROW_CLASSES
     assert "dark:" in TABLE_BODY_ROW_CLASSES
+    assert "dark:" in TABLE_BODY_ROW_ZEBRA_CLASSES
 
 
 def test_link_classes_carry_dark_mode_classes() -> None:
     assert "dark:" in LINK_CLASSES
+
+
+def test_page_header_classes_carry_dark_mode_classes() -> None:
+    assert "dark:" in PAGE_HEADER_WRAP_CLASSES
+    assert "dark:" in PAGE_HEADER_TEXT_CLASSES

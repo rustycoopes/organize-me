@@ -80,6 +80,14 @@ def test_button_danger_variant_uses_flame_outline() -> None:
     assert "text-flame" in html
 
 
+def test_button_danger_solid_variant_uses_flame_fill() -> None:
+    html = _render(_env(), "components/button.html", "button", "Delete", variant="danger-solid")
+
+    assert "bg-flame" in html
+    assert "text-paper" in html
+    assert "border-flame" not in html  # distinct from the outline-only "danger" variant
+
+
 def test_button_x_bind_disabled_and_x_bind_class_render_alpine_bindings() -> None:
     html = _render(
         _env(),
@@ -421,6 +429,20 @@ def test_toggle_with_label_wraps_control() -> None:
     assert "<label" in html
     assert "Email notifications" in html
     assert 'for="field-notifications"' in html
+
+
+def test_page_header_renders_title_inside_pill() -> None:
+    html = _render(_env(), "components/page_header.html", "page_header", "Dashboard")
+
+    assert "<h1" in html
+    assert "Dashboard" in html
+    assert "rounded-full" in html
+
+
+def test_page_header_id_overrides_heading_element() -> None:
+    html = _render(_env(), "components/page_header.html", "page_header", "Dashboard", id="page-title")
+
+    assert 'id="page-title"' in html
 
 
 def test_toggle_wires_alpine_model_and_change() -> None:

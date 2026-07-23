@@ -61,7 +61,17 @@ BUTTON_VARIANT_CLASSES: dict[str, str] = {
     # the same token STATUS_VARIANT_CLASSES/ALERT_VARIANT_CLASSES use for "danger", rather than
     # introducing a second red into the palette.
     "danger": "border border-flame text-flame hover:bg-flame-tint dark:hover:bg-flame/10",
+    # Filled destructive action (event-creator dashboard row deletes) - outline "danger" reads too
+    # faint at small sizes inside a table row; this mirrors "primary"'s own fill/hover pattern with
+    # the same flame token so a row-level delete is unmistakable at a glance.
+    "danger-solid": "bg-flame text-paper hover:bg-flame/90",
 }
+
+# page_header's pill background (event-creator's Dashboard heading blended into the data below
+# it) - reuses BADGE_VARIANT_CLASSES["neutral"]'s bg-mist/dark:bg-ink-2 tint rather than a new
+# color, just at pill/rounded-full shape and heading-scale padding instead of badge scale.
+PAGE_HEADER_WRAP_CLASSES = "inline-flex items-center rounded-full bg-mist px-4 py-1.5 dark:bg-ink-2"
+PAGE_HEADER_TEXT_CLASSES = "font-display text-2xl font-semibold text-ink dark:text-paper"
 
 BADGE_VARIANT_CLASSES: dict[str, str] = {
     "neutral": "bg-mist text-ink-2 dark:bg-ink-2 dark:text-paper-2",
@@ -94,6 +104,12 @@ TABLE_CLASSES = "w-full text-left font-body text-sm border-collapse"
 TABLE_HEAD_ROW_CLASSES = "border-b border-ink-2/30 bg-mist dark:border-paper-2/30 dark:bg-ink-2"
 TABLE_HEAD_CELL_CLASSES = "px-3 py-2 font-medium text-ink-2 dark:text-paper-2"
 TABLE_BODY_ROW_CLASSES = "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10"
+# Opt-in zebra striping - a separate constant rather than folding into TABLE_BODY_ROW_CLASSES since
+# not every table wants it; callers pick whichever fits (see event-creator's dashboard events
+# table, which asked for alternating rows to make dense data easier to scan).
+TABLE_BODY_ROW_ZEBRA_CLASSES = (
+    "border-b border-ink-2/10 last:border-0 dark:border-paper-2/10 even:bg-mist/40 dark:even:bg-ink-2/40"
+)
 TABLE_BODY_CELL_CLASSES = "px-3 py-2 align-middle"
 
 # Inline text-link treatment (event-creator#29) - the one color decision in event-creator's
