@@ -1,0 +1,17 @@
+{#
+  page_header — page-level heading rendered inside a rounded pill background, so it reads as
+  distinct from whatever content (tables, cards) follows it on the page.
+
+  Usage:
+    {% from "components/page_header.html" import page_header %}
+    {{ page_header("Dashboard") }}
+
+  Parameters
+    title — heading text.
+    id    — optional element id override for the wrapping <h1>.
+#}
+{% macro page_header(title, id=None) %}
+<div class="{{ PAGE_HEADER_WRAP_CLASSES }}">
+  <h1{% if id %} id="{{ id }}"{% endif %} class="{{ PAGE_HEADER_TEXT_CLASSES }}">{{ title }}</h1>
+</div>
+{% endmacro %}

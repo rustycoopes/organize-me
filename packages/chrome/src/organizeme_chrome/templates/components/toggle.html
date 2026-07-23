@@ -19,8 +19,10 @@
                  so a caller can compose it into its own layout (e.g. alongside a description).
     x_model    — optional Alpine expression (adds x-model) for reactive two-way binding.
     on_change  — optional Alpine expression (adds @change).
+    disabled   — disables the control (e.g. gating notification toggles until a contact method is
+                 set) and dims it so the disabled state isn't conveyed by cursor alone.
 #}
-{% macro toggle(name, checked=False, id=None, label=None, x_model=None, on_change=None) %}
+{% macro toggle(name, checked=False, id=None, label=None, x_model=None, on_change=None, disabled=False) %}
 {% set field_id = id or "field-" + name %}
 {% set control %}<input
     type="checkbox"
@@ -29,7 +31,8 @@
     {% if checked %}checked{% endif %}
     {% if x_model %}x-model="{{ x_model }}"{% endif %}
     {% if on_change %}@change="{{ on_change }}"{% endif %}
-    class="relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-mist transition-colors before:absolute before:left-1 before:top-1 before:h-4 before:w-4 before:rounded-full before:bg-paper before:transition-transform checked:bg-flame checked:before:translate-x-5 dark:bg-ink-2 {{ FOCUS_RING }}"
+    {% if disabled %}disabled{% endif %}
+    class="relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-mist transition-colors before:absolute before:left-1 before:top-1 before:h-4 before:w-4 before:rounded-full before:bg-paper before:transition-transform checked:bg-flame checked:before:translate-x-5 dark:bg-ink-2 {{ FOCUS_RING }} disabled:cursor-not-allowed disabled:opacity-50"
   />{% endset %}
 {% if label %}
 <div class="inline-flex items-center gap-3">
