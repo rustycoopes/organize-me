@@ -15,6 +15,7 @@ Each issue gets a fresh interactive Claude session where you can:
 The script monitors GitHub for closure and moves to the next issue.
 """
 
+#import typing_extensions
 import json
 import subprocess
 import sys
@@ -109,7 +110,7 @@ def run_implementation(issue_number: str, auto_mode: bool = False) -> bool:
         cmd.append("/to-implementation")
         cmd.append(f"{issue_number}")
         
-        cmdString = f'claude "/to-implementation {issue_number}" --permission-mode auto --remote-control claudecode'
+        cmdString = f'claude "/to-implementation {issue_number}" --permission-mode auto --remote-control claudecode{issue_number}'
         print(cmdString)
         # print(f"[DEBUG] Running: {cmd}")
 
@@ -150,6 +151,10 @@ def process_issues(issues: list[int], repo: str = "organize-me", skip_wait: bool
         repo: Repository name
         skip_wait: If True, don't wait for issue closure before moving to next
         auto_mode: If True, enable Claude auto mode for each session
+
+EXAMPLE : python .\automate_implementation.py --issues 1, 2, 3python .\automate_implementation.py --issues 17, 18 --repo doc-library
+
+
     """
     total = len(issues)
     print(f"\n{'='*70}")

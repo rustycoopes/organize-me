@@ -252,6 +252,18 @@ def git_init_and_commit(dest: Path, dry_run: bool) -> None:
     # would silently mean CI never runs until someone notices and renames the branch by hand.
     subprocess.run(["git", "init", "-b", "main"], cwd=dest, check=True)
     subprocess.run(["git", "add", "-A"], cwd=dest, check=True)
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=dest,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if not status.stdout.strip():
+        print("  nothing to commit — reusing existing commit")
+        return
+
     subprocess.run(
         ["git", "commit", "-m", "Scaffold hosted-app repo via /new-hosted-app skill"],
         cwd=dest,
