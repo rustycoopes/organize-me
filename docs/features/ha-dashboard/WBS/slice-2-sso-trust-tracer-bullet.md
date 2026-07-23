@@ -21,13 +21,16 @@ An empty-state `/ha-dashboard` page wired into the full platform seam:
 - Reads and passes `dark_mode` into the template context via a `HostUser`/`get_dark_mode()`
   helper (cross-schema read-only mapping to `host.users`), matching the platform's R7 gotcha
   pattern — do not skip this the way an early `event-creator` page port once did.
-- Host-repo PR: add the **full** `ha-dashboard` `AppEntry` to
-  `packages/chrome/src/organizeme_chrome/registry.py` —
+- Host-repo PR: add the **full** `ha-dashboard` `AppEntry` to `app/core/registry.py`'s `APPS` list
+  (not `packages/chrome/src/organizeme_chrome/registry.py` — registry-decoupling moved the
+  hand-authored app list out of the versioned `organizeme_chrome` package and into the Host's own
+  runtime; see `docs/how-to-add-a-hosted-app.md`) —
   `nav=[AppNavItem("/ha-dashboard", "HA Dashboard")]`,
   `settings_tabs=[SettingsTab("ha-dashboard", "HA Dashboard")]`,
   `api_prefixes=["/ha-dashboard/tiles", "/settings/ha-dashboard"]`. The prefixes aren't served by
   any route yet (Slices 3-4 add those), but registering them now avoids a second registry PR
-  later — the same move `doc-library`'s Slice 2 made.
+  later — the same move `doc-library`'s Slice 2 made. No `packages/chrome` edit or new `chrome-v*`
+  tag is needed for this — that only applies to changes to the shared chrome mechanism itself.
 - Provision `ha-dashboard-prod`'s Serverless NEG + backend service (`infra/gcp_lb/provision-
   prod.sh`), regenerate the URL map (`infra/gcp_lb/generate_url_map.py prod`) and import it.
 

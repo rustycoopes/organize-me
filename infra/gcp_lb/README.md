@@ -105,6 +105,12 @@ set, not a reuse of QA's). `generate_url_map.py` takes an optional environment a
 generated URL map to match (`host-backend-prod`, `organizeme-backend-prod`,
 `event-creator-backend-prod`); omitting it keeps the original QA behavior (`host-backend`, etc.).
 
+`ha-dashboard` deliberately has no QA tier (see its own
+`docs/adr/ha-dashboard-no-qa-environment.md`) — its NEG/backend-service block only exists in
+`provision-prod.sh`/`provision-prod.ps1`. Its absence from `provision.sh`/`provision.ps1` is
+intentional, not an oversight (unlike `doc-library`'s Slice 2, which originally shipped QA-only
+and needed a follow-up fix to add its prod block).
+
 ```bash
 gcloud auth login
 gcloud config set project gen-lang-client-0791944342
