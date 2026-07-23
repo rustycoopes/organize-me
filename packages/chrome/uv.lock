@@ -475,7 +475,7 @@ wheels = [
 
 [[package]]
 name = "organizeme-chrome"
-version = "0.15.0"
+version = "0.15.1"
 source = { editable = "." }
 dependencies = [
     { name = "google-auth" },
