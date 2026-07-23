@@ -459,6 +459,13 @@ def test_page_header_id_overrides_heading_element() -> None:
     assert 'id="page-title"' in html
 
 
+def test_toggle_disabled_sets_native_attribute() -> None:
+    html = _render(_env(), "components/toggle.html", "toggle", "notifications", disabled=True)
+
+    assert "disabled" in html
+    assert "disabled:opacity-50" in html
+
+
 def test_toggle_wires_alpine_model_and_change() -> None:
     html = _render(
         _env(),
