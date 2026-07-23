@@ -124,6 +124,7 @@
   change was needed there. Branch `restructure/r12-flip-prod-redirect-uris`.
 
 ### Fixed
+- 2026-07-23 — #249 Settings shell hardcoded every tab's HTMX fragment fetch to event-creator (R7 leftover) — never actually reachable for a second app's tab despite the registry listing it; now aggregates settings_tabs across every registered app and routes each to its own owning service_name — discovered while implementing ha-dashboard#3 — [details](https://github.com/rustycoopes/organize-me/pull/249)
 - 2026-07-20 — event-creator#30 Finish adopting the shared design system on event-creator's Dashboard, Settings, Upload, and Logs pages (event-creator#26 only migrated the Dashboard filter bar/events table and Processing page, leaving the rest on dead DaisyUI classes) — [details](https://github.com/rustycoopes/event-creator/pull/31)
 - 2026-07-19 — doc-library#18: Doc Library's sidebar in QA showed only itself, never
   organize-me/event-creator — the registry refresh loop's `google.auth.transport.requests` OIDC
