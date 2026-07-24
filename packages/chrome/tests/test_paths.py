@@ -26,7 +26,7 @@ def test_chrome_fonts_dir_contains_the_self_hosted_webfonts() -> None:
     assert fonts_dir.is_dir()
     font_files = {f.name for f in fonts_dir.glob("*.woff2")}
     assert font_files == {
-        "bricolage-grotesque-700.woff2",
+        "baloo-2-700.woff2",
         "ibm-plex-sans-400.woff2",
         "jetbrains-mono-400.woff2",
     }

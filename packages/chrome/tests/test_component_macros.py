@@ -40,14 +40,14 @@ def test_button_renders_a_real_button_by_default() -> None:
     assert "<button" in html
     assert 'type="button"' in html
     assert "Save" in html
-    assert "bg-flame" in html  # primary variant, default
+    assert "bg-cobalt" in html  # primary variant, default
 
 
 def test_button_secondary_and_ghost_variants_use_distinct_classes() -> None:
     secondary = _render(_env(), "components/button.html", "button", "Go", variant="secondary")
     ghost = _render(_env(), "components/button.html", "button", "Go", variant="ghost")
 
-    assert "bg-cobalt" in secondary
+    assert "bg-amber" in secondary
     assert "border-ink/30" in ghost
     assert "bg-ink/5" in ghost
 
@@ -144,7 +144,7 @@ def test_button_class_appends_to_variant_classes() -> None:
     html = _render(_env(), "components/button.html", "button", "Go", class_="w-full")
 
     assert "w-full" in html
-    assert "bg-flame" in html  # still carries the primary variant's own classes
+    assert "bg-cobalt" in html  # still carries the primary variant's own classes
 
 
 def test_button_call_block_renders_rich_content_without_a_label() -> None:
@@ -286,7 +286,7 @@ def test_badge_uses_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "New", variant="primary")
 
     assert "New" in html
-    assert "bg-flame-tint" in html
+    assert "bg-cobalt-tint" in html
 
 
 def test_badge_class_appends_to_variant_classes() -> None:

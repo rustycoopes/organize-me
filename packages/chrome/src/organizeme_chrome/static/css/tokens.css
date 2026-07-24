@@ -1,4 +1,7 @@
-/* OrganizeMe "Signal" design tokens.
+/* OrganizeMe design tokens - FamilyWall-anchored redesign (2026-07-24). See DESIGN.md and
+   docs/adr/container-redesign-familywall-visual-system.md for the direction and the
+   primary/danger color-role split this replaced.
+
    Shipped as chrome package data - never compiled here. Each consuming service imports this
    file into its own Tailwind v4 entry CSS and runs its own `pytailwindcss` build; see
    docs/adr/design-refresh-per-service-tailwind-build.md in the organize-me repo.
@@ -8,11 +11,11 @@
    build time so these absolute URLs resolve. */
 
 @font-face {
-  font-family: "Bricolage Grotesque";
+  font-family: "Baloo 2";
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url("/static/fonts/bricolage-grotesque-700.woff2") format("woff2");
+  src: url("/static/fonts/baloo-2-700.woff2") format("woff2");
 }
 
 @font-face {
@@ -36,20 +39,30 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-ink: #14161c;
-  --color-ink-2: #2a2d38;
-  --color-paper: #f6f4ef;
-  --color-paper-2: #eeece4;
-  --color-flame: #ff4b33;
-  --color-flame-tint: #ffe6e1;
-  --color-cobalt: #2f4b7c;
-  --color-cobalt-tint: #e3e9f3;
-  --color-mist: #eef1f5;
-  --color-mist-2: #e2e7ee;
-  --color-sage: #2f7d5c;
-  --color-sage-tint: #e1f0e8;
+  --color-ink: #21252c;
+  --color-ink-2: #454b56;
+  --color-paper: #fbf9f5;
+  --color-paper-2: #f1ede3;
+  --color-mist: #eef1eb;
+  --color-mist-2: #e3e6de;
 
-  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  /* Brand primary - see docs/adr/container-redesign-familywall-visual-system.md for why this
+     (not flame) is the primary/interactive brand color. */
+  --color-cobalt: #3f6fe0;
+  --color-cobalt-tint: #e7edfc;
+
+  /* Secondary accent - warm counterpart to cobalt. */
+  --color-amber: #e2932f;
+  --color-amber-tint: #faecd8;
+
+  --color-sage: #3f8a5f;
+  --color-sage-tint: #e3f1e7;
+
+  /* Danger only - no longer doubles as brand primary. */
+  --color-flame: #e14b3f;
+  --color-flame-tint: #fbe4e1;
+
+  --font-display: "Baloo 2", ui-sans-serif, system-ui, sans-serif;
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }

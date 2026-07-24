@@ -8,7 +8,7 @@
 
 {% block content %}
 <div
-  class="flex min-h-screen items-center justify-center px-4"
+  class="flex min-h-screen"
   x-data="{
     error: '',
     info: '',
@@ -47,7 +47,21 @@
     },
   }"
 >
-<div class="w-full max-w-sm">
+  <div class="hidden lg:flex lg:w-1/2 relative">
+    <img
+      src="/static/images/auth-morning-notebook.jpg"
+      alt=""
+      aria-hidden="true"
+      class="absolute inset-0 h-full w-full object-cover"
+    />
+    <div class="absolute inset-0 bg-gradient-to-t from-ink/75 via-ink/15 to-transparent" aria-hidden="true"></div>
+    <div class="relative mt-auto p-10">
+      <span class="font-display text-2xl font-bold text-paper">OrganizeMe</span>
+      <p class="mt-2 font-body text-paper/85 max-w-xs">Welcome back — every household tool you use, in one place.</p>
+    </div>
+  </div>
+  <div class="flex flex-1 items-center justify-center px-4 py-12">
+  <div class="w-full max-w-sm">
 {% call card_shell(density="marketing") %}
   <h1 class="mb-3 font-display text-lg font-semibold text-ink dark:text-paper">Log in</h1>
 
@@ -95,6 +109,7 @@
   </p>
 
 {% endcall %}
-</div>
+  </div>
+  </div>
 </div>
 {% endblock %}

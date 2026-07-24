@@ -1,9 +1,12 @@
 """Tailwind class-name tables for the shared component primitives.
 
 Every entry here is keyed off a token from `static/css/tokens.css`'s `@theme` block (ink/paper/
-flame/cobalt/mist/sage) - see docs/adr/design-refresh-shared-component-library.md. Density is the
-one axis shared by every sizeable primitive (button/input/card), so its two variants live in one
-place rather than being repeated per-macro.
+mist/cobalt/amber/sage/flame) - see docs/adr/design-refresh-shared-component-library.md. Density
+is the one axis shared by every sizeable primitive (button/input/card), so its two variants live
+in one place rather than being repeated per-macro.
+
+cobalt (blue) is the brand primary and flame (red) is danger-only - they used to be one dual-role
+token; see docs/adr/container-redesign-familywall-visual-system.md for why they were split.
 """
 
 DENSITY_PADDING: dict[str, str] = {
@@ -24,7 +27,7 @@ DENSITY_BADGE_TEXT: dict[str, str] = {
 
 FOCUS_RING = (
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 "
-    "focus-visible:outline-flame"
+    "focus-visible:outline-cobalt"
 )
 
 # input's error state (see docs/features/design-refresh/WBS/slice-3-auth-pages.md and
@@ -47,8 +50,8 @@ INPUT_DEFAULT_FILL = "bg-paper-2 dark:bg-ink-2"
 # `dark` theme automatically producing readable colors.
 
 BUTTON_VARIANT_CLASSES: dict[str, str] = {
-    "primary": "bg-flame text-paper hover:bg-flame/90",
-    "secondary": "bg-cobalt text-paper hover:bg-cobalt/90",
+    "primary": "bg-cobalt text-paper hover:bg-cobalt/90",
+    "secondary": "bg-amber text-ink hover:bg-amber/90",
     # A transparent fill with a 30%-opacity border was indistinguishable from Paper/Mist page
     # backgrounds (both near-identical lightness) - see issue #240. An alpha-blended ink/paper
     # tint (rather than a literal bg-paper-2/bg-mist-2 fill) contrasts against either page
@@ -80,8 +83,8 @@ PAGE_HEADER_TEXT_CLASSES = "font-display text-2xl font-semibold text-ink dark:te
 
 BADGE_VARIANT_CLASSES: dict[str, str] = {
     "neutral": "bg-mist text-ink-2 dark:bg-ink-2 dark:text-paper-2",
-    "primary": "bg-flame-tint text-flame dark:bg-flame/20",
-    "secondary": "bg-cobalt-tint text-cobalt dark:bg-cobalt/20",
+    "primary": "bg-cobalt-tint text-cobalt dark:bg-cobalt/20",
+    "secondary": "bg-amber-tint text-amber dark:bg-amber/20",
     "success": "bg-sage-tint text-sage dark:bg-sage/20",
 }
 
