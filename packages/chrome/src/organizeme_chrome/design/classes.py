@@ -86,6 +86,14 @@ BADGE_VARIANT_CLASSES: dict[str, str] = {
     "primary": "bg-cobalt-tint text-cobalt dark:bg-cobalt/20",
     "secondary": "bg-amber-tint text-amber dark:bg-amber/20",
     "success": "bg-sage-tint text-sage dark:bg-sage/20",
+    # Added in the FamilyWall redesign (docs/adr/container-redesign-familywall-visual-system.md):
+    # consumers (e.g. event-creator's logs_grid.html) previously had no real "failed"/"in progress"
+    # badge color and reused "primary"/"secondary" as stand-ins, which broke once those two swapped
+    # meaning. danger/info give status badges their own real entries, matching
+    # STATUS_VARIANT_CLASSES/ALERT_VARIANT_CLASSES' existing danger/info roles instead of
+    # borrowing brand-accent variants for status meaning.
+    "danger": "bg-flame-tint text-flame dark:bg-flame/20",
+    "info": "bg-cobalt-tint text-cobalt dark:bg-cobalt/20",
 }
 
 STATUS_VARIANT_CLASSES: dict[str, str] = {

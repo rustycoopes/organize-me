@@ -289,6 +289,14 @@ def test_badge_uses_variant_classes() -> None:
     assert "bg-cobalt-tint" in html
 
 
+def test_badge_danger_and_info_variants_use_distinct_classes() -> None:
+    danger = _render(_env(), "components/badge.html", "badge", "Failed", variant="danger")
+    info = _render(_env(), "components/badge.html", "badge", "In progress", variant="info")
+
+    assert "bg-flame-tint" in danger
+    assert "bg-cobalt-tint" in info
+
+
 def test_badge_class_appends_to_variant_classes() -> None:
     html = _render(_env(), "components/badge.html", "badge", "AB", class_="mr-1")
 
