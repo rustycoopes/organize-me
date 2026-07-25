@@ -123,3 +123,27 @@ traffic is affected until `GOOGLE_OAUTH_REDIRECT_URI`/`GOOGLE_DRIVE_REDIRECT_URI
 flipped to it in a separate, reviewed PR — see the R12 slice doc and
 [`host-integration-guide.md`](../../docs/host-integration-guide.md) for that
 follow-up.
+
+## Static-asset path rules (static-asset-routing Slice 3)
+
+`generate_url_map.py` also emits one wildcard path rule per hosted app —
+`{static_mount_path(service_name)}/*` — routing that app's future prefixed static-asset requests
+to its own backend, per
+[`docs/features/static-asset-routing/TDD.md`](../../docs/features/static-asset-routing/TDD.md#load-balancer-path-rule-generation).
+These rules are inert until each app's own migration PR (Slices 4-6) actually mounts its static
+files under that prefix — until then the prefix simply doesn't exist on the app's side, so
+requests to it 404 rather than silently misrouting.
+
+`verify_static_routing.py` is a manual, real-infra operator script (not wired into CI, per the
+PRD) for confirming an already-migrated app's static assets are reachable identically via the
+shared domain and via that app's own direct Cloud Run URL:
+
+```bash
+uv run python -m infra.gcp_lb.verify_static_routing --env prod doc-library
+```
+
+It only checks the app(s) named on the command line — passing an app that hasn't migrated yet
+will correctly report a mismatch (404 via the shared domain), since its prefix is still inert by
+design. Before comparing, it asserts the app's Cloud Run service is serving 100% traffic from a
+single revision (`gcloud run services describe`), failing loudly rather than comparing against a
+non-representative target.

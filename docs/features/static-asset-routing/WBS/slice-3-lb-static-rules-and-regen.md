@@ -51,14 +51,14 @@ regenerating QA's map fails the same way it does today.
 
 ## Acceptance criteria
 
-- [ ] `organize-me`'s own chrome pin is bumped to Slice 2's version.
-- [ ] `generate_url_map.py`'s output includes a static-asset path rule per hosted app, for both `qa`
+- [x] `organize-me`'s own chrome pin is bumped to Slice 2's version.
+- [x] `generate_url_map.py`'s output includes a static-asset path rule per hosted app, for both `qa`
       and any `-prod` suffix generation.
-- [ ] Live QA and prod URL maps are updated (`gcloud compute url-maps describe` on each shows the
+- [x] Live QA and prod URL maps are updated (`gcloud compute url-maps describe` on each shows the
       new rules) with no observable change in behavior for any existing route (verify the existing
       smoke checks — `curl .../login`, `curl .../dashboard`, `curl .../doc-library`,
       `curl .../ha-dashboard` — still succeed identically to before this slice).
-- [ ] The verification script exists, runs against at least one app (expected result: still a
+- [x] The verification script exists, runs against at least one app (expected result: still a
       mismatch, since no app has migrated yet — this slice doesn't fix any app's actual bug, it
       only makes the infrastructure ready for Slices 4-6 to use).
 
@@ -71,3 +71,32 @@ operational, not unit-testable — they're acceptance criteria for the person ru
 automated coverage.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-25, issue #255, branch `feature/lb-static-asset-rules`)
+
+Shipped as designed. `organizeme-chrome` bumped to `chrome-v0.18.0`. `generate_path_rules()` now
+emits one wildcard-only static-asset `PathRule` per registered app (`{static_mount_path(app)}/*`),
+reusing the same `seen_paths` collision map as `nav`/`api_prefixes` — a small `_claim_path()`
+helper was factored out during review to keep that three-times-repeated check from drifting in
+wording as it grew a third caller. One real (if minor, pre-existing-scale) behavior change came
+along for free: an app with empty `nav` and no `api_prefixes` now always gets a `PathRule` (just
+its static wildcard) instead of being omitted — no such app exists in today's registry, but it's
+now an explicit, tested invariant rather than an accidental side effect.
+
+Live QA and prod URL maps were both diffed against the pre-slice generator output first (byte-for-byte
+match — no out-of-band drift), then regenerated via `provision.sh`/`provision-prod.sh`; both scripts
+call the same generator so no script-level changes were needed. Post-regen, `gcloud compute
+url-maps describe` on both confirms the new `/*` rule per app, and the existing smoke checks
+(`/login`, `/dashboard`, `/doc-library`, `/ha-dashboard` on both hosts) return the same status
+codes as before.
+
+`verify_static_routing.py` (new) and its unit tests shipped as specced, plus one hardening pass
+found in code review: CLI-supplied app names are now validated against the same
+`service_name` pattern `AppEntry` itself enforces before ever reaching a `gcloud` subprocess call
+— on Windows, `gcloud` must run with `shell=True` (it's a `.cmd` wrapper), which made an
+unvalidated argument a real, demonstrated command-injection vector via cmd.exe's `%VAR%`
+expansion, not just a theoretical one. Also added: a timeout on `gcloud` calls (it previously had
+none, unlike the HTTP fetches), and broadened `main()`'s per-app exception handling so one app's
+unexpected failure (e.g. malformed `gcloud` JSON) doesn't abort evaluation of the rest. Ran live
+against `doc-library` on QA: reports a 404 mismatch, as expected — no app has migrated its own
+static mount yet, so the new rule is still inert.
