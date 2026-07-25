@@ -58,6 +58,13 @@ def generate_path_rules(
     if apps is None:
         apps = list_apps()
 
+    # An empty backend_suffix always means QA (see __main__ below: only qa runs unsuffixed, every
+    # other environment gets "-{env}"). An app with no QA deployment (organize-me#257, e.g.
+    # ha-dashboard — docs/adr/ha-dashboard-no-qa-environment.md) has no QA backend service to route
+    # to, so it must be skipped entirely when generating QA's URL map, not just left unsuffixed.
+    is_qa = backend_suffix == ""
+    apps = [app for app in apps if app.qa_available or not is_qa]
+
     host_backend = f"{HOST_BACKEND}{backend_suffix}"
     rules = [PathRule(service=host_backend, paths=list(HOST_PATHS))]
     seen_paths: dict[str, str] = {path: host_backend for path in HOST_PATHS}
