@@ -5,6 +5,7 @@
 import pytest
 import yaml
 from organizeme_chrome.registry import AppEntry, AppNavItem
+from organizeme_chrome.static_paths import static_mount_path
 
 from infra.gcp_lb.generate_url_map import HOST_PATHS, generate_path_rules, to_url_map_yaml
 
@@ -31,7 +32,8 @@ def test_app_nav_paths_route_to_that_apps_backend() -> None:
     host_rule = next(r for r in rules if r.service == "host-backend")
     app_rule = next(r for r in rules if r.service == "organizeme-backend")
     assert set(host_rule.paths) == set(HOST_PATHS)
-    assert set(app_rule.paths) == {"/dashboard", "/upload"}
+    # Every app rule also carries its static-asset wildcard rule (Slice 3) alongside its nav paths.
+    assert set(app_rule.paths) == {"/dashboard", "/upload", f"{static_mount_path('organizeme')}/*"}
 
 
 def test_app_nav_paths_already_owned_by_host_are_not_duplicated() -> None:
@@ -67,7 +69,7 @@ def test_generated_rules_are_driven_by_the_registry_not_hand_maintained() -> Non
     rules = generate_path_rules(apps=apps)
 
     future_rule = next(r for r in rules if r.service == "future-app-backend")
-    assert future_rule.paths == ["/future-thing"]
+    assert future_rule.paths == ["/future-thing", f"{static_mount_path('future-app')}/*"]
 
 
 def test_second_neg_slot_placeholder_is_ready_for_event_creator() -> None:
@@ -159,6 +161,66 @@ def test_two_apps_claiming_the_same_api_prefix_is_rejected() -> None:
         generate_path_rules(apps=apps)
 
 
+def test_app_with_no_nav_or_api_prefixes_still_gets_a_rule_for_its_static_wildcard() -> None:
+    # Slice 3: every registered app now contributes a PathRule regardless of nav/api_prefixes,
+    # since the static-asset wildcard is unconditionally part of its route surface — unlike
+    # before this slice, an app couldn't end up with zero paths and simply be omitted.
+    apps = [AppEntry(service_name="doc-library", nav=[], settings_tabs=[])]
+
+    rules = generate_path_rules(apps=apps)
+
+    app_rule = next(r for r in rules if r.service == "doc-library-backend")
+    assert app_rule.paths == [f"{static_mount_path('doc-library')}/*"]
+
+
+def test_app_static_asset_prefix_produces_a_wildcard_only_path_rule() -> None:
+    # Slice 3 (organize-me#255): static_mount_path() is the shared helper both this generator and
+    # each app's own FastAPI static mount derive from — asserting via the helper (not a
+    # reconstructed string) so this test would catch the two drifting apart.
+    apps = [
+        AppEntry(
+            service_name="doc-library", nav=[AppNavItem("/doc-library", "Doc Library")], settings_tabs=[]
+        )
+    ]
+
+    rules = generate_path_rules(apps=apps)
+
+    app_rule = next(r for r in rules if r.service == "doc-library-backend")
+    prefix = static_mount_path("doc-library")
+    assert f"{prefix}/*" in app_rule.paths
+    # Unlike api_prefixes' bare-path rule, only the wildcard form is emitted here — a bare
+    # `/doc-library/static` with nothing after it has no file for StaticFiles to serve anyway.
+    assert prefix not in app_rule.paths
+
+
+def test_static_asset_prefix_rule_generated_for_every_app_and_environment() -> None:
+    apps = [
+        AppEntry(service_name="organizeme", nav=[AppNavItem("/dashboard", "Dashboard")], settings_tabs=[]),
+        AppEntry(service_name="event-creator", nav=[AppNavItem("/events", "Events")], settings_tabs=[]),
+    ]
+
+    qa_rules = generate_path_rules(apps=apps)
+    prod_rules = generate_path_rules(apps=apps, backend_suffix="-prod")
+
+    for rules, suffix in [(qa_rules, ""), (prod_rules, "-prod")]:
+        for name in ("organizeme", "event-creator"):
+            app_rule = next(r for r in rules if r.service == f"{name}-backend{suffix}")
+            assert f"{static_mount_path(name)}/*" in app_rule.paths
+
+
+def test_two_apps_claiming_the_same_static_prefix_is_rejected() -> None:
+    # Not reachable via distinct service_names today (the prefix derives 1:1 from service_name),
+    # but the generator should fail loudly rather than silently misroute if the registry ever
+    # assigns the same service_name to two entries.
+    apps = [
+        AppEntry(service_name="doc-library", nav=[], settings_tabs=[]),
+        AppEntry(service_name="doc-library", nav=[AppNavItem("/other", "Other")], settings_tabs=[]),
+    ]
+
+    with pytest.raises(ValueError, match=r"doc-library/static/\*"):
+        generate_path_rules(apps=apps)
+
+
 def test_backend_suffix_renames_every_backend_for_a_second_environment() -> None:
     # R12: prod needs its own distinctly-named backend services/NEGs (GCP resource names are
     # global, and QA already owns the unsuffixed ones) without duplicating the generator.
@@ -193,6 +255,7 @@ def test_qa_unavailable_app_is_skipped_for_qa_but_included_for_prod() -> None:
     assert {r.service for r in qa_rules} == {"host-backend"}
     prod_rule = next(r for r in prod_rules if r.service == "ha-dashboard-backend-prod")
     assert "/ha-dashboard" in prod_rule.paths
+    assert f"{static_mount_path('ha-dashboard')}/*" in prod_rule.paths
 
 
 def test_qa_available_defaults_to_true_so_existing_apps_are_unaffected() -> None:
@@ -224,6 +287,9 @@ def test_url_map_yaml_references_backend_services_by_full_resource_path() -> Non
         tuple(rule["paths"]): rule["service"] for rule in matcher["pathRules"]
     }
     assert services_by_path_rule[tuple(HOST_PATHS)] == "global/backendServices/host-backend"
-    assert services_by_path_rule[("/dashboard",)] == "global/backendServices/organizeme-backend"
+    assert (
+        services_by_path_rule[("/dashboard", f"{static_mount_path('organizeme')}/*")]
+        == "global/backendServices/organizeme-backend"
+    )
     assert parsed["hostRules"][0]["hosts"] == ["organizeme.qa.russcoopersoftware.com"]
     assert parsed["hostRules"][0]["pathMatcher"] == "app-registry-path-matcher"
