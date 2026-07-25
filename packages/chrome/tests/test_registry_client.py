@@ -62,6 +62,36 @@ async def test_fetch_registry_once_returns_parsed_apps_on_200() -> None:
     assert request.headers["authorization"] == f"Bearer {_TOKEN}"
 
 
+async def test_fetch_registry_once_parses_qa_available_including_its_default() -> None:
+    # organize-me#257: qa_available must round-trip through the wire, not silently reset to its
+    # default True for an app the Host explicitly marked False (e.g. ha-dashboard).
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "service_name": "ha-dashboard",
+                    "nav": [],
+                    "settings_tabs": [],
+                    "api_prefixes": [],
+                    "qa_available": False,
+                },
+                {
+                    "service_name": "organizeme",
+                    "nav": [],
+                    "settings_tabs": [],
+                    "api_prefixes": [],
+                },
+            ],
+        )
+
+    async with _client(handler) as client:
+        apps = await fetch_registry_once(client, "https://host.example", _fake_token_provider)
+
+    assert apps[0].qa_available is False
+    assert apps[1].qa_available is True
+
+
 async def test_fetch_registry_once_strips_trailing_slash_from_host_url() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=_registry_json())
