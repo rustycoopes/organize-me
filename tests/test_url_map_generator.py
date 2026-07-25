@@ -173,6 +173,38 @@ def test_backend_suffix_renames_every_backend_for_a_second_environment() -> None
     assert services == {"host-backend-prod", "organizeme-backend-prod", "event-creator-backend-prod"}
 
 
+def test_qa_unavailable_app_is_skipped_for_qa_but_included_for_prod() -> None:
+    # organize-me#257: ha-dashboard has no QA Cloud Run service/backend
+    # (docs/adr/ha-dashboard-no-qa-environment.md) — generating QA's URL map must not emit a path
+    # rule for a backend service that was never provisioned there, while prod (which does have the
+    # backend) is unaffected.
+    apps = [
+        AppEntry(
+            service_name="ha-dashboard",
+            nav=[AppNavItem("/ha-dashboard", "HA Dashboard")],
+            settings_tabs=[],
+            qa_available=False,
+        )
+    ]
+
+    qa_rules = generate_path_rules(apps=apps)
+    prod_rules = generate_path_rules(apps=apps, backend_suffix="-prod")
+
+    assert {r.service for r in qa_rules} == {"host-backend"}
+    prod_rule = next(r for r in prod_rules if r.service == "ha-dashboard-backend-prod")
+    assert "/ha-dashboard" in prod_rule.paths
+
+
+def test_qa_available_defaults_to_true_so_existing_apps_are_unaffected() -> None:
+    apps = [
+        AppEntry(service_name="organizeme", nav=[AppNavItem("/dashboard", "Dashboard")], settings_tabs=[])
+    ]
+
+    rules = generate_path_rules(apps=apps)
+
+    assert any(r.service == "organizeme-backend" for r in rules)
+
+
 def test_url_map_yaml_references_backend_services_by_full_resource_path() -> None:
     # Bare service names are silently misresolved by `gcloud compute url-maps import` — the
     # schema expects a resource path (or self-link), not a short name.

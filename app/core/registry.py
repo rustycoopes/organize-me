@@ -81,6 +81,10 @@ APPS: list[AppEntry] = [
         nav=[AppNavItem("/ha-dashboard", "HA Dashboard")],
         settings_tabs=[SettingsTab("ha-dashboard", "HA Dashboard")],
         api_prefixes=["/ha-dashboard/tiles", "/settings/ha-dashboard"],
+        # No QA Cloud Run service/backend for this app (organize-me#257) — deliberate, see
+        # docs/adr/ha-dashboard-no-qa-environment.md. Keeps generate_url_map.py from emitting a
+        # QA path rule pointing at a backend service that was never provisioned.
+        qa_available=False,
     ),
 ]
 

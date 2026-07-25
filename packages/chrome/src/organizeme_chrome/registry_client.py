@@ -36,6 +36,7 @@ def _parse_apps(payload: object) -> list[AppEntry]:
                     SettingsTab(id=tab["id"], label=tab["label"]) for tab in item["settings_tabs"]
                 ],
                 api_prefixes=list(item.get("api_prefixes", [])),
+                qa_available=item.get("qa_available", True),
             )
         )
     return apps
