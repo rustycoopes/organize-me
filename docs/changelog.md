@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-25 — doc-library#30 Slice 4: `doc-library` migrated to prefixed static path (`/doc-library/static/*`), dual-mounted alongside the old bare `/static/*` for one release — [details](features/static-asset-routing/WBS/slice-4-doc-library-migration.md#delivered-2026-07-25-doc-library30-branch-featurestatic-asset-routing-slice-4-in-doc-library)
 - 2026-07-25 — event-creator#34 Slice 5: migrate `event-creator` to prefixed static path (`/event-creator/static/*`) — [details](features/static-asset-routing/WBS/slice-5-event-creator-migration.md#delivered-2026-07-25-event-creator34-branch-fixstatic-mount-path-migration-merged-via-event-creator35)
 - 2026-07-25 — #255 Slice 3: LB static-asset path rules + QA/prod regen + verification script — [details](features/static-asset-routing/WBS/slice-3-lb-static-rules-and-regen.md#delivered-2026-07-25-issue-255-branch-featurelb-static-asset-rules)
 - 2026-07-25 — #254 Slice 2: `organizeme_chrome` static-mount-path helper + `tokens.css` fix + new package version (v0.18.0) — [details](features/static-asset-routing/WBS/slice-2-chrome-static-mount-helper.md#delivered-2026-07-25-issue-254-branch-featurechrome-static-mount-path)
