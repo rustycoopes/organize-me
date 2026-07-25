@@ -41,7 +41,10 @@ app) could not truthfully claim to be.
 - Shared infrastructure: one GCP project, one database instance, one shared QA/production
   environment; separation is per-repo/per-Cloud-Run-service, not per-infrastructure.
 - The chrome (sidebar, header, page shell, shared components) ships as a separately-versioned
-  package, `organizeme-chrome`, consumed by the Host and (eventually) styling other hosted apps.
+  package, `organizeme-chrome`, consumed by the Host and all three hosted apps via a pinned git-tag
+  dependency (each repo's own `pyproject.toml`). All four repos are on `chrome-v0.16.1`, so the
+  FamilyWall-anchored visual system (see Brand Commitments) is live platform-wide, not just on the
+  Host's own pages.
 
 ## Capabilities and Constraints
 
@@ -57,12 +60,15 @@ app) could not truthfully claim to be.
 ## Brand Commitments
 
 - Product name **OrganizeMe** is finalized — not to be changed.
-- Existing visual system ("Signal"): tokens defined in
-  `packages/chrome/src/organizeme_chrome/static/css/tokens.css` — ink `#14161c`, paper `#f6f4ef`,
-  flame `#ff4b33`, cobalt `#2f4b7c`, sage `#2f7d5c`; display face "Bricolage Grotesque", body
-  "IBM Plex Sans", mono "JetBrains Mono". Original PRD called for a "Laravel-inspired aesthetic."
-  This is being actively redesigned (see current request) — treated as prior-art evidence, not a
-  binding constraint.
+- Current visual system ("FamilyWall-anchored redesign", shipped): tokens defined in
+  `packages/chrome/src/organizeme_chrome/static/css/tokens.css` — ink `#21252c`, paper `#fbf9f5`,
+  cobalt `#3f6fe0` (brand primary), amber `#e2932f` (secondary accent), sage `#3f8a5f` (success),
+  flame `#e14b3f` (danger only); display face "Baloo 2", body "IBM Plex Sans", mono "JetBrains
+  Mono". Warm off-white paper, rounded pill buttons/cards, real independently-sourced lifestyle
+  photography on public surfaces. Full rationale in `DESIGN.md` and
+  `docs/adr/container-redesign-familywall-visual-system.md`. Supersedes the prior "Signal" system
+  (near-black ink `#14161c`, flame-red `#ff4b33` primary, Bricolage Grotesque) — now retired
+  anti-reference, not a binding constraint.
 
 ## Evidence on Hand
 
