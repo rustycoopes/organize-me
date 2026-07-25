@@ -14,31 +14,46 @@
   <span class="font-display text-xl font-bold text-ink">OrganizeMe</span>
   <div class="flex items-center gap-2">
     <a href="/login" class="px-4 py-2 rounded-full text-sm font-semibold text-ink hover:bg-paper-2 transition-colors">Log in</a>
-    <a href="/register" class="px-4 py-2 rounded-full text-sm font-semibold bg-flame text-paper hover:opacity-90 transition-opacity">Sign up</a>
+    <a href="/register" class="px-4 py-2 rounded-full text-sm font-semibold bg-cobalt text-paper hover:bg-cobalt/90 transition-colors">Sign up</a>
   </div>
 </div>
 
-<section id="hero" class="bg-paper px-4 md:px-8 py-16 md:py-24">
-  <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-    <div class="max-w-xl">
-      <h1 class="font-display text-4xl md:text-5xl font-extrabold text-ink leading-tight">
-        Turn your conversations into calendar events — automatically
-      </h1>
-      <p class="mt-6 text-lg text-ink/70">
-        OrganizeMe watches your WhatsApp, SMS, or CSV exports, uses AI to find the dates and
-        agreements you made, and turns them into calendar events and tasks — no manual re-reading
-        required.
-      </p>
-      <a
-        href="/register"
-        class="inline-block mt-8 px-8 py-4 rounded-full text-lg font-semibold bg-flame text-paper hover:opacity-90 transition-opacity"
-      >
-        Get started for free
-      </a>
-    </div>
+<section id="hero" class="relative overflow-hidden">
+  <img
+    src="/static/images/hero-household-planning.jpg"
+    alt=""
+    aria-hidden="true"
+    class="absolute inset-0 h-full w-full object-cover"
+  />
+  <div class="absolute inset-0 bg-gradient-to-t from-ink/95 via-ink/65 to-ink/15" aria-hidden="true"></div>
+  <div class="absolute inset-0 bg-gradient-to-r from-ink/50 via-transparent to-transparent" aria-hidden="true"></div>
+
+  <div class="relative max-w-5xl mx-auto px-4 md:px-8 py-28 md:py-40 flex flex-col justify-end min-h-[560px] md:min-h-[640px]">
+    <h1 class="font-display text-4xl md:text-6xl font-bold text-paper leading-[1.05] max-w-2xl text-balance [text-shadow:0_2px_16px_rgba(20,22,28,0.45)]">
+      Turn your conversations into calendar events — automatically
+    </h1>
+    <p class="mt-5 text-lg text-paper/85 max-w-xl">
+      OrganizeMe watches your WhatsApp, SMS, or CSV exports, uses AI to find the dates and
+      agreements you made, and turns them into calendar events and tasks — no manual re-reading
+      required.
+    </p>
+    <a
+      href="/register"
+      class="inline-block self-start mt-8 px-8 py-4 rounded-full text-lg font-semibold bg-cobalt text-paper hover:bg-cobalt/90 transition-colors"
+    >
+      Get started for free
+    </a>
+  </div>
+</section>
+
+<section id="how-it-works" class="py-16 px-4 md:px-8 bg-paper-2">
+  <div class="max-w-5xl mx-auto flex flex-col items-center">
+    <h2 class="font-display text-2xl md:text-3xl font-bold text-ink mb-10 text-center">
+      From a message to a calendar event, in seconds
+    </h2>
 
     <!-- Signature moment: a chat message visually resolving into a calendar/event chip. -->
-    <div class="relative flex flex-col items-center gap-3" aria-hidden="true">
+    <div class="relative flex flex-col items-center gap-3 w-full max-w-sm" aria-hidden="true">
       <div class="self-start bg-mist rounded-2xl rounded-bl-sm px-5 py-3 max-w-xs shadow-sm">
         <p class="font-body text-sm text-ink">
           Let's meet Thursday at 3pm for coffee ☕
@@ -101,7 +116,7 @@
     <div class="flex flex-col sm:flex-row gap-4 justify-center">
       <a
         href="/register"
-        class="px-8 py-4 rounded-full text-lg font-semibold bg-flame text-paper hover:opacity-90 transition-opacity"
+        class="px-8 py-4 rounded-full text-lg font-semibold bg-cobalt text-paper hover:bg-cobalt/90 transition-colors"
       >
         Create your free account
       </a>

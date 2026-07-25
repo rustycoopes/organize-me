@@ -38,7 +38,7 @@
     class_           — extra classes appended to the button/anchor (e.g. "w-full").
 #}
 {% macro button(label=None, href=None, variant="primary", density="product", type="button", disabled=False, id=None, x_bind_disabled=None, x_bind_class=None, attrs=None, class_="") %}
-{% set classes = "inline-flex items-center justify-center gap-2 rounded-md font-body font-medium transition-colors " + FOCUS_RING + " " + DENSITY_PADDING[density] + " " + BUTTON_VARIANT_CLASSES[variant] + " " + class_ %}
+{% set classes = "inline-flex items-center justify-center gap-2 rounded-full font-body font-medium transition-colors " + FOCUS_RING + " " + DENSITY_PADDING[density] + " " + BUTTON_VARIANT_CLASSES[variant] + " " + class_ %}
 {% set effective_x_bind_class = x_bind_class or (x_bind_disabled and ("{ 'opacity-50 cursor-not-allowed': " + x_bind_disabled + " }")) %}
 {% if href %}
 <a{% if id %} id="{{ id }}"{% endif %} href="{{ href }}" class="{{ classes }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{% if label %}{{ label }}{% endif %}{% if caller %}{{ caller() }}{% endif %}</a>
