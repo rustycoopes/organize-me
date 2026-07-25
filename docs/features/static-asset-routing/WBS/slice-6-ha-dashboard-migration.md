@@ -54,3 +54,53 @@ canary/traffic-flip steps are operational and verified manually via the steps ab
 automated tests.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-25, ha-dashboard#15, branch `feature/slice-6-static-prefix-migration` in
+`ha-dashboard`)
+
+Shipped as designed. `organizeme-chrome` bumped to `chrome-v0.18.0`. `app/main.py` now mounts
+`app/static` twice at the same directory: the existing bare `/static` mount (route name `"static"`)
+and the new `static_mount_path("ha-dashboard")` prefix (route name `"static-prefixed"`) — no route-
+name collision to work around here, unlike `doc-library`'s slice, since this app's bare mount
+already had a distinct name from the start. Template/code audit reconfirmed clean, as expected — no
+hardcoded `/static/...` references beyond the mount itself. New `tests/test_static_mount.py` covers
+both mounts: route registration, real non-empty content served at the prefixed path, and a byte-
+identical check between bare and prefixed.
+
+One real deviation from the plan: implementing the canary step surfaced a bug in `organize-me`'s
+`verify_static_routing.py` (the shared Slice 3 verification script) — its `--direct-url` addition
+(added specifically to support this slice, `organize-me#263`) initially still compared against the
+shared domain unconditionally, but pre-traffic-flip the shared domain is still 100% on the *old*
+revision (the entire point of checking before the flip), so the one scenario the flag exists for was
+structurally guaranteed to fail. Code review caught this before it reached production use. Fixed:
+`--direct-url` mode instead compares the canary revision's new prefixed mount against its own bare
+mount (both point at the same on-disk directory during the dual-mount transition window) — a
+self-contained check with no dependency on the shared domain having cut over yet. That fix also
+caught and corrected a masked test regression (a hand-rolled `verify_app` stub whose signature drifted
+out of sync with a new kwarg, silently no longer exercising the scenario its own docstring claimed).
+
+Deployed via the documented canary process, not the normal merge-to-main path:
+- Built the migration branch's image via Cloud Build (`gcloud builds submit`) — no local Docker
+  available in this environment — tagged
+  `northamerica-northeast1-docker.pkg.dev/gen-lang-client-0791944342/ha-dashboard/app:canary-9697030`.
+- `gcloud run deploy ha-dashboard-prod --no-traffic --tag=canary-slice6` produced revision
+  `ha-dashboard-prod-00011-yom`, reachable directly at
+  `https://canary-slice6---ha-dashboard-prod-n7cbjtsj5a-nn.a.run.app`, serving 0% of traffic.
+- `verify_static_routing.py --env prod --direct-url <canary URL> ha-dashboard` (the fixed version)
+  reported the canary's prefixed and bare mounts byte-identical (19,113 bytes) before any traffic
+  reached it.
+- Flipped traffic with `gcloud run services update-traffic ha-dashboard-prod --to-latest` —
+  confirmed 100% on the new revision via `gcloud run services describe`.
+- Manual visual check of `organizeme.russcoopersoftware.com/ha-dashboard` post-flip: renders fully
+  styled (chrome sidebar, tile cards, icons, fonts all correct) — the incident is resolved.
+- `verify_static_routing.py --env prod ha-dashboard` (no `--direct-url`, the standard check)
+  re-run post-flip: shared domain and direct Cloud Run URL byte-identical (19,113 bytes) at
+  `/ha-dashboard/static/css/app.css`.
+- Only then merged `ha-dashboard#16` to `main`, which re-ran the normal `deploy.yml` pipeline
+  (smoke-test + deploy-prod) against the now-verified code — redundant with the manual canary
+  deploy but harmless, since it deploys the identical already-verified source.
+
+One suggested improvement from code review filed as a follow-up, not blocking:
+[ha-dashboard#17](https://github.com/rustycoopes/ha-dashboard/issues/17) (the new static-mount HTTP
+tests require a live database via the `client` fixture even though they never touch it — a
+pre-existing repo-wide pattern, not unique to this slice).
