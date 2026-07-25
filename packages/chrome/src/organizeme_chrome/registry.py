@@ -52,6 +52,13 @@ class AppEntry:
     # app's full route surface, not just its nav (closes #178). A `default_factory` (rather than a
     # bare `[]`, which NamedTuple's lack of one previously forced) so each entry gets its own list.
     api_prefixes: list[str] = field(default_factory=list)
+    # Whether this app has a QA Cloud Run service/backend (organize-me#257). Defaults to True since
+    # every app but ha-dashboard has the standard QA+prod pair
+    # (docs/adr/ha-dashboard-no-qa-environment.md). infra/gcp_lb/generate_url_map.py's
+    # generate_path_rules() skips an app entirely when generating QA's URL map if this is False —
+    # QA has no backend service for it to route to. Declarative so a future QA-less app just sets
+    # this instead of needing a one-off special case in the generator.
+    qa_available: bool = True
 
 
 class RegistrySource(Protocol):
