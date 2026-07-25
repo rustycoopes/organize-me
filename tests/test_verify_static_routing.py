@@ -155,10 +155,77 @@ def test_verify_app_rejects_mismatched_content(
             verify_app("doc-library", shared_host="organizeme.qa.russcoopersoftware.com", env="qa")
 
 
+@patch("infra.gcp_lb.verify_static_routing.fetch")
+@patch("infra.gcp_lb.verify_static_routing.direct_service_url")
+@patch("infra.gcp_lb.verify_static_routing.assert_single_revision_full_traffic")
+def test_verify_app_with_direct_url_compares_bare_vs_prefixed_on_the_same_revision(
+    mock_traffic_check: MagicMock, mock_direct_url: MagicMock, mock_fetch: MagicMock
+) -> None:
+    # Deliberately does NOT touch shared_host: pre-traffic-flip, the shared domain still serves
+    # the OLD revision (that's the entire point of checking before the flip) - comparing against
+    # it here would always report a false failure. This is the actual bug the first version of
+    # this flag had (caught in code review): it fetched shared_host unconditionally, which can
+    # never succeed for the one real scenario --direct-url exists for.
+    mock_fetch.return_value = b"same-bytes"
+    canary_url = "https://canary---ha-dashboard-prod-abc123.a.run.app"
+
+    verify_app(
+        "ha-dashboard",
+        shared_host="organizeme.russcoopersoftware.com",
+        env="prod",
+        direct_url=canary_url,
+    )
+
+    mock_traffic_check.assert_not_called()
+    mock_direct_url.assert_not_called()
+    asset_path = f"{static_mount_path('ha-dashboard')}/css/app.css"
+    fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
+    assert fetched_urls == [
+        f"{canary_url}/static/css/app.css",
+        f"{canary_url}{asset_path}",
+    ]
+    assert "organizeme.russcoopersoftware.com" not in " ".join(fetched_urls)
+
+
+@patch("infra.gcp_lb.verify_static_routing.fetch")
+def test_verify_app_with_direct_url_rejects_mismatch_between_bare_and_prefixed(
+    mock_fetch: MagicMock,
+) -> None:
+    mock_fetch.side_effect = [b"bare-version", b"prefixed-version"]
+
+    with pytest.raises(VerificationError, match="differs from"):
+        verify_app(
+            "ha-dashboard",
+            shared_host="organizeme.russcoopersoftware.com",
+            env="prod",
+            direct_url="https://canary---ha-dashboard-prod-abc123.a.run.app",
+        )
+
+
+def test_main_rejects_direct_url_with_more_than_one_app() -> None:
+    with pytest.raises(SystemExit):
+        main(["--env", "prod", "--direct-url", "https://example.a.run.app", "doc-library", "event-creator"])
+
+
+@pytest.mark.parametrize(
+    "malformed_url",
+    [
+        "example.a.run.app",  # missing scheme
+        "ftp://example.a.run.app",  # wrong scheme
+        "https://example.a.run.app/",  # trailing slash
+    ],
+)
+def test_main_rejects_malformed_direct_url(malformed_url: str) -> None:
+    with pytest.raises(SystemExit):
+        main(["--env", "prod", "--direct-url", malformed_url, "ha-dashboard"])
+
+
 def test_main_keeps_checking_remaining_apps_after_one_raises_an_unexpected_error() -> None:
     # An app's own bug (e.g. malformed `gcloud` JSON raising json.JSONDecodeError, not
     # VerificationError) must not abort evaluation of the apps after it in the list.
-    def fake_verify_app(app_service_name: str, *, shared_host: str, env: str) -> None:
+    def fake_verify_app(
+        app_service_name: str, *, shared_host: str, env: str, direct_url: str | None = None
+    ) -> None:
         if app_service_name == "event-creator":
             raise json.JSONDecodeError("bad json", "doc", 0)
 

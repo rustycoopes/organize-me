@@ -16,6 +16,14 @@ only pass apps that have actually migrated.
 
 Usage:
     uv run python -m infra.gcp_lb.verify_static_routing --env prod doc-library event-creator
+
+    # Against a single tagged canary revision (0% traffic, pre-traffic-flip) - e.g. ha-dashboard's
+    # canary rollout (docs/adr/static-asset-routing-ha-dashboard-canary.md). This compares the
+    # canary's own new prefixed mount against its own bare mount (not against the shared domain,
+    # which is still serving the OLD revision at this point - that's the whole reason to check
+    # before the flip).
+    uv run python -m infra.gcp_lb.verify_static_routing --env prod --direct-url \
+        https://canary---ha-dashboard-prod-abc123.a.run.app ha-dashboard
 """
 
 import argparse
@@ -122,13 +130,40 @@ def fetch(url: str) -> bytes:
         raise VerificationError(f"GET {url} failed: {exc.reason}") from exc
 
 
-def verify_app(app_service_name: str, *, shared_host: str, env: str) -> None:
+def verify_app(
+    app_service_name: str, *, shared_host: str, env: str, direct_url: str | None = None
+) -> None:
     _validate_service_name(app_service_name)
+    asset_path = f"{static_mount_path(app_service_name)}{KNOWN_ASSET_SUFFIX}"
+
+    if direct_url is not None:
+        # Pre-traffic-flip canary check (docs/adr/static-asset-routing-ha-dashboard-canary.md):
+        # at this point the shared domain still routes 100% of its traffic to the OLD revision
+        # (that's the entire point of checking before the flip), so comparing against shared_host
+        # here would always report a false failure - the new content genuinely isn't reachable via
+        # the shared domain yet. Instead, confirm the canary revision's new prefixed mount serves
+        # byte-identical content to its own bare mount - both point at the same on-disk directory
+        # per the dual-mount transition (docs/adr/static-asset-routing-mount-transition.md), so
+        # this is a real, self-contained signal that the new mount is wired correctly, with no
+        # dependency on the shared domain having cut over yet.
+        bare_asset_path = f"/static{KNOWN_ASSET_SUFFIX}"
+        reference_bytes = fetch(f"{direct_url}{bare_asset_path}")
+        candidate_bytes = fetch(f"{direct_url}{asset_path}")
+        if reference_bytes != candidate_bytes:
+            raise VerificationError(
+                f"{app_service_name!r}: content at {asset_path} differs from {bare_asset_path} "
+                f"on the same revision ({direct_url}) — the new prefixed mount is not serving "
+                "this app's own static assets."
+            )
+        print(
+            f"OK  {app_service_name}: {len(candidate_bytes)} bytes match between {bare_asset_path} "
+            f"and {asset_path} on {direct_url}"
+        )
+        return
+
     run_service = _run_service_name(app_service_name, env)
     assert_single_revision_full_traffic(run_service)
-
     direct_base = direct_service_url(run_service)
-    asset_path = f"{static_mount_path(app_service_name)}{KNOWN_ASSET_SUFFIX}"
 
     shared_bytes = fetch(f"https://{shared_host}{asset_path}")
     direct_bytes = fetch(f"{direct_base}{asset_path}")
@@ -151,13 +186,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--host", default=None, help="Override the shared-domain host (defaults per --env)"
     )
+    parser.add_argument(
+        "--direct-url",
+        default=None,
+        help=(
+            "Compare against this URL directly instead of the app's Cloud Run service URL - for "
+            "a tagged canary revision, pre-traffic-flip. Requires exactly one app."
+        ),
+    )
     args = parser.parse_args(argv)
     shared_host = args.host or DEFAULT_HOSTS[args.env]
+
+    if args.direct_url is not None:
+        if len(args.apps) != 1:
+            parser.error("--direct-url requires exactly one app")
+        if not args.direct_url.startswith(("http://", "https://")) or args.direct_url.endswith("/"):
+            parser.error("--direct-url must start with http(s):// and have no trailing slash")
 
     failures = []
     for app in args.apps:
         try:
-            verify_app(app, shared_host=shared_host, env=args.env)
+            verify_app(app, shared_host=shared_host, env=args.env, direct_url=args.direct_url)
         except Exception as exc:  # noqa: BLE001 - one app's unexpected failure (e.g. malformed
             # `gcloud` JSON, an unhandled urllib exception) must not abort checking the rest;
             # report it against this app and keep going, per this script's per-app-report design.
