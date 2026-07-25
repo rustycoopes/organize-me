@@ -92,12 +92,22 @@ otherwise changes the relative layout, this breaks loudly (404) rather than sile
 worth a one-line comment in `tokens.css` naming the assumption for whoever touches the build layout
 next.
 
-### Host (`organize-me`) is unchanged
+### Host (`organize-me`) keeps bare `/static/*` as primary, but also gains the prefixed mount
 
-The Host stays on bare `/static/*` and remains the LB's `defaultService`. It was never part of the
-ambiguity this feature closes — after every hosted app migrates, the `defaultService` fallback is
-correctly limited to genuinely being the Host's own unprefixed requests, no longer accidentally
-absorbing every other app's too.
+The Host stays on bare `/static/*` as its permanent, primary mount and remains the LB's
+`defaultService`. It was never part of the ambiguity this feature closes — after every hosted app
+migrates, the `defaultService` fallback is correctly limited to genuinely being the Host's own
+unprefixed requests, no longer accidentally absorbing every other app's too.
+
+Caught live on QA while shipping Slice 3 (organize-me#255): `chrome_base.html` (chrome-v0.18.0+)
+has no way to know a given consumer *is* the Host — it unconditionally links its stylesheet via
+`CHROME_STATIC_PREFIX`, which `register_chrome(app_service_name="organizeme")` sets to
+`static_mount_path("organizeme")` for the Host's own pages exactly like any other app. Without a
+matching mount, every authenticated Host page's CSS 404s. The fix: `app/main.py` dual-mounts the
+same static directory at both `/static` (permanent — direct requests and `defaultService` fallback)
+and `static_mount_path("organizeme")` (satisfies `chrome_base.html`, unlike every other app there's
+no planned follow-up removal of either mount, since neither one is a transitional artifact for the
+Host the way it is for a migrating app).
 
 ### Mount transition: dual-mount for one release
 

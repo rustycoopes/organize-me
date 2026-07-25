@@ -100,3 +100,20 @@ none, unlike the HTTP fetches), and broadened `main()`'s per-app exception handl
 unexpected failure (e.g. malformed `gcloud` JSON) doesn't abort evaluation of the rest. Ran live
 against `doc-library` on QA: reports a 404 mismatch, as expected — no app has migrated its own
 static mount yet, so the new rule is still inert.
+
+**Diverged from plan — a real bug found and fixed, outside this slice's original "no app-side
+changes" scope.** CI's `e2e-qa` Playwright suite failed repeatedly and reproducibly after bumping
+the chrome pin, on tests unrelated to routing (`profile.spec.ts`, `sidebar.spec.ts`'s mobile
+drawer). Investigation (traced network responses + computed styles in a live browser against QA,
+not just re-running CI) found the actual cause: `chrome_base.html` in chrome-v0.18.0 unconditionally
+links its stylesheet via `CHROME_STATIC_PREFIX`, which the Host's own `register_chrome(
+app_service_name="organizeme")` call sets to `static_mount_path("organizeme")` — exactly like any
+other app, since `chrome_base.html` has no way to know a given consumer *is* the Host. `organize-me`
+itself only had the old bare `/static` mount, so every authenticated Host page's compiled CSS
+404'd the moment the pin bumped, unstyling the whole app (this is what broke `sidebar.spec.ts`'s
+`.fixed`-class assertion and, intermittently, `profile.spec.ts`'s render-timing). Fixed by
+dual-mounting `app/main.py`'s static directory at both the bare and prefixed paths (see TDD's
+updated "Host keeps bare `/static/*`..." section); added `tests/test_host_static_mount.py` as
+regression coverage (an authenticated page's actual stylesheet `<link>` must resolve to a mounted,
+200-returning path — the existing test suite had no such assertion, which is how this shipped in
+chrome-v0.18.0 unnoticed until Slice 3 was the first to actually bump the pin and deploy it).

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from organizeme_chrome.static_paths import static_mount_path
 
 # Imported first, deliberately - configures organizeme_chrome's registry source (see
 # app/core/registry.py's module docstring) before any router module below can call
@@ -38,6 +39,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="OrganizeMe", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+# static-asset-routing (organize-me#255): organizeme_chrome's shared chrome_base.html (chrome-v0.18.0+)
+# unconditionally links its stylesheet via the CHROME_STATIC_PREFIX Jinja global that
+# register_chrome(app_service_name="organizeme") (app/core/templating.py) sets to
+# static_mount_path("organizeme") - it has no way to know this particular consumer is the Host,
+# so the Host's own authenticated pages need this prefixed mount too, even though the Host's own
+# bare /static/* mount above never goes away (unlike every other hosted app's one-release dual
+# mount, docs/adr/static-asset-routing-mount-transition.md - the Host was never part of the
+# routing ambiguity that ADR's transition exists for, so there's no follow-up removal here).
+app.mount(
+    static_mount_path("organizeme"), StaticFiles(directory=BASE_DIR / "static"), name="static-prefixed"
+)
 
 app.include_router(auth_router)
 app.include_router(users_router)
