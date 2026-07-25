@@ -42,3 +42,20 @@ the TDD's `CHROME_STATIC_PREFIX` mechanism.
 Same pattern as Slice 4's Testing section, applied to `event-creator`'s own test suite.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-25, [event-creator#34](https://github.com/rustycoopes/event-creator/issues/34), branch `fix/static-mount-path-migration`, merged via [event-creator#35](https://github.com/rustycoopes/event-creator/pull/35))
+
+Shipped exactly the planned shape: `organizeme-chrome` pin bumped to `chrome-v0.18.0`, a second
+`app.mount()` added at `static_mount_path("event-creator")` alongside the pre-existing bare
+`/static` mount (both serving the same directory), templates re-confirmed clean of hardcoded
+`/static` references. `organize-me#255`'s verification script reports the shared domain and the
+direct Cloud Run URL serving byte-identical static assets for `event-creator` on both QA and prod.
+
+Two small additions beyond the original plan:
+- Added `tests/test_static_mount.py`, a DB-free regression test asserting both mount paths are
+  registered on `app.routes` — mirroring the equivalent test already shipped in this repo
+  (`organize-me/tests/test_host_static_mount.py`). No such coverage existed for this class of bug
+  before.
+- Registered the two mounts bare-`/static`-then-prefixed (matching `organize-me`'s own
+  `app/main.py` ordering byte-for-byte) rather than prefixed-then-bare as first drafted — a
+  cosmetic-only reordering flagged during review, functionally inert either way.
