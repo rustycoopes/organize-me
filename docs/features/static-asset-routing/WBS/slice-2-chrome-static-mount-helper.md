@@ -62,3 +62,31 @@ existing coverage in `packages/chrome/tests/test_registry.py`. A template-render
 following whatever existing test pattern covers `CHROME_ASSET_VERSION`'s rendering today.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-25, issue #254, branch `feature/chrome-static-mount-path`)
+
+Shipped as planned: `static_mount_path(service_name: str) -> str` in a new
+`organizeme_chrome/static_paths.py` (colocated with `registry.py`, not `paths.py`/`assets.py`, per
+the ADR); a `service_name` validator on `AppEntry.__post_init__`
+(`^[a-z][a-z0-9-]*$`); `tokens.css`'s three `@font-face` `src` URLs changed from
+`/static/fonts/...` to `../fonts/...`; a `CHROME_STATIC_PREFIX` Jinja global in
+`register_chrome()`, and `chrome_base.html`'s one hardcoded stylesheet `<link>` now renders
+through it. Cut as `organizeme_chrome` v0.18.0 (`chrome-v0.18.0`).
+
+Before adding the validator, confirmed every real `AppEntry.service_name` across all four repos
+(`organizeme`, `event-creator`, `doc-library`, `ha-dashboard`) already matches the pattern — no
+backward-incompatible break. Verified the relative font-URL fix against doc-library's own
+`scripts/build_css.py`, temporarily pointed at this branch's local chrome build: Tailwind's
+Lightning CSS bundler inlines the `@import`ed `tokens.css` without rewriting its relative
+`url()`s, and since both the installed package's `static/css/tokens.css` and every consumer's own
+`app/static/css/app.css` sit one level below a sibling `fonts/` dir, the unrewritten relative path
+resolves correctly in both places — confirmed by inspecting the compiled `app.css` output, then
+reverted doc-library back to its pinned `chrome-v0.16.1`.
+
+No divergence from the plan. Code review (`code-review-master` + `code-quality-guardian`) raised
+one shared must-fix (an `__post_init__` sandwiched between two dataclass fields, splitting the
+field block — moved after `qa_available`) plus minor nits (CRLF-normalized the two new files to
+match the rest of the package; tightened a test line). Two optional, non-blocking suggestions
+(a trailing-hyphen gap in the validator's pattern; a missing `registry_client` failure-path test)
+were filed as issue #260 rather than fixed here. This slice ships nothing live — no consuming app
+bumps its `organizeme-chrome` pin yet.

@@ -97,3 +97,25 @@ def test_settings_tabs_scoped_to_event_creator_include_its_own_tabs() -> None:
     settings_tabs = env.globals["settings_tabs"]
     assert isinstance(settings_tabs, list)
     assert [tab.id for tab in settings_tabs] == ["storage", "notifications", "preferences"]
+
+
+def test_chrome_static_prefix_is_derived_from_the_calling_apps_service_name() -> None:
+    env = Environment()
+
+    register_chrome(env, app_service_name="event-creator")
+
+    assert env.globals["CHROME_STATIC_PREFIX"] == "/event-creator/static"
+
+
+def test_chrome_base_html_stylesheet_link_uses_the_static_prefix_global() -> None:
+    # static-asset-routing (organize-me#254): chrome_base.html's one hardcoded static reference
+    # must render through CHROME_STATIC_PREFIX, not a bare "/static/..." path, so each app's
+    # compiled stylesheet resolves under its own service-scoped prefix.
+    env = Environment()
+
+    register_chrome(env, app_service_name="event-creator")
+
+    html_output = env.get_template("chrome_base.html").render(dark_mode=False)
+
+    assert 'href="/event-creator/static/css/app.css?v=' in html_output
+    assert 'href="/static/css/app.css' not in html_output

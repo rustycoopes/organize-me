@@ -27,6 +27,7 @@ from organizeme_chrome.design import (
 )
 from organizeme_chrome.json_filter import tojson_filter
 from organizeme_chrome.registry import get_app
+from organizeme_chrome.static_paths import static_mount_path
 from organizeme_chrome.theme import theme_attr
 
 
@@ -57,6 +58,7 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["theme_attr"] = theme_attr
     env.globals["ALPINE_CDN"] = ALPINE_CDN
     env.globals["CHROME_ASSET_VERSION"] = chrome_asset_version()
+    env.globals["CHROME_STATIC_PREFIX"] = static_mount_path(app_service_name)
     env.globals["ALERT_VARIANT_CLASSES"] = ALERT_VARIANT_CLASSES
     env.globals["BUTTON_VARIANT_CLASSES"] = BUTTON_VARIANT_CLASSES
     env.globals["BADGE_VARIANT_CLASSES"] = BADGE_VARIANT_CLASSES

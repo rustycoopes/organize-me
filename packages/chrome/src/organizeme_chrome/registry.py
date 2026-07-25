@@ -15,8 +15,11 @@ docstring used to describe is fully retired). See docs/features/registry-decoupl
 "Rollout mechanics."
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Protocol
+
+_SERVICE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,17 @@ class AppEntry:
     # QA has no backend service for it to route to. Declarative so a future QA-less app just sets
     # this instead of needing a one-off special case in the generator.
     qa_available: bool = True
+
+    def __post_init__(self) -> None:
+        # static-asset-routing (organize-me#254): service_name doubles as a URL path segment
+        # (static_mount_path()) and a GCP backend service name - both depend on it being
+        # URL-path-safe, an assumption this now enforces rather than leaves implicit. See
+        # docs/adr/static-asset-routing-prefix-derivation.md.
+        if not _SERVICE_NAME_PATTERN.match(self.service_name):
+            raise ValueError(
+                f"AppEntry.service_name={self.service_name!r} must match "
+                f"{_SERVICE_NAME_PATTERN.pattern!r}"
+            )
 
 
 class RegistrySource(Protocol):

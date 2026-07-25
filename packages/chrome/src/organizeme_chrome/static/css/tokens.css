@@ -8,14 +8,16 @@
 
    Font files referenced below are shipped alongside this file as chrome package data
    (../fonts/*.woff2) and must be copied into each consuming service's own /static mount at
-   build time so these absolute URLs resolve. */
+   build time. URLs here are relative to this file's own location (static-asset-routing,
+   organize-me#254) so they resolve correctly under any app's own static prefix
+   (/<service_name>/static/*) with no build-pipeline changes anywhere. */
 
 @font-face {
   font-family: "Baloo 2";
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url("/static/fonts/baloo-2-700.woff2") format("woff2");
+  src: url("../fonts/baloo-2-700.woff2") format("woff2");
 }
 
 @font-face {
@@ -23,7 +25,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/static/fonts/ibm-plex-sans-400.woff2") format("woff2");
+  src: url("../fonts/ibm-plex-sans-400.woff2") format("woff2");
 }
 
 @font-face {
@@ -31,7 +33,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/static/fonts/jetbrains-mono-400.woff2") format("woff2");
+  src: url("../fonts/jetbrains-mono-400.woff2") format("woff2");
 }
 
 /* Class-based (not OS-preference-based) dark mode - preserves the existing DB-driven

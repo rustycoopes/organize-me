@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-25 — #254 Slice 2: `organizeme_chrome` static-mount-path helper + `tokens.css` fix + new package version (v0.18.0) — [details](features/static-asset-routing/WBS/slice-2-chrome-static-mount-helper.md#delivered-2026-07-25-issue-254-branch-featurechrome-static-mount-path)
 - 2026-07-19 — event-creator#26 Adopt the shared OrganizeMe design system on the Dashboard and Processing pages — [details](https://github.com/rustycoopes/event-creator/pull/28)
 - 2026-07-19 — #244 Add alert success/neutral variants + table primitive classes (`organizeme_chrome`, chrome-v0.13.0) — unblocks event-creator#26 — [details](https://github.com/rustycoopes/organize-me/pull/244)
 - 2026-07-19 — #241 Slice 6: Consistent button/input macro adoption (design-refresh) — [details](features/design-refresh/WBS/slice-6-consistent-button-macro-adoption.md#delivered-2026-07-19-issue-241-branch-featureslice-6-button-input-macro-adoption)

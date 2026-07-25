@@ -117,3 +117,21 @@ def test_configure_registry_source_called_twice_fully_replaces_the_first_source(
     configure_registry_source(FakeRegistrySource([other_app]))
 
     assert [app.service_name for app in list_apps()] == ["other-app"]
+
+
+@pytest.mark.parametrize(
+    "service_name",
+    ["Doc-Library", "doc_library", "-doc-library", "1doc-library", "doc library", ""],
+)
+def test_app_entry_rejects_a_non_url_safe_service_name(service_name: str) -> None:
+    # static-asset-routing (organize-me#254): service_name doubles as a URL path segment
+    # (organizeme_chrome.static_paths.static_mount_path) and a GCP backend service name - both
+    # depend on this pattern holding.
+    with pytest.raises(ValueError, match="service_name"):
+        AppEntry(service_name=service_name, nav=[], settings_tabs=[])
+
+
+@pytest.mark.parametrize("service_name", ["doc-library", "organizeme", "a", "a1-b2"])
+def test_app_entry_accepts_a_url_safe_service_name(service_name: str) -> None:
+    app = AppEntry(service_name=service_name, nav=[], settings_tabs=[])
+    assert app.service_name == service_name
