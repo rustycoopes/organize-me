@@ -1,3 +1,4 @@
+from organizeme_chrome.assets import chrome_asset_version
 from organizeme_chrome.cdn import ALPINE_CDN
 from organizeme_chrome.jwt_verify import verify_token
 from organizeme_chrome.nav_groups import NavGroup, build_nav_groups, flat_nav_items
@@ -17,6 +18,7 @@ __all__ = [
     "AppNavItem",
     "NavGroup",
     "build_nav_groups",
+    "chrome_asset_version",
     "chrome_fonts_dir",
     "chrome_package_dir",
     "chrome_templates_dir",

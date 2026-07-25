@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}OrganizeMe{% endblock %}</title>
     <script defer src="{{ ALPINE_CDN }}"></script>
-    <link href="/static/css/app.css" rel="stylesheet" type="text/css" />
+    {# ?v=... busts any cache keying on the full URL (browser or an intermediate CDN/Load
+       Balancer) - see organizeme_chrome/assets.py's chrome_asset_version(). #}
+    <link href="/static/css/app.css?v={{ CHROME_ASSET_VERSION }}" rel="stylesheet" type="text/css" />
     <!-- Alpine's x-cloak only works if the page supplies this rule itself; without it,
          x-cloak elements flash visibly for one frame before Alpine initializes. -->
     <style>[x-cloak] { display: none !important; }</style>
