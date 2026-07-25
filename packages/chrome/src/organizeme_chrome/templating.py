@@ -1,5 +1,6 @@
 from jinja2 import ChoiceLoader, Environment, PackageLoader
 
+from organizeme_chrome.assets import chrome_asset_version
 from organizeme_chrome.cdn import ALPINE_CDN
 from organizeme_chrome.design import (
     ALERT_VARIANT_CLASSES,
@@ -55,6 +56,7 @@ def register_chrome(env: Environment, app_service_name: str) -> None:
     env.globals["settings_tabs"] = app.settings_tabs
     env.globals["theme_attr"] = theme_attr
     env.globals["ALPINE_CDN"] = ALPINE_CDN
+    env.globals["CHROME_ASSET_VERSION"] = chrome_asset_version()
     env.globals["ALERT_VARIANT_CLASSES"] = ALERT_VARIANT_CLASSES
     env.globals["BUTTON_VARIANT_CLASSES"] = BUTTON_VARIANT_CLASSES
     env.globals["BADGE_VARIANT_CLASSES"] = BADGE_VARIANT_CLASSES
