@@ -96,17 +96,26 @@ permission required) in FamilyWall's warm-lifestyle mood. Never FamilyWall's own
 
 ## Components affected
 
-`packages/chrome/src/organizeme_chrome/`: `static/css/tokens.css`, `design/classes.py`,
-`templates/components/{button,card_shell,toggle}.html`, `templates/macros/{chrome_nav,
-chrome_tabs}.html`. `app/templates/`: `landing.html`, `auth/*.html`, `settings.html`,
-`pages/placeholder.html`. See `docs/adr/container-redesign-familywall-visual-system.md` for the
-primary/secondary color-role swap rationale.
+- **organize-me** (`packages/chrome/src/organizeme_chrome/`): `static/css/tokens.css`,
+  `design/classes.py` (incl. new `danger`/`info` badge variants),
+  `templates/components/{button,card_shell,toggle,badge}.html`, `templates/macros/{chrome_nav,
+  chrome_tabs}.html`. `app/templates/`: `landing.html`, `auth/*.html`, `settings.html`,
+  `profile.html`, `pages/placeholder.html`. See
+  `docs/adr/container-redesign-familywall-visual-system.md` for the primary/secondary color-role
+  swap rationale.
+- **event-creator**: `pyproject.toml` pin bump to `chrome-v0.16.1`; `app/templates/pages/{upload,
+  processing}.html` (dropzone/drag states), full rewrite of `pages/processing_run_detail.html` and
+  `partials/processing_logs.html` off raw unstyled DaisyUI onto shared `card_shell`/`button`/
+  `status_dot` components, `partials/{events_panel,logs_grid}.html`.
+- **doc-library**: `pyproject.toml` pin bump to `chrome-v0.16.1`; `partials/doc_links_list.html`.
+- **ha-dashboard**: `pyproject.toml` pin bump to `chrome-v0.16.1`; `pages/ha_dashboard.html`,
+  `partials/ha_dashboard_tiles.html`.
 
 ## Scope
 
-This pass covers every Host-owned surface: landing, auth (login/register/forgot/reset password),
-and the authenticated shell (sidebar nav, header, Settings, Profile, shared components). Hosted
-apps (Event Creator, Doc Library, HA Dashboard) are **out of scope** — they consume this same
-`organizeme-chrome` package and will pick up the shared tokens/components automatically once each
-repo bumps its pin, but their own app-specific templates are a deliberate follow-on pass (per the
-user's own stated sequencing: container first, then the hosted apps).
+This pass covers every Host-owned surface (landing, auth, authenticated shell) **and** a full pass
+on all three hosted apps (Event Creator, Doc Library, HA Dashboard) — not just shared-component
+inheritance via the chrome pin bump, but each app's own app-specific templates too, including
+fixing pre-existing issues surfaced along the way (Event Creator's leftover unstyled DaisyUI pages,
+the primary/secondary badge-variant reuse hack). All four repos are merged to `main` and deployed
+to production on `chrome-v0.16.1`; no remaining follow-on pass.
