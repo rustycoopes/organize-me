@@ -155,6 +155,36 @@ def test_verify_app_rejects_mismatched_content(
             verify_app("doc-library", shared_host="organizeme.qa.russcoopersoftware.com", env="qa")
 
 
+@patch("infra.gcp_lb.verify_static_routing.fetch")
+@patch("infra.gcp_lb.verify_static_routing.direct_service_url")
+@patch("infra.gcp_lb.verify_static_routing.assert_single_revision_full_traffic")
+def test_verify_app_with_direct_url_skips_the_traffic_check_and_uses_the_given_url(
+    mock_traffic_check: MagicMock, mock_direct_url: MagicMock, mock_fetch: MagicMock
+) -> None:
+    mock_fetch.return_value = b"same-bytes"
+
+    verify_app(
+        "ha-dashboard",
+        shared_host="organizeme.russcoopersoftware.com",
+        env="prod",
+        direct_url="https://canary---ha-dashboard-prod-abc123.a.run.app",
+    )
+
+    mock_traffic_check.assert_not_called()
+    mock_direct_url.assert_not_called()
+    asset_path = f"{static_mount_path('ha-dashboard')}/css/app.css"
+    fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
+    assert fetched_urls == [
+        f"https://organizeme.russcoopersoftware.com{asset_path}",
+        f"https://canary---ha-dashboard-prod-abc123.a.run.app{asset_path}",
+    ]
+
+
+def test_main_rejects_direct_url_with_more_than_one_app() -> None:
+    with pytest.raises(SystemExit):
+        main(["--env", "prod", "--direct-url", "https://example.a.run.app", "doc-library", "event-creator"])
+
+
 def test_main_keeps_checking_remaining_apps_after_one_raises_an_unexpected_error() -> None:
     # An app's own bug (e.g. malformed `gcloud` JSON raising json.JSONDecodeError, not
     # VerificationError) must not abort evaluation of the apps after it in the list.

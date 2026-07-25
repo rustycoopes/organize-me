@@ -16,6 +16,12 @@ only pass apps that have actually migrated.
 
 Usage:
     uv run python -m infra.gcp_lb.verify_static_routing --env prod doc-library event-creator
+
+    # Against a single tagged canary revision (0% traffic, not yet the service's default URL) -
+    # e.g. ha-dashboard's canary rollout (docs/adr/static-asset-routing-ha-dashboard-canary.md):
+    # skips the single-revision/100%-traffic check below, since a canary is deliberately not that.
+    uv run python -m infra.gcp_lb.verify_static_routing --env prod --direct-url \
+        https://canary---ha-dashboard-prod-abc123.a.run.app ha-dashboard
 """
 
 import argparse
@@ -122,12 +128,24 @@ def fetch(url: str) -> bytes:
         raise VerificationError(f"GET {url} failed: {exc.reason}") from exc
 
 
-def verify_app(app_service_name: str, *, shared_host: str, env: str) -> None:
+def verify_app(
+    app_service_name: str, *, shared_host: str, env: str, direct_url: str | None = None
+) -> None:
     _validate_service_name(app_service_name)
     run_service = _run_service_name(app_service_name, env)
-    assert_single_revision_full_traffic(run_service)
 
-    direct_base = direct_service_url(run_service)
+    if direct_url is not None:
+        # A tagged canary revision (e.g. ha-dashboard's --no-traffic rollout,
+        # docs/adr/static-asset-routing-ha-dashboard-canary.md) deliberately serves 0% of the
+        # service's traffic pre-flip - the 100%-single-revision check below exists to keep this
+        # script from comparing against a non-representative target, but a canary revision's own
+        # URL is unambiguous regardless of the service's traffic split, so that check doesn't
+        # apply here.
+        direct_base = direct_url
+    else:
+        assert_single_revision_full_traffic(run_service)
+        direct_base = direct_service_url(run_service)
+
     asset_path = f"{static_mount_path(app_service_name)}{KNOWN_ASSET_SUFFIX}"
 
     shared_bytes = fetch(f"https://{shared_host}{asset_path}")
@@ -151,13 +169,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--host", default=None, help="Override the shared-domain host (defaults per --env)"
     )
+    parser.add_argument(
+        "--direct-url",
+        default=None,
+        help=(
+            "Compare against this URL directly instead of the app's Cloud Run service URL - for "
+            "a tagged canary revision, pre-traffic-flip. Requires exactly one app."
+        ),
+    )
     args = parser.parse_args(argv)
     shared_host = args.host or DEFAULT_HOSTS[args.env]
+
+    if args.direct_url is not None and len(args.apps) != 1:
+        parser.error("--direct-url requires exactly one app")
 
     failures = []
     for app in args.apps:
         try:
-            verify_app(app, shared_host=shared_host, env=args.env)
+            verify_app(app, shared_host=shared_host, env=args.env, direct_url=args.direct_url)
         except Exception as exc:  # noqa: BLE001 - one app's unexpected failure (e.g. malformed
             # `gcloud` JSON, an unhandled urllib exception) must not abort checking the rest;
             # report it against this app and keep going, per this script's per-app-report design.
