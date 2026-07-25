@@ -132,7 +132,6 @@ def verify_app(
     app_service_name: str, *, shared_host: str, env: str, direct_url: str | None = None
 ) -> None:
     _validate_service_name(app_service_name)
-    run_service = _run_service_name(app_service_name, env)
 
     if direct_url is not None:
         # A tagged canary revision (e.g. ha-dashboard's --no-traffic rollout,
@@ -143,6 +142,7 @@ def verify_app(
         # apply here.
         direct_base = direct_url
     else:
+        run_service = _run_service_name(app_service_name, env)
         assert_single_revision_full_traffic(run_service)
         direct_base = direct_service_url(run_service)
 
