@@ -150,8 +150,10 @@ non-representative target.
 
 For an app rolling out via a `--no-traffic` canary revision instead (`ha-dashboard`'s Slice 6, per
 [`docs/adr/static-asset-routing-ha-dashboard-canary.md`](../../docs/adr/static-asset-routing-ha-dashboard-canary.md)),
-`--direct-url` overrides the comparison target with the tagged revision's own URL and skips the
-100%-traffic assertion above (a canary is deliberately not that) — restricted to exactly one app:
+`--direct-url` points at the tagged revision's own URL — restricted to exactly one app. In this
+mode the script does **not** compare against the shared domain (pre-flip, the shared domain still
+serves the old revision, which would always report a false failure); instead it compares the
+canary revision's new prefixed mount against its own bare mount, both on that same revision:
 
 ```bash
 uv run python -m infra.gcp_lb.verify_static_routing --env prod --direct-url \

@@ -17,9 +17,11 @@ only pass apps that have actually migrated.
 Usage:
     uv run python -m infra.gcp_lb.verify_static_routing --env prod doc-library event-creator
 
-    # Against a single tagged canary revision (0% traffic, not yet the service's default URL) -
-    # e.g. ha-dashboard's canary rollout (docs/adr/static-asset-routing-ha-dashboard-canary.md):
-    # skips the single-revision/100%-traffic check below, since a canary is deliberately not that.
+    # Against a single tagged canary revision (0% traffic, pre-traffic-flip) - e.g. ha-dashboard's
+    # canary rollout (docs/adr/static-asset-routing-ha-dashboard-canary.md). This compares the
+    # canary's own new prefixed mount against its own bare mount (not against the shared domain,
+    # which is still serving the OLD revision at this point - that's the whole reason to check
+    # before the flip).
     uv run python -m infra.gcp_lb.verify_static_routing --env prod --direct-url \
         https://canary---ha-dashboard-prod-abc123.a.run.app ha-dashboard
 """
@@ -132,21 +134,36 @@ def verify_app(
     app_service_name: str, *, shared_host: str, env: str, direct_url: str | None = None
 ) -> None:
     _validate_service_name(app_service_name)
+    asset_path = f"{static_mount_path(app_service_name)}{KNOWN_ASSET_SUFFIX}"
 
     if direct_url is not None:
-        # A tagged canary revision (e.g. ha-dashboard's --no-traffic rollout,
-        # docs/adr/static-asset-routing-ha-dashboard-canary.md) deliberately serves 0% of the
-        # service's traffic pre-flip - the 100%-single-revision check below exists to keep this
-        # script from comparing against a non-representative target, but a canary revision's own
-        # URL is unambiguous regardless of the service's traffic split, so that check doesn't
-        # apply here.
-        direct_base = direct_url
-    else:
-        run_service = _run_service_name(app_service_name, env)
-        assert_single_revision_full_traffic(run_service)
-        direct_base = direct_service_url(run_service)
+        # Pre-traffic-flip canary check (docs/adr/static-asset-routing-ha-dashboard-canary.md):
+        # at this point the shared domain still routes 100% of its traffic to the OLD revision
+        # (that's the entire point of checking before the flip), so comparing against shared_host
+        # here would always report a false failure - the new content genuinely isn't reachable via
+        # the shared domain yet. Instead, confirm the canary revision's new prefixed mount serves
+        # byte-identical content to its own bare mount - both point at the same on-disk directory
+        # per the dual-mount transition (docs/adr/static-asset-routing-mount-transition.md), so
+        # this is a real, self-contained signal that the new mount is wired correctly, with no
+        # dependency on the shared domain having cut over yet.
+        bare_asset_path = f"/static{KNOWN_ASSET_SUFFIX}"
+        reference_bytes = fetch(f"{direct_url}{bare_asset_path}")
+        candidate_bytes = fetch(f"{direct_url}{asset_path}")
+        if reference_bytes != candidate_bytes:
+            raise VerificationError(
+                f"{app_service_name!r}: content at {asset_path} differs from {bare_asset_path} "
+                f"on the same revision ({direct_url}) — the new prefixed mount is not serving "
+                "this app's own static assets."
+            )
+        print(
+            f"OK  {app_service_name}: {len(candidate_bytes)} bytes match between {bare_asset_path} "
+            f"and {asset_path} on {direct_url}"
+        )
+        return
 
-    asset_path = f"{static_mount_path(app_service_name)}{KNOWN_ASSET_SUFFIX}"
+    run_service = _run_service_name(app_service_name, env)
+    assert_single_revision_full_traffic(run_service)
+    direct_base = direct_service_url(run_service)
 
     shared_bytes = fetch(f"https://{shared_host}{asset_path}")
     direct_bytes = fetch(f"{direct_base}{asset_path}")
@@ -180,8 +197,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     shared_host = args.host or DEFAULT_HOSTS[args.env]
 
-    if args.direct_url is not None and len(args.apps) != 1:
-        parser.error("--direct-url requires exactly one app")
+    if args.direct_url is not None:
+        if len(args.apps) != 1:
+            parser.error("--direct-url requires exactly one app")
+        if not args.direct_url.startswith(("http://", "https://")) or args.direct_url.endswith("/"):
+            parser.error("--direct-url must start with http(s):// and have no trailing slash")
 
     failures = []
     for app in args.apps:
