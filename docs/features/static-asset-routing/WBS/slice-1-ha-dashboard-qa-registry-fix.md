@@ -56,3 +56,35 @@ no path rule when generating for the `qa` environment, but does produce one when
 file.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-25, issue #257, branch `fix/ha-dashboard-qa-registry-mismatch`)
+
+Shipped as planned: `AppEntry` gained a `qa_available: bool = True` field
+(`packages/chrome/src/organizeme_chrome/registry.py`), `app/core/registry.py` sets it `False` on the
+`ha-dashboard` entry, and `generate_path_rules()` (`infra/gcp_lb/generate_url_map.py`) skips any
+QA-unavailable app when generating the unsuffixed (QA) URL map — inferring "this is QA" from
+`backend_suffix == ""`, the same convention `__main__` already used. Verified manually:
+`uv run python -m infra.gcp_lb.generate_url_map` (QA) emits zero `ha-dashboard` references;
+`... generate_url_map prod` still emits `ha-dashboard`'s full path set unchanged.
+
+One thing the plan didn't anticipate: `packages/chrome/src/organizeme_chrome/registry_client.py`'s
+`_parse_apps()` (the client-side JSON parse every other hosted app uses to fetch the Host's
+registry) wasn't reading `qa_available` off the wire at all, so a fetching consumer's cached
+`AppEntry` would have silently reset `qa_available` back to its default `True` regardless of what
+the Host configured. Caught by the pre-existing round-trip test
+(`tests/test_internal_registry.py::test_response_round_trips_through_the_client_side_dataclasses`)
+failing once `ha-dashboard.qa_available` was set to `False`; fixed alongside the main change, with
+its own regression test added in `packages/chrome/tests/test_registry_client.py`.
+
+`organizeme-chrome` bumped `0.17.0` → `0.17.2` (`chrome-v0.17.1` added the field, `chrome-v0.17.2`
+fixed the round-trip gap above); this repo's own pin was bumped to match. Bumping past the
+already-tagged-but-unconsumed `chrome-v0.17.0` (PR #252's stylesheet cache-busting fix, tagged but
+never picked up by this repo's own pin) was unavoidable — the git-tag dependency always resolves the
+full tagged source tree, not just this slice's diff — so this repo's chrome consumer now also
+transparently picks up `CHROME_ASSET_VERSION` cache-busting with no Host-side code change required.
+
+Code review (code-review-master, code-quality-guardian) found no blocking issues. One non-blocking
+design suggestion — making `generate_path_rules()`'s QA-vs-other-env detection an explicit parameter
+instead of inferring it from `backend_suffix == ""` — filed as
+[#258](https://github.com/rustycoopes/organize-me/issues/258) rather than implemented here, since
+current behavior is correct for the two environments (`qa`, `prod`) that exist today.
