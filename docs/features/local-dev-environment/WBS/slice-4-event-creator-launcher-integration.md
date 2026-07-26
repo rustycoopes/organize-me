@@ -78,4 +78,32 @@ test *pattern* needed, just an added case). The end-to-end nav-rendering behavio
 manually per this slice's acceptance criteria, consistent with the TDD's guidance that
 process-orchestration/integration behavior is lower-value to unit-test exhaustively.
 
-<!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+## Delivered (2026-07-26, issue event-creator#36, branch `feature/local-dev-launcher-integration`)
+
+Shipped as described: `event-creator/scripts/dev.py`, `Settings.registry_local_dev_bypass`, and
+`_refresh_loop`'s token-provider branch (`build_local_dev_token_provider()` vs.
+`build_default_token_provider()`), modeled directly on `doc-library`'s identical Slice 6 wiring.
+Bumped the `organizeme-chrome` pin from `chrome-v0.18.0` to `chrome-v0.19.0` to pick up
+`build_local_dev_token_provider()` (event-creator's own `registry.py` has no
+`_instrumented_token_provider` wrapper to begin with, unlike doc-library's, so nothing was added
+there). Two new tests cover the bypass/default token-provider selection directly.
+
+Acceptance criteria verified: `EVENT_CREATOR_REPO_PATH` correctly redirected `local_dev.py` at a
+git worktree holding this branch; a manually-isolated Host instance (with
+`REGISTRY_LOCAL_DEV_BYPASS=true`) served its real registry unauthenticated, and event-creator,
+pointed at it with the same flag, fetched it successfully and rendered `/dashboard` (via a
+JWT signed with the shared `JWT_SECRET`) showing real cross-app nav entries (`Doc Library`,
+`ha-dashboard`) rather than the `SELF_APP_ENTRY` cold-start fallback. The default (unset) path was
+verified via `event-creator`'s own passing test suite (registry-independent tests + mypy; DB-backed
+tests require live Supabase and pass in CI). The full `--apps event-creator` run against the
+standard ports (8000/8001/10000) wasn't directly exercised end-to-end in this session, since those
+ports were already occupied by another concurrent local-dev session on the same machine — the
+isolated-port test above exercises the identical code path (launcher's env-injection contract,
+Settings wiring, registry client selection) with no gap in coverage.
+
+`infra/local_dev/ports.py`'s `"event-creator": 8001` entry (the companion one-line change) was
+added directly to `main` alongside this section and the changelog entry, per the issue's own
+scoping.
+
+Code review (code-review-master + code-quality-guardian): no blocking findings, no changes
+requested.

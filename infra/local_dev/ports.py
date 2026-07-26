@@ -18,6 +18,7 @@ HOST_SERVICE_NAME = "organizeme"
 
 PORTS: dict[str, int] = {
     HOST_SERVICE_NAME: 8000,
+    "event-creator": 8001,
     "doc-library": 8002,
     "ha-dashboard": 8003,
 }
