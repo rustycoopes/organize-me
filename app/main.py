@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -5,6 +6,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from organizeme_chrome.static_paths import static_mount_path
+
+from app.core.config import Settings, get_settings
 
 # Imported first, deliberately - configures organizeme_chrome's registry source (see
 # app/core/registry.py's module docstring) before any router module below can call
@@ -27,8 +30,23 @@ from app.pages.settings import router as settings_pages_router
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def _reject_registry_bypass_on_cloud_run(settings: Settings) -> None:
+    """Fail-safe guard for `registry_local_dev_bypass` (local-dev-environment Slice 3,
+    organize-me#266): `K_SERVICE` is Cloud Run's own env var, set on every real deployment and
+    never present locally. Raising here converts "the bypass was accidentally left on in a real
+    deployment" into a boot-time crash instead of a silently reopened unauthenticated read of
+    GET /internal/app-registry.json - see
+    docs/adr/local-dev-environment-registry-sync-auth-bypass.md."""
+    if settings.registry_local_dev_bypass and os.environ.get("K_SERVICE"):
+        raise RuntimeError(
+            "registry_local_dev_bypass is true but K_SERVICE is set - refusing to start what "
+            "looks like a real Cloud Run deployment with the registry OIDC check bypassed."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _reject_registry_bypass_on_cloud_run(get_settings())
     yield
     # Imported here, not at module level, so importing app.main (e.g. for /health tests that
     # never touch the DB) doesn't force DATABASE_URL/Settings to be resolved at import time.

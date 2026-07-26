@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-26 — #266 local-dev-environment Slice 3: Host-side registry-sync local-dev bypass (`registry_local_dev_bypass` setting + `K_SERVICE` boot-time crash guard) — [details](features/local-dev-environment/WBS/slice-3-registry-bypass-host-side.md#delivered-2026-07-26-issue-266-branch-featureregistry-local-dev-bypass-host)
 - 2026-07-26 — #264 local-dev-environment Slice 1: extracted `infra/path_rules.py` out of `infra/gcp_lb/generate_url_map.py` as a provider-neutral prerequisite for Slice 2's local Caddyfile generator — [details](features/local-dev-environment/WBS/slice-1-extract-path-rules.md#delivered-2026-07-26-issue-264-branch-refactorextract-path-rules)
 - 2026-07-25 — ha-dashboard#15 Slice 6: `ha-dashboard` migrated to prefixed static path (`/ha-dashboard/static/*`) via a `--no-traffic` canary rollout, resolving the confirmed live incident where the shared prod domain served the Host's CSS instead of its own — [details](features/static-asset-routing/WBS/slice-6-ha-dashboard-migration.md#delivered-2026-07-25-ha-dashboard15-branch-featureslice-6-static-prefix-migration-in-ha-dashboard)
 - 2026-07-25 — doc-library#30 Slice 4: `doc-library` migrated to prefixed static path (`/doc-library/static/*`), dual-mounted alongside the old bare `/static/*` for one release — [details](features/static-asset-routing/WBS/slice-4-doc-library-migration.md#delivered-2026-07-25-doc-library30-branch-featurestatic-asset-routing-slice-4-in-doc-library)

@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # identity via the metadata server, so this is the one email the endpoint accepts.
     registry_endpoint_url: str = ""
     registry_invoker_service_account: str = ""
+    # local-dev-environment Slice 3 (organize-me#266): lets a locally-running consumer app fetch
+    # the real registry without a Google-signed OIDC token, which is unobtainable off real GCP
+    # infra. Evaluated only from this Host's own config, never from anything a caller claims about
+    # itself - see docs/adr/local-dev-environment-registry-sync-auth-bypass.md. Set only by the
+    # local-dev launcher as a subprocess env var, never hand-added to .env.local; app/main.py's
+    # startup guard crashes the process if this is ever true on real Cloud Run infra.
+    registry_local_dev_bypass: bool = False
 
 
 @lru_cache

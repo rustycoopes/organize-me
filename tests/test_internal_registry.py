@@ -103,6 +103,72 @@ async def test_returns_503_when_settings_unconfigured(
     assert response.json()["detail"] == "not_configured"
 
 
+async def test_local_dev_bypass_short_circuits_when_oidc_settings_unset(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REGISTRY_ENDPOINT_URL", "")
+    monkeypatch.setenv("REGISTRY_INVOKER_SERVICE_ACCOUNT", "")
+    monkeypatch.setenv("REGISTRY_LOCAL_DEV_BYPASS", "true")
+    get_settings.cache_clear()
+
+    response = await _get(client, token=None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["service_name"] for entry in body] == [app.service_name for app in APPS]
+
+
+async def test_local_dev_bypass_is_inert_when_oidc_settings_are_populated(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # _configure_oidc_settings already populates REGISTRY_ENDPOINT_URL/
+    # REGISTRY_INVOKER_SERVICE_ACCOUNT - turning the bypass on here must not change the outcome:
+    # the real OIDC check still runs and still rejects a missing token.
+    monkeypatch.setenv("REGISTRY_LOCAL_DEV_BYPASS", "true")
+    get_settings.cache_clear()
+
+    response = await _get(client, token=None)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "missing_token"
+
+
+async def test_local_dev_bypass_does_not_affect_a_valid_token_when_oidc_settings_are_populated(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Proves inertness end-to-end, not just that a missing token is still rejected: with the
+    # bypass on but real OIDC settings populated, a genuinely valid token must still succeed via
+    # the real check, exactly as if the bypass were off.
+    monkeypatch.setenv("REGISTRY_LOCAL_DEV_BYPASS", "true")
+    get_settings.cache_clear()
+    _accept_valid_token(monkeypatch)
+
+    response = await _get(client, token="valid-token")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["service_name"] for entry in body] == [app.service_name for app in APPS]
+
+
+@pytest.mark.parametrize(
+    "unset_env_var", ["REGISTRY_ENDPOINT_URL", "REGISTRY_INVOKER_SERVICE_ACCOUNT"]
+)
+async def test_local_dev_bypass_is_inert_when_only_one_oidc_setting_is_populated(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, unset_env_var: str
+) -> None:
+    # A half-migrated deployment (one real setting populated, the other still empty) must fail
+    # closed exactly as it would with the bypass off - the bypass only ever fires while *both*
+    # settings are still at their pristine empty default, never for just one of the two.
+    monkeypatch.setenv(unset_env_var, "")
+    monkeypatch.setenv("REGISTRY_LOCAL_DEV_BYPASS", "true")
+    get_settings.cache_clear()
+
+    response = await _get(client, token="anything")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "not_configured"
+
+
 async def test_valid_token_returns_the_current_registry(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
