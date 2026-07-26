@@ -59,3 +59,44 @@ Same shape as Slice 4: a direct test of `ha-dashboard`'s consumer-side bypass se
 manual verification of the end-to-end nav-rendering acceptance criteria above.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-26, issue ha-dashboard#18, branch `feature/local-dev-launcher-integration`)
+
+Shipped as designed: `ha-dashboard/scripts/dev.py` (new, mirrors organize-me's own), `Settings.
+registry_local_dev_bypass: bool = False` (read from `REGISTRY_LOCAL_DEV_BYPASS`), and
+`app/core/registry.py`'s `_refresh_loop` selecting `organizeme_chrome.registry_client.
+build_local_dev_token_provider()` instead of the real OIDC provider when the flag is true.
+`registry_host_url` needed no separate override code - the launcher already injects
+`REGISTRY_HOST_URL` generically (Slice 2), and `Settings` already read that field for the
+QA/prod Load-Balancer-bypass case.
+
+Two companion changes landed in `organize-me` ahead of this repo's own PR, since `build_local_dev_
+token_provider()` didn't exist yet in `organizeme_chrome.registry_client` (event-creator/doc-
+library's Slice 4/6 were still in flight in parallel, so this is the first of the three consumer
+slices to add it to the shared package rather than a private copy):
+
+- #273 — adds `build_local_dev_token_provider()` to `packages/chrome` + the `"ha-dashboard": 8003`
+  `infra/local_dev/ports.py` entry (`chrome-v0.19.0`).
+- #274 — a code-review-master pass caught a dead-code duplicate `return _provider` statement left
+  over from #273's edit (harmless - the function already returns on the first `return`, no
+  functional bug); fixed as a clean patch release (`chrome-v0.19.1`), which `ha-dashboard`'s PR
+  pins to directly rather than the short-lived `chrome-v0.19.0`.
+
+One test-shape refinement beyond the WBS's literal wording, surfaced during the code-review pass
+(`code-review-master` + `code-quality-guardian`, both independently flagged the same thing): the
+first draft of the two bypass-selection tests monkeypatched `build_local_dev_token_provider` itself
+away to a sentinel object, which was unnecessary over-mocking of a real, pure, I/O-free function.
+Rewritten to mirror doc-library's identical Slice 6 tests instead - drive the real
+`start_registry_refresh_task`, capture whichever token provider actually got passed to a faked
+`fetch_registry_once`, and assert on the actual token string returned by `await token_provider()`,
+only faking `build_default_token_provider` (the one that genuinely needs an unreachable GCP
+metadata server). The review also flagged an initial `_build_token_provider` helper extracted out
+of `_refresh_loop` as an unnecessary structural divergence from doc-library's identical slice
+(which kept the bypass `if`/`else` inline) - reverted to match.
+
+`ha-dashboard`'s own DB-backed test suite couldn't be run end-to-end in this session's local dev
+environment (a pre-existing Supabase-pooler connectivity issue, confirmed present on unmodified
+`main` too and unrelated to this change) - relied on this repo's own CI (throwaway Postgres
+container) for that coverage instead, plus manual verification that `scripts/dev.py` boots cleanly
+and that the bypass path reaches a real Host process over HTTP without ever calling google-auth's
+metadata server.
