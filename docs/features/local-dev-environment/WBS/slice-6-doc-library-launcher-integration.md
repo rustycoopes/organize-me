@@ -70,13 +70,22 @@ end-to-end nav-rendering acceptance criteria above.
 Shipped as designed: `doc-library/scripts/dev.py` (byte-identical in shape to `organize-me`'s own
 `scripts/dev.py`); `registry_local_dev_bypass: bool = False` on doc-library's `Settings`
 (`app/core/config.py`); `app/core/registry.py`'s `_refresh_loop` now branches on that flag,
-selecting a new `_build_local_dev_token_provider()` (a constant placeholder string, no
-metadata-server round trip) instead of the existing `_instrumented_token_provider(build_default_
-token_provider(...), ...)` when it's true; `README.md` points at `organize-me`'s "Local
-development" doc. `registry_host_url` needed no code change — it already reads unconditionally
-from `REGISTRY_HOST_URL`, which the launcher sets to the Host's local port the same way CI/deploy
-already set it to the real QA/prod Host URL. The companion `infra/local_dev/ports.py` entry
-(`"doc-library": 8002`) shipped separately, direct to `organize-me`'s `main`, ahead of this PR.
+selecting `organizeme_chrome.registry_client.build_local_dev_token_provider()` (a constant
+placeholder string, no metadata-server round trip) instead of the existing
+`_instrumented_token_provider(build_default_token_provider(...), ...)` when it's true; `README.md`
+points at `organize-me`'s "Local development" doc. `registry_host_url` needed no code change — it
+already reads unconditionally from `REGISTRY_HOST_URL`, which the launcher sets to the Host's local
+port the same way CI/deploy already set it to the real QA/prod Host URL. The companion
+`infra/local_dev/ports.py` entry (`"doc-library": 8002`) shipped separately, direct to
+`organize-me`'s `main`, ahead of this PR.
+
+Initial implementation added a private `_build_local_dev_token_provider()` local to this repo's own
+`app/core/registry.py` (see the superseded follow-up discussion below), but while this PR was in
+flight, `organize-me`#273 (the companion PR for ha-dashboard#18, `local-dev-environment` Slice 7)
+landed the real shared `organizeme_chrome.registry_client.build_local_dev_token_provider()`
+(chrome-v0.19.0) — ha-dashboard reached the "second consumer" point first. This PR was updated to
+bump to chrome-v0.19.0 and import the shared function instead of keeping the private copy, so
+doc-library never actually shipped its own duplicate.
 
 End-to-end verified manually (this dev machine has no local Postgres, so the DB-backed half of
 doc-library's own suite couldn't run locally — confirmed instead that CI, which does have QA
@@ -98,15 +107,14 @@ behavior, unchanged by this diff) and this dev machine's known ARM64 gap (no `py
 windows-arm64 binary) means `scripts/dev.py`'s own CSS-watcher subprocess can't run here — an
 existing, unrelated environment limitation, not something this issue introduced.
 
-One divergence from the WBS's literal wording, surfaced by the `code-review-master` review: the
-WBS/ADR describe `registry_client.py` gaining `build_local_dev_token_provider()`, which read
-literally names the *shared* `organizeme_chrome.registry_client` module. What shipped is a private
-`_build_local_dev_token_provider()` local to doc-library's own `app/core/registry.py` instead —
-consistent with this file's existing `_instrumented_token_provider` convention, and avoids a
-shared-package version-bump/release cycle that neither this issue nor any merged slice budgeted
-for (no other consumer app has implemented this yet either, so there's no shared-package
-precedent to match). Both reviewing agents agreed this shouldn't block the PR; filed as a
-follow-up (doc-library#33, Intake) to promote it to `organizeme_chrome.registry_client` once a
-second consumer (`event-creator` Slice 4 or `ha-dashboard` Slice 7) actually needs the same
-function, at which point the duplication would cross the threshold that justifies the version
-bump.
+Divergence-that-resolved-itself: the WBS/ADR describe `registry_client.py` gaining
+`build_local_dev_token_provider()`, which read literally names the *shared*
+`organizeme_chrome.registry_client` module. The first pass here shipped a private
+`_build_local_dev_token_provider()` local to doc-library's own `app/core/registry.py` instead,
+reasoning that no other consumer app had implemented this yet so there was no shared-package
+precedent to match, and filed a follow-up (doc-library#33, Intake) to promote it once a second
+consumer landed. Both reviewing agents (`code-review-master`, `code-quality-guardian`) agreed that
+call was defensible but flagged the duplication risk. Before this PR merged, `ha-dashboard`#18
+reached that "second consumer" point first (`organize-me`#273) and added the real shared function —
+so this PR was updated in place to consume it, and doc-library#33 was closed as superseded rather
+than acted on.
