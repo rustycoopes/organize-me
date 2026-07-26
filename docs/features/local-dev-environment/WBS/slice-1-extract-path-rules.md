@@ -54,3 +54,27 @@ so Slice 2's Caddyfile-generator tests have an obvious sibling to follow — sam
 constructed `AppEntry` objects, no real network/subprocess/file dependency.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-26, issue #264, branch `refactor/extract-path-rules`)
+
+`PathRule`, `generate_path_rules()`, `_claim_path()`, and `_prefix_patterns()` moved byte-for-byte
+into the new `infra/path_rules.py`, alongside `HOST_BACKEND`/`HOST_PATHS`. `infra/gcp_lb/
+generate_url_map.py` now imports these via explicit `from infra.path_rules import X as X`
+re-exports (needed so `mypy --strict`'s `no_implicit_reexport` doesn't flag the still-unmodified
+`tests/test_url_map_generator.py`'s `from infra.gcp_lb.generate_url_map import ...` call site) and
+keeps only its GCP-specific remainder: `_backend_service_ref()`, `to_url_map_yaml()`, and the
+`__main__` CLI entrypoint. Its module docstring was trimmed to describe that narrower remaining
+scope rather than the (now relocated) derivation rules.
+
+`tests/test_path_rules.py` was added with the path-rule-generation-specific cases duplicated
+(not moved) from `tests/test_url_map_generator.py`, which was left completely unmodified — proving
+the relocation didn't change behavior. `uv run python -m infra.gcp_lb.generate_url_map` output was
+diffed before/after for both QA (`backend_suffix=""`) and prod (`backend_suffix="-prod"`) and
+confirmed byte-identical. `mypy --strict` and the full `pytest` suite (211 tests) pass.
+
+Two independent reviews (code-review-master, code-quality-guardian) ran against the diff.
+code-review-master found no issues. code-quality-guardian flagged the stale docstring above
+(fixed here) and separately flagged that duplicating rather than trimming
+`tests/test_url_map_generator.py` creates an ongoing two-file maintenance cost for any future
+path-rule-logic change — not a blocker for this pure-relocation slice, so it's tracked as a
+follow-up instead: [#267](https://github.com/rustycoopes/organize-me/issues/267).
