@@ -117,5 +117,3 @@ def build_local_dev_token_provider() -> TokenProvider:
         return "local-dev-placeholder-token"
 
     return _provider
-
-    return _provider
