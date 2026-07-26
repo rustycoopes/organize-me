@@ -2,7 +2,11 @@ import httpx
 import pytest
 
 from organizeme_chrome.registry import AppEntry, AppNavItem, SettingsTab
-from organizeme_chrome.registry_client import FetchedRegistrySource, fetch_registry_once
+from organizeme_chrome.registry_client import (
+    FetchedRegistrySource,
+    build_local_dev_token_provider,
+    fetch_registry_once,
+)
 
 _TOKEN = "fake-oidc-token"
 
@@ -135,6 +139,15 @@ async def test_fetch_registry_once_raises_on_unexpected_shape() -> None:
     async with _client(handler) as client:
         with pytest.raises(ValueError):
             await fetch_registry_once(client, "https://host.example", _fake_token_provider)
+
+
+async def test_build_local_dev_token_provider_returns_a_constant_placeholder() -> None:
+    provider = build_local_dev_token_provider()
+
+    assert await provider() == "local-dev-placeholder-token"
+    # Called twice: proves it's a constant, not something that varies per-call (e.g. a counter or
+    # a timestamp) that would make a consumer's local-dev behavior non-deterministic.
+    assert await provider() == await provider()
 
 
 def _self_entry() -> AppEntry:

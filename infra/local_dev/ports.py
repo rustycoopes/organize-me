@@ -19,6 +19,7 @@ HOST_SERVICE_NAME = "organizeme"
 PORTS: dict[str, int] = {
     HOST_SERVICE_NAME: 8000,
     "doc-library": 8002,
+    "ha-dashboard": 8003,
 }
 
 # Overridable so a developer with something else already bound to :10000 can move the shared
