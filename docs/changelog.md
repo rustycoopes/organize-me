@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-26 — #264 local-dev-environment Slice 1: extracted `infra/path_rules.py` out of `infra/gcp_lb/generate_url_map.py` as a provider-neutral prerequisite for Slice 2's local Caddyfile generator — [details](features/local-dev-environment/WBS/slice-1-extract-path-rules.md#delivered-2026-07-26-issue-264-branch-refactorextract-path-rules)
 - 2026-07-25 — ha-dashboard#15 Slice 6: `ha-dashboard` migrated to prefixed static path (`/ha-dashboard/static/*`) via a `--no-traffic` canary rollout, resolving the confirmed live incident where the shared prod domain served the Host's CSS instead of its own — [details](features/static-asset-routing/WBS/slice-6-ha-dashboard-migration.md#delivered-2026-07-25-ha-dashboard15-branch-featureslice-6-static-prefix-migration-in-ha-dashboard)
 - 2026-07-25 — doc-library#30 Slice 4: `doc-library` migrated to prefixed static path (`/doc-library/static/*`), dual-mounted alongside the old bare `/static/*` for one release — [details](features/static-asset-routing/WBS/slice-4-doc-library-migration.md#delivered-2026-07-25-doc-library30-branch-featurestatic-asset-routing-slice-4-in-doc-library)
 - 2026-07-25 — event-creator#34 Slice 5: migrate `event-creator` to prefixed static path (`/event-creator/static/*`) — [details](features/static-asset-routing/WBS/slice-5-event-creator-migration.md#delivered-2026-07-25-event-creator34-branch-fixstatic-mount-path-migration-merged-via-event-creator35)
