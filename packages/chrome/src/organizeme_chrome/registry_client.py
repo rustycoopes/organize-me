@@ -104,3 +104,18 @@ def build_default_token_provider(audience: str) -> TokenProvider:
         return await asyncio.to_thread(_fetch_id_token_blocking, audience)
 
     return _provider
+
+
+def build_local_dev_token_provider() -> TokenProvider:
+    """The local-dev `token_provider`: a constant placeholder string, no metadata-server round
+    trip (unreachable off real GCP infrastructure anyway). Only ever selected by a consumer whose
+    own `registry_local_dev_bypass` setting is true, which the Host's own
+    `_verify_registry_read_token` only honors when it is itself running with the matching bypass -
+    see docs/adr/local-dev-environment-registry-sync-auth-bypass.md."""
+
+    async def _provider() -> str:
+        return "local-dev-placeholder-token"
+
+    return _provider
+
+    return _provider
