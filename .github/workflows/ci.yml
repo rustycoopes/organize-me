@@ -50,7 +50,7 @@ jobs:
         run: uv run pytest
 
       - name: Run mypy
-        run: uv run mypy app tests scripts
+        run: uv run mypy app tests scripts infra
 
   deploy-qa:
     needs: test
