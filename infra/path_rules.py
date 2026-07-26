@@ -66,7 +66,10 @@ def _prefix_patterns(prefix: str) -> list[str]:
 
 
 def generate_path_rules(
-    apps: list[AppEntry] | None = None, *, backend_suffix: str = ""
+    apps: list[AppEntry] | None = None,
+    *,
+    backend_suffix: str = "",
+    apply_qa_filter: bool = True,
 ) -> list[PathRule]:
     if apps is None:
         apps = list_apps()
@@ -75,8 +78,13 @@ def generate_path_rules(
     # other environment gets "-{env}"). An app with no QA deployment (organize-me#257, e.g.
     # ha-dashboard — docs/adr/ha-dashboard-no-qa-environment.md) has no QA backend service to route
     # to, so it must be skipped entirely when generating QA's URL map, not just left unsuffixed.
-    is_qa = backend_suffix == ""
-    apps = [app for app in apps if app.qa_available or not is_qa]
+    # This filtering is GCP-specific (QA/prod is a real distinction there); the local Caddyfile
+    # generator (infra/local_dev/generate_caddyfile.py) passes apply_qa_filter=False, since there's
+    # only one local environment and an app's lack of a QA deployment has no bearing on whether it
+    # can run locally — see docs/adr/local-dev-environment-local-reverse-proxy.md.
+    if apply_qa_filter:
+        is_qa = backend_suffix == ""
+        apps = [app for app in apps if app.qa_available or not is_qa]
 
     host_backend = f"{HOST_BACKEND}{backend_suffix}"
     rules = [PathRule(service=host_backend, paths=list(HOST_PATHS))]

@@ -60,6 +60,15 @@ uv run uvicorn app.main:app --reload
 
 The app serves `GET /health` for a liveness check. Local dev connects directly to the Supabase QA database and Upstash Redis via `.env.local` — no local Docker required for either.
 
+### Running the whole platform locally
+
+To run the Host alongside other hosted apps behind a shared local origin (matching how QA/prod
+route across services), see [`docs/local-development.md`](docs/local-development.md):
+
+```bash
+uv run python scripts/local_dev.py
+```
+
 ### CSS (Tailwind)
 
 The compiled stylesheet (`app/static/css/app.css`) isn't wired into `uvicorn --reload` — run its

@@ -261,6 +261,26 @@ def test_qa_unavailable_app_is_skipped_for_qa_but_included_for_prod() -> None:
     assert f"{static_mount_path('ha-dashboard')}/*" in prod_rule.paths
 
 
+def test_apply_qa_filter_false_includes_qa_unavailable_apps_regardless_of_backend_suffix() -> None:
+    # infra/local_dev/generate_caddyfile.py (local-dev-environment Slice 2) needs every
+    # registered app's rule regardless of its qa_available flag - there's only one local
+    # environment, so GCP's QA/prod distinction doesn't apply.
+    apps = [
+        AppEntry(
+            service_name="ha-dashboard",
+            nav=[AppNavItem("/ha-dashboard", "HA Dashboard")],
+            settings_tabs=[],
+            qa_available=False,
+        )
+    ]
+
+    rules = generate_path_rules(apps=apps, apply_qa_filter=False)
+
+    assert {r.service for r in rules} == {"host-backend", "ha-dashboard-backend"}
+    ha_rule = next(r for r in rules if r.service == "ha-dashboard-backend")
+    assert "/ha-dashboard" in ha_rule.paths
+
+
 def test_qa_available_defaults_to_true_so_existing_apps_are_unaffected() -> None:
     apps = [
         AppEntry(service_name="organizeme", nav=[AppNavItem("/dashboard", "Dashboard")], settings_tabs=[])
