@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-26 — #266 local-dev-environment Slice 3: Host-side registry-sync local-dev bypass (`registry_local_dev_bypass` setting + `K_SERVICE` boot-time crash guard) — [details](features/local-dev-environment/WBS/slice-3-registry-bypass-host-side.md#delivered-2026-07-26-issue-266-branch-featureregistry-local-dev-bypass-host)
 - 2026-07-26 — #265 local-dev-environment Slice 2: local launcher (`scripts/local_dev.py`) + Caddy reverse-proxy generator, Host-only — run the Host locally behind `http://localhost:10000`, matching QA/prod routing — [details](features/local-dev-environment/WBS/slice-2-launcher-and-proxy-host-only.md#delivered-2026-07-26-issue-265-branch-featurelocal-launcher-caddy-host-only)
 - 2026-07-26 — #264 local-dev-environment Slice 1: extracted `infra/path_rules.py` out of `infra/gcp_lb/generate_url_map.py` as a provider-neutral prerequisite for Slice 2's local Caddyfile generator — [details](features/local-dev-environment/WBS/slice-1-extract-path-rules.md#delivered-2026-07-26-issue-264-branch-refactorextract-path-rules)
 - 2026-07-25 — ha-dashboard#15 Slice 6: `ha-dashboard` migrated to prefixed static path (`/ha-dashboard/static/*`) via a `--no-traffic` canary rollout, resolving the confirmed live incident where the shared prod domain served the Host's CSS instead of its own — [details](features/static-asset-routing/WBS/slice-6-ha-dashboard-migration.md#delivered-2026-07-25-ha-dashboard15-branch-featureslice-6-static-prefix-migration-in-ha-dashboard)

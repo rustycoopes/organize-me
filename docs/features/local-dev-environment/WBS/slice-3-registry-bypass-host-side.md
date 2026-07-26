@@ -56,3 +56,28 @@ populated. Mirrors `tests/test_internal_registry.py`'s existing structure. A sec
 the startup guard raises when `registry_local_dev_bypass=True` and `K_SERVICE` is set.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-26, issue #266, branch `feature/registry-local-dev-bypass-host`)
+
+Shipped as designed: `registry_local_dev_bypass: bool = False` on the Host's `Settings`
+(`app/core/config.py`); `_verify_registry_read_token` (`app/api/internal/registry.py`) checks it
+before parsing any `Authorization` header and short-circuits with a `logger.warning` when true;
+`app/main.py`'s `lifespan` calls a new `_reject_registry_bypass_on_cloud_run` before `yield`,
+raising `RuntimeError` if the bypass is on while `K_SERVICE` is set.
+
+One refinement beyond the WBS's literal wording, surfaced during the code-review pass
+(`code-review-master` + `code-quality-guardian`, both independently flagged it): the bypass's
+inertness condition uses `registry_endpoint_url OR registry_invoker_service_account` (either one
+populated disables the bypass), not `AND`. Firing only when *both* are still empty is stricter
+than "inert once populated" read literally as an AND - a half-migrated deployment with just one
+of the two settings set now still fails closed (503 `not_configured`) exactly as it would with the
+bypass off, rather than silently serving an unauthenticated read. Added
+`test_local_dev_bypass_is_inert_when_only_one_oidc_setting_is_populated` (parametrized over both
+settings) plus `test_local_dev_bypass_does_not_affect_a_valid_token_when_oidc_settings_are_populated`
+to `tests/test_internal_registry.py` to pin this down; `tests/test_main_startup.py` is new,
+covering the three meaningful `(registry_local_dev_bypass, K_SERVICE)` combinations for the
+startup guard directly.
+
+A lower-priority follow-up (a lifespan-level integration test for the startup guard, since the
+current tests call `_reject_registry_bypass_on_cloud_run` directly rather than booting the real
+ASGI app) was filed as issue #271 rather than done here.

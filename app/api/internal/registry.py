@@ -55,7 +55,21 @@ def _verify_registry_read_token(request: Request, settings: Settings = Depends(g
     Checks both the token's signature/expiry (verified against Google's public certs by
     `id_token.verify_oauth2_token`) and that its `aud`/`email` claims match what this deployment
     expects; a token that's validly signed but minted for a different audience or service account
-    must not be accepted here."""
+    must not be accepted here.
+
+    `registry_local_dev_bypass` (local-dev-environment Slice 3, organize-me#266) short-circuits
+    this check entirely, but only while *neither* real OIDC setting has been touched - as soon as
+    either `registry_endpoint_url` or `registry_invoker_service_account` is populated (even just
+    one, e.g. a half-finished migration), the bypass goes inert and the real check below runs
+    instead, so a partially-configured real deployment still fails closed rather than silently
+    serving an unauthenticated read. See
+    docs/adr/local-dev-environment-registry-sync-auth-bypass.md."""
+    if settings.registry_local_dev_bypass and not (
+        settings.registry_endpoint_url or settings.registry_invoker_service_account
+    ):
+        logger.warning("registry endpoint: local-dev bypass active, OIDC check skipped")
+        return
+
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
