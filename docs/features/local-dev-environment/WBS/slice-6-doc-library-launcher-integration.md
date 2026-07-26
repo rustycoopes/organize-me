@@ -64,3 +64,49 @@ Same shape as Slice 4: a direct test of `doc-library`'s consumer-side bypass sel
 end-to-end nav-rendering acceptance criteria above.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-26, issue doc-library#32, branch `feature/local-dev-launcher-integration`)
+
+Shipped as designed: `doc-library/scripts/dev.py` (byte-identical in shape to `organize-me`'s own
+`scripts/dev.py`); `registry_local_dev_bypass: bool = False` on doc-library's `Settings`
+(`app/core/config.py`); `app/core/registry.py`'s `_refresh_loop` now branches on that flag,
+selecting a new `_build_local_dev_token_provider()` (a constant placeholder string, no
+metadata-server round trip) instead of the existing `_instrumented_token_provider(build_default_
+token_provider(...), ...)` when it's true; `README.md` points at `organize-me`'s "Local
+development" doc. `registry_host_url` needed no code change — it already reads unconditionally
+from `REGISTRY_HOST_URL`, which the launcher sets to the Host's local port the same way CI/deploy
+already set it to the real QA/prod Host URL. The companion `infra/local_dev/ports.py` entry
+(`"doc-library": 8002`) shipped separately, direct to `organize-me`'s `main`, ahead of this PR.
+
+End-to-end verified manually (this dev machine has no local Postgres, so the DB-backed half of
+doc-library's own suite couldn't run locally — confirmed instead that CI, which does have QA
+Supabase access via secrets, exercises those unaffected): started `organize-me`'s Host directly
+with `REGISTRY_LOCAL_DEV_BYPASS=true` on an alternate port and doc-library with
+`REGISTRY_LOCAL_DEV_BYPASS=true`/`REGISTRY_HOST_URL` pointed at it (equivalent to what
+`scripts/local_dev.py` injects, done this way to avoid colliding with another already-running
+local-dev session on the default ports) — confirmed the Host's `/internal/app-registry.json`
+served unauthenticated, and doc-library's refresh loop logged `freshly-refreshed (4 apps)` within
+its first attempt, proving it received the real multi-app registry rather than staying on its
+1-entry `SELF_APP_ENTRY` cold-start default. Separately confirmed `DOC_LIBRARY_REPO_PATH`
+correctly redirects `scripts/local_dev.py`'s `resolve_repo_path()`/`_discoverable_non_host_
+services()` to an alternate checkout (this issue's own worktree, which the sibling-directory
+default doesn't have `scripts/dev.py` on yet) and that doc-library is auto-discovered with no
+`--apps` flag once that override is set — both by calling those functions directly against the
+override env var, the same code path `scripts/local_dev.py --apps doc-library` itself uses. Full
+Caddy+login UI verification wasn't re-run (Slices 2/3 already cover Caddy routing/SSO-cookie
+behavior, unchanged by this diff) and this dev machine's known ARM64 gap (no `pytailwindcss`
+windows-arm64 binary) means `scripts/dev.py`'s own CSS-watcher subprocess can't run here — an
+existing, unrelated environment limitation, not something this issue introduced.
+
+One divergence from the WBS's literal wording, surfaced by the `code-review-master` review: the
+WBS/ADR describe `registry_client.py` gaining `build_local_dev_token_provider()`, which read
+literally names the *shared* `organizeme_chrome.registry_client` module. What shipped is a private
+`_build_local_dev_token_provider()` local to doc-library's own `app/core/registry.py` instead —
+consistent with this file's existing `_instrumented_token_provider` convention, and avoids a
+shared-package version-bump/release cycle that neither this issue nor any merged slice budgeted
+for (no other consumer app has implemented this yet either, so there's no shared-package
+precedent to match). Both reviewing agents agreed this shouldn't block the PR; filed as a
+follow-up (doc-library#33, Intake) to promote it to `organizeme_chrome.registry_client` once a
+second consumer (`event-creator` Slice 4 or `ha-dashboard` Slice 7) actually needs the same
+function, at which point the duplication would cross the threshold that justifies the version
+bump.

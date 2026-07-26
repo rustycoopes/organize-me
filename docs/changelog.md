@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Added
+- 2026-07-26 — doc-library#32 local-dev-environment Slice 6: `doc-library` local-dev launcher integration — `scripts/dev.py`, consumer-side `registry_local_dev_bypass` wiring (`_build_local_dev_token_provider`), README pointer — [details](features/local-dev-environment/WBS/slice-6-doc-library-launcher-integration.md#delivered-2026-07-26-issue-doc-library32-branch-featurelocal-dev-launcher-integration)
 - 2026-07-26 — #266 local-dev-environment Slice 3: Host-side registry-sync local-dev bypass (`registry_local_dev_bypass` setting + `K_SERVICE` boot-time crash guard) — [details](features/local-dev-environment/WBS/slice-3-registry-bypass-host-side.md#delivered-2026-07-26-issue-266-branch-featureregistry-local-dev-bypass-host)
 - 2026-07-26 — #265 local-dev-environment Slice 2: local launcher (`scripts/local_dev.py`) + Caddy reverse-proxy generator, Host-only — run the Host locally behind `http://localhost:10000`, matching QA/prod routing — [details](features/local-dev-environment/WBS/slice-2-launcher-and-proxy-host-only.md#delivered-2026-07-26-issue-265-branch-featurelocal-launcher-caddy-host-only)
 - 2026-07-26 — #264 local-dev-environment Slice 1: extracted `infra/path_rules.py` out of `infra/gcp_lb/generate_url_map.py` as a provider-neutral prerequisite for Slice 2's local Caddyfile generator — [details](features/local-dev-environment/WBS/slice-1-extract-path-rules.md#delivered-2026-07-26-issue-264-branch-refactorextract-path-rules)
