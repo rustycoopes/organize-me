@@ -124,4 +124,46 @@ output relaying/prefixing) is explicitly lower-value to unit test exhaustively p
 slice's acceptance criteria above (manually verified: run it, log in, Ctrl-C, run it again) are the
 intended coverage instead of mocked-subprocess unit tests.
 
-<!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+## Delivered (2026-07-26, issue #265, branch `feature/local-launcher-caddy-host-only`)
+
+Shipped as designed: `infra/local_dev/ports.py` (port map + `CADDY_LOCAL_PORT`),
+`infra/local_dev/generate_caddyfile.py` (pure Caddyfile generator built on `infra/path_rules.py`),
+`organize-me/scripts/dev.py`, and `organize-me/scripts/local_dev.py` (the orchestrator), plus the
+"Local development" doc section (`docs/local-development.md`) and a `README.md` pointer.
+
+Two things diverged from the plan, both found during implementation/review rather than anticipated
+up front:
+
+- `generate_path_rules()` gained a new `apply_qa_filter: bool = True` keyword (defaulting to the
+  existing GCP-facing behavior). Without it, `generate_caddyfile()` silently dropped any app with
+  `qa_available=False` (e.g. `ha-dashboard`) even when it *did* have a local port assigned — a
+  real bug against the registry as it stands today, not just a hypothetical. `generate_caddyfile()`
+  now calls it with `apply_qa_filter=False`, since a QA/prod distinction has no bearing on the one
+  local environment. Resolves the open question `slice-1-extract-path-rules.md` flagged for this
+  slice to confirm.
+- `ManagedProcess.terminate()` (the Ctrl-C cleanup path) tree-kills via `taskkill /T /F` on
+  Windows, and via a POSIX process group (`start_new_session=True` at spawn +
+  `os.killpg(..., SIGTERM)`, falling back to `SIGKILL` after a timeout) on macOS/Linux — the WBS
+  text only anticipated the Windows gap; the POSIX equivalent was added during code review so
+  Ctrl-C cleanup (and the "second run doesn't hit a port-in-use error" guarantee) holds
+  cross-platform, matching the docs' `brew install caddy` macOS instructions. The whole
+  startup sequence (not just the run loop) is now wrapped in the same try/finally, and an
+  explicitly-requested `--apps` service whose repo/`scripts/dev.py` isn't actually checked out
+  now fails fast with a labeled error before any subprocess starts, instead of leaving an
+  already-started Host orphaned after a raw `Popen` traceback.
+
+Manually verified per the acceptance criteria: `uv run python scripts/local_dev.py` starts the
+Host + Caddy cleanly with no other apps checked out; register/login/`/profile`/`/settings` and the
+compiled stylesheet (`/organizeme/static/css/app.css`) all render correctly through
+`http://localhost:10000`; an unmatched path (`/health`) falls through to the Host's own
+`defaultService`-equivalent fallback; a not-yet-onboarded app path (`/dashboard`, since
+`event-creator` isn't in `ports.py` until Slice 4) cleanly 404s instead of misrouting; a missing
+`caddy` binary and a busy port each produce a labeled, actionable error instead of a traceback.
+`organize-me`'s own `event-creator`/`doc-library`/`ha-dashboard` sibling repos exist on this dev
+machine but have no `scripts/dev.py` of their own yet, so the no-`--apps` default correctly
+resolves to a Host-only session, as the WBS anticipated.
+
+One low-severity code-review finding was deferred rather than fixed in this slice: the generated
+Caddyfile is written to a fixed, predictable path in the system temp directory (a minor
+symlink/race concern on a shared machine, not a single-developer one) — tracked as
+[#269](https://github.com/rustycoopes/organize-me/issues/269).
