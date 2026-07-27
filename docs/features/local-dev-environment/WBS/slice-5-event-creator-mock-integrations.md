@@ -60,3 +60,34 @@ implementation when `mock_integrations` is set and the real implementation other
 new `get_pipeline_notifier()` branch needs an equivalent new test following the same shape.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-27, issue event-creator#37, branch `feature/mock-integrations-flag`)
+
+Shipped as described: `Settings.mock_integrations: bool = False`, OR'd alongside `e2e_test_mode`
+at `build_storage_provider()` and `get_gemini_client()` (one-clause additions), and a new branch
+built from scratch in `get_pipeline_notifier()` — under either flag it still returns
+`RealNotificationSender` (preserving per-user email/SMS preference gating and templating) but with
+`FakeEmailSender`/`FakeSmsSender` injected in place of the real Resend/Twilio clients.
+
+One addition beyond the three named call sites: code review surfaced that
+`app/api/v1/import_pending_files.py`'s `get_import_storage()` has its own early
+`e2e_test_mode`-only gate ahead of `build_storage_provider()` (used because the import-pending-files
+endpoint has no ephemeral-storage fallback, unlike manual upload) — `MOCK_INTEGRATIONS` alone
+wouldn't have bypassed the connected-storage requirement there. OR'd the same flag in for
+consistency, with a mirrored test. Also added `MOCK_INTEGRATIONS` to `.env.local.example` for
+discoverability, and reworded the `Settings` docstring's reset-token-endpoint aside (carried over
+from the ADR/organize-me context) to clarify event-creator itself has no such endpoint.
+
+Filed as a follow-up rather than fixed here: `is_storage_connected()`
+(`app/api/v1/storage_config.py`) and `upload_page()`'s `using_ephemeral` check
+(`app/pages/upload.py`) still branch on `e2e_test_mode` only, so the "storage not connected"/
+"using ephemeral storage" UI banners don't reflect `mock_integrations` — cosmetic (no real network
+calls are affected), tracked as
+[event-creator#39](https://github.com/rustycoopes/event-creator/issues/39).
+
+`tests/test_storage_factory.py`, `tests/test_gemini.py`, `tests/test_pipeline_notifications.py`,
+and `tests/test_import_pending_files_api.py` were extended with `mock_integrations`-alone,
+`e2e_test_mode`-alone, both-together, and both-unset cases for every affected factory/provider
+function — `mypy app tests` and the full non-DB-dependent test suite pass locally; DB-backed
+integration tests (including the pre-existing `e2e_test_mode` equivalent) couldn't be exercised in
+this sandbox due to no local network route to the shared Supabase pooler, left to CI.
