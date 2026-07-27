@@ -55,3 +55,28 @@ direct test of `build_ha_transport_factory()` asserting it returns the fake impl
 existing test-suite usages continue to pass, now importing from its new application-code location.
 
 <!-- /to-implementation appends a "## Delivered" section here once this slice ships. -->
+
+## Delivered (2026-07-26, issue rustycoopes/ha-dashboard#19, branch `feature/slice-8-mock-integrations`)
+
+Shipped as planned: `Settings.mock_integrations: bool = False`
+(`app/core/config.py`), a new `build_ha_transport_factory(settings)` seam
+(`app/services/ha_client/factory.py`) wired into `get_ha_client()`, and
+`FakeHATransport` promoted out of `tests/test_ha_client.py` into
+`app/services/ha_client/fake.py`. The promoted fake gained a `DEFAULT_SCRIPT`
+constant (a canned auth + three-command exchange with one pending update, one
+repair issue, one integration error) so it renders real-looking dashboard
+tiles when built with no arguments via the factory, while existing unit tests
+keep passing their own `scripted_recvs` for scenario-specific coverage.
+`tests/test_ha_transport_factory.py` directly tests both branches plus the
+unset-defaults-to-real case, mirroring `event-creator`'s
+`tests/test_storage_factory.py`.
+
+One acceptance criterion — manually confirming the local launcher renders
+mocked dashboard tiles with `MOCK_INTEGRATIONS=true` and no real HA
+reachable — could not be exercised in this environment: the local
+`DATABASE_URL` (Supabase pooler) was unreachable here (`ConnectionRefused`),
+identically on `main` before this change, so it's a pre-existing sandbox
+limitation, not a regression. All DB-independent verification passed: `mypy
+app tests` clean, and every touched/new test green. CI's throwaway-Postgres
+job exercises the full route stack and should be treated as the real gate for
+that criterion.
