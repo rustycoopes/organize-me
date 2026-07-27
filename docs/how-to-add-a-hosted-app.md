@@ -144,6 +144,38 @@ re-running the generator and importing it (`gcloud compute url-maps import
 organizeme{-prod}-url-map --source=<generated.yaml>`) is the only routing step for every
 subsequent nav/prefix change — you never hand-edit LB resources directly.
 
+### Static asset mounting
+
+Your compiled CSS/fonts need to be reachable *through the shared domain*, not just directly
+against your own Cloud Run URL — the Load Balancer only routes what it has a path rule for.
+`organizeme_chrome.static_paths.static_mount_path(service_name)` is the single source of truth for
+where: it returns `/{service_name}/static` for any `service_name`, and both `generate_url_map.py`
+(this section) and the local-dev Caddy generator (see "Local development" below) derive their
+static-asset path rule from the exact same helper, via the shared `infra/path_rules.py` module —
+you never register this path yourself.
+
+Mount your app's `StaticFiles` directory there in `app/main.py`, e.g. `doc-library`'s real code:
+
+```python
+from organizeme_chrome.static_paths import static_mount_path
+
+app.mount(
+    static_mount_path("doc-library"), StaticFiles(directory=BASE_DIR / "static"), name="static"
+)
+```
+
+That's the entire app-side change — `generate_path_rules()` (which both the LB generator and the
+local-dev Caddy generator call) automatically emits a `{static_mount_path(service_name)}/*`
+wildcard rule for every app in the registry, the moment your `AppEntry` exists (step 1); nothing
+extra to add there. A **brand-new** app only needs this one prefixed mount — don't also add a bare
+`/static` mount. (The dual-mount you'll see in `doc-library`/`event-creator`/`ha-dashboard`'s real
+code is a one-release migration shim for apps that had already shipped a bare-only mount before
+this routing existed — see `docs/adr/static-asset-routing-mount-transition.md` — not something a
+new app has any reason to carry.) `chrome_base.html`'s stylesheet link already targets this same
+prefix automatically via `register_chrome(app_service_name=...)` (step 3) — as long as your
+`service_name` matches what you pass there, styling "just works" once the mount and the LB rule
+both exist.
+
 ## 3. The shared-chrome-package dependency
 
 Every hosted app pins `organizeme-chrome` as a direct dependency, published by the Host's own CI
@@ -255,7 +287,68 @@ Unit tests and e2e tests live with the code they exercise, in the app's **own** 
   repo at a fixed ref and runs only the relevant boundary spec(s) against your freshly-deployed
   QA service (see `event-creator`'s `e2e-boundary-qa` CI job).
 
-## 6. Quick-start checklist
+## 6. Local development
+
+A developer can run the Host plus a chosen subset of hosted apps — your app included — as plain
+local processes behind a shared local Caddy proxy, with real login and real cross-app nav, no
+Docker involved. Full workflow docs:
+[`docs/local-development.md`](local-development.md). Onboarding **your** app into this needs, in
+your own repo (nothing in `organize-me`'s `scripts/local_dev.py` or
+`infra/local_dev/generate_caddyfile.py` needs to change — both are already pure functions of the
+whole registry plus the port map below):
+
+- **`scripts/dev.py`**, matching every other hosted app's shape exactly — `uv run uvicorn
+  app.main:app --reload` plus `scripts/build_css.py --watch`, port read from the `PORT`
+  environment variable, no `--no-css-watch` escape hatch. Copy an existing app's
+  `scripts/dev.py` verbatim; it's boilerplate, not app-specific.
+- **`registry_local_dev_bypass: bool = False`** on your `Settings`, read from the
+  `REGISTRY_LOCAL_DEV_BYPASS` environment variable — the local-dev launcher already injects this,
+  plus `REGISTRY_HOST_URL` (pointed at the Host's local port, the same field your registry client
+  already reads to bypass the real Load Balancer in QA/prod), generically for any non-Host app it
+  starts. Nothing to add to the launcher itself. When true, your registry refresh loop's
+  `token_provider` selection should use
+  `organizeme_chrome.registry_client.build_local_dev_token_provider()` instead of the real OIDC
+  one — `doc-library`'s real `app/core/registry.py::_refresh_loop` is the worked example:
+
+  ```python
+  if settings.registry_local_dev_bypass:
+      token_provider = build_local_dev_token_provider()
+  else:
+      token_provider = build_default_token_provider(settings.registry_host_url)
+  ```
+
+  See
+  [`docs/adr/local-dev-environment-registry-sync-auth-bypass.md`](adr/local-dev-environment-registry-sync-auth-bypass.md)
+  for the full design and why the bypass is safe.
+- **If your app depends on a costly/side-effecting third-party integration** (an LLM call, SMS/
+  email, an OAuth-backed storage provider, a WebSocket to an external service, etc.) that already
+  has — or should have — a `Protocol` + real implementation + fake implementation: add
+  `mock_integrations: bool = False` to your `Settings` too, and OR it into your existing (or newly
+  built) real-vs-fake selection point. No shared cross-repo abstraction for this — the convention
+  is documented once, here. `ha-dashboard`'s real `build_ha_transport_factory()` is the worked
+  example for a selection point that didn't exist as a function before:
+
+  ```python
+  def build_ha_transport_factory(settings: Settings) -> HATransportFactory:
+      if settings.mock_integrations:
+          return lambda host: FakeHATransport()
+      return WebSocketsHATransport
+  ```
+
+  Keep this flag independent of any existing `E2E_TEST_MODE`-style flag your app has — OR them
+  together at each selection point, don't merge them into one, so turning on mocks for everyday
+  local dev doesn't also incidentally expose a Playwright-only test endpoint. See
+  [`docs/adr/local-dev-environment-mock-integrations-flag.md`](adr/local-dev-environment-mock-integrations-flag.md).
+  An app with no third-party integration (`doc-library`) needs none of this.
+- **One entry in the Host's `infra/local_dev/ports.py`** (`"<service-name>": <port>`) — a
+  Host-repo PR, the only change needed outside your own repo. This file is deliberately kept
+  separate from the registry entry (step 1): local port numbers have no bearing on real QA/prod
+  routing, so they don't force a package version bump.
+- **A short pointer in your own `README.md`** to `organize-me`'s
+  [`docs/local-development.md`](local-development.md), so a contributor working in your repo alone
+  can discover the shared launcher.
+
+## 7. Quick-start checklist
 
 Distilled from the above — everything you need for a brand-new hosted app from scratch. This is
 the maintained, current version of this checklist; `host-integration-guide.md` keeps its own
@@ -296,4 +389,10 @@ older copy for historical continuity but points here as the canonical one.
 10. No login/session/registration/password code of your own, ever (step 4).
 11. No server-to-server call to the Host at request time, for anything (step 4).
 12. Regenerate and import the LB URL map once your service and registry entry both exist (step 2).
-13. Your own `tests/` and `e2e/` — nothing shared except the boundary spec (step 5).
+13. Mount your static files at `static_mount_path(service_name)` (step 2) — no bare `/static`
+    mount needed for a brand-new app.
+14. Your own `tests/` and `e2e/` — nothing shared except the boundary spec (step 5).
+15. `scripts/dev.py` + `registry_local_dev_bypass` Settings field (+ `mock_integrations` if you
+    have a real third-party integration) + one entry in the Host's `infra/local_dev/ports.py` +
+    a README pointer to `docs/local-development.md` (step 6), so a contributor can run your app
+    locally alongside the Host and the rest of the platform.

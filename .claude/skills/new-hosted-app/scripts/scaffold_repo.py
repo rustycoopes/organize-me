@@ -162,6 +162,17 @@ def scaffold(args: argparse.Namespace) -> Path:
     write_file(dest / "app" / "main.py", render(templates / "app" / "main.py.template", subs), args.dry_run)
     for pkg in ("core", "db", "pages", "api", "api/v1", "models", "schemas"):
         write_file(dest / "app" / pkg / "__init__.py", "", args.dry_run)
+    # Empty until this app adopts the chrome/Tailwind build pipeline (copy an existing hosted
+    # app's scripts/build_css.py) - app/main.py's static_mount_path() mount needs the directory to
+    # exist even before then, so StaticFiles doesn't fail at import time.
+    write_file(dest / "app" / "static" / ".gitkeep", "", args.dry_run)
+
+    write_file(dest / "scripts" / "__init__.py", "", args.dry_run)
+    write_file(
+        dest / "scripts" / "dev.py",
+        (templates / "scripts" / "dev.py").read_text(encoding="utf-8"),
+        args.dry_run,
+    )
     write_file(
         dest / "app" / "core" / "auth.py",
         (templates / "app" / "core" / "auth.py").read_text(encoding="utf-8"),

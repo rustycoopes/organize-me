@@ -17,8 +17,15 @@ in `DATABASE_URL`/`JWT_SECRET` for local development against the QA Supabase dat
 ## Running locally
 
 ```
-uv run uvicorn app.main:app --reload --port 8000
+uv run python scripts/dev.py
 ```
+
+(or `uv run uvicorn app.main:app --reload --port 8000` directly, if you don't need the CSS
+watcher). To run alongside the Host and other hosted apps behind a shared local proxy (real
+registry-synced cross-app nav, one login for all apps, no Docker), use `organize-me`'s launcher
+instead — see its
+["Local development"](https://github.com/{{GITHUB_OWNER}}/organize-me/blob/main/docs/local-development.md)
+doc.
 
 ## Tests
 

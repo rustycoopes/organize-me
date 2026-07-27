@@ -110,7 +110,15 @@ Use the script; don't hand-write these files again.
      (`version_table_schema` — already wired into the generated `migrations/env.py`).
    - Only once the service is deployed and reachable: the Host-repo registry PR
      (`packages/chrome/src/organizeme_chrome/registry.py`) and Load Balancer provisioning
-     (`infra/gcp_lb/provision.sh` + `generate_url_map.py` + `gcloud compute url-maps import`).
+     (`infra/gcp_lb/provision.sh` + `generate_url_map.py` + `gcloud compute url-maps import`) —
+     this automatically also wires up the app's static-asset routing (the generated
+     `app/main.py` already mounts at `static_mount_path(app_slug)`), no separate step needed.
+   - One entry in **this** repo's `infra/local_dev/ports.py` (`"<app-slug>": <port>`) — the only
+     change needed for the new app to work with `organize-me`'s local-dev launcher, since the
+     generated `scripts/dev.py` already matches every other app's shape. See
+     `docs/how-to-add-a-hosted-app.md`'s "Local development" section for the full local-dev
+     checklist (registry-bypass Settings field, optional `mock_integrations`, README pointer —
+     the generated `README.md` already has the pointer).
    If the feature has a WBS (`docs/features/<slug>/WBS/`), these map directly onto its "Repo &
    infra setup" and "SSO-trust tracer bullet" slices — point the user there if it exists rather
    than re-deriving the checklist from scratch.
@@ -123,8 +131,14 @@ Use the script; don't hand-write these files again.
   effect of scaffolding a different repo.
 - No app-specific business logic — the generated `app/pages/`, `app/api/v1/`, `app/models/`,
   `app/schemas/` packages are empty (just `__init__.py`). This skill's job ends at "a working,
-  deployable skeleton with health check, auth, and CI wired up" — the app's actual feature slices
-  (per its own WBS) are `/to-implementation`'s job, run from inside the new repo.
+  deployable skeleton with health check, auth, static-asset mount, local-dev script, and CI wired
+  up" — the app's actual feature slices (per its own WBS) are `/to-implementation`'s job, run from
+  inside the new repo.
+- No chrome/Tailwind build pipeline — `scripts/build_css.py` and the shared-chrome template
+  wiring (`register_chrome()`, `chrome_base.html`) aren't generated; copy an existing hosted app's
+  once this app renders its first real page. `app/main.py`'s static mount and `scripts/dev.py`
+  (which starts the CSS watcher only once `scripts/build_css.py` exists) are both already set up
+  to pick that up with no further changes.
 
 ## Files
 
@@ -136,4 +150,6 @@ Use the script; don't hand-write these files again.
   placeholders). Update these if the platform's own conventions change (e.g. a new required env
   var every hosted app needs) — they were sourced from `event-creator`'s real files, trimmed to
   the generic subset every app needs (no OAuth/Twilio/Gemini-specific scaffolding, since those are
-  `event-creator`-specific, not part of the platform pattern itself).
+  `event-creator`-specific, not part of the platform pattern itself). `scripts/dev.py` is copied
+  verbatim (no placeholders — it's identical across every hosted app, per
+  `docs/adr/local-dev-environment-launcher-orchestration-boundary.md`).

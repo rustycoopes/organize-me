@@ -651,6 +651,102 @@ PRD/TDD/WBS.
     `organizeme-chrome` pin now only needs bumping for changes to the shared *mechanism* itself
     (chrome templates, `jwt_verify`, the registry-client code, theme constants).
 
+## Slice — static-asset-routing (organize-me#251-#263, ha-dashboard#15, doc-library#30, event-creator#34/#35, done)
+
+Tracked in this repo's own
+[`docs/features/static-asset-routing/`](https://github.com/rustycoopes/organize-me/tree/main/docs/features/static-asset-routing)
+PRD/TDD/WBS. Fixes a bug latent since R5: the shared domain's Load Balancer only ever routed a
+hosted app's *pages*, never its own compiled CSS/fonts — those silently fell through to
+`defaultService` (the Host), so every app but the Host was serving the **Host's** static assets
+through the shared domain (confirmed live for `ha-dashboard`, ha-dashboard#15).
+
+- **Infra:** None new — same Cloud Run services and Load Balancer from R5/R6, plus per-app LBs
+  provisioned since (doc-library, ha-dashboard).
+- **Routing:** New `organizeme_chrome.static_paths.static_mount_path(service_name) -> str`
+  (`/{service_name}/static`, Slice 2) is the single source of truth both `generate_url_map.py`
+  and the new local-dev Caddy generator (see the next section) derive their static-asset path rule
+  from — via a shared `infra/path_rules.py` extraction (local-dev-environment Slice 1), so the two
+  generators can never diverge on this logic. `generate_path_rules()` now emits one
+  `{static_mount_path(app)}/*` wildcard-only rule per registered app automatically (Slice 3) — no
+  registry field needed beyond the existing `service_name`. Each already-deployed app's migration
+  (Slices 4-6: doc-library, event-creator, ha-dashboard) added the new prefixed `app.mount()`
+  alongside its pre-existing bare `/static` mount for exactly one release
+  (`docs/adr/static-asset-routing-mount-transition.md`) to cover a stale browser tab open across
+  the deploy; each app's fast-follow bare-mount removal is tracked separately per app, not part of
+  this feature. **A brand-new app never needs the dual mount** — see
+  `how-to-add-a-hosted-app.md`'s "Static asset mounting" section.
+- **Secrets:** None new.
+- **Interface contract:**
+  - A hosted app mounts its `StaticFiles` directory at `static_mount_path(service_name)` in its
+    own `app/main.py` — the LB rule (and, since local-dev-environment, the local Caddy rule) is
+    generated automatically the moment the app's `AppEntry` exists, no separate registration step.
+  - The Host itself needed a second, prefixed mount alongside its existing bare `/static` too
+    (permanently, not a one-release transition) — `chrome_base.html`'s shared stylesheet link has
+    no way to know a given consumer *is* the Host, so it always requests the prefixed path via
+    `CHROME_STATIC_PREFIX` regardless of who's rendering it.
+  - New `infra/gcp_lb/verify_static_routing.py` (Slice 3): given an app, fetches a known static
+    asset via the shared domain and via that app's own direct Cloud Run URL and asserts
+    byte-identical content — the repeatable way to confirm an app's migration actually closed the
+    gap, for both QA and prod (`--direct-url` override supports canary/pre-cutover revisions,
+    organize-me#263).
+  - **Gotcha (caught in review, Slice 3):** on Windows, `gcloud` runs via a `.cmd` wrapper needing
+    `shell=True`, which makes an unvalidated CLI argument a real command-injection vector (not
+    theoretical — demonstrated via `cmd.exe`'s `%VAR%` expansion) — any script shelling out to
+    `gcloud` with a caller-supplied app name must validate it against the same `service_name`
+    pattern `AppEntry` itself enforces first.
+
+## Slice — local-dev-environment (organize-me#264-#274ish, doc-library#32, ha-dashboard#18/#19, mostly done — event-creator#37 open)
+
+Tracked in this repo's own
+[`docs/features/local-dev-environment/`](https://github.com/rustycoopes/organize-me/tree/main/docs/features/local-dev-environment)
+PRD/TDD/WBS. Lets a developer run the Host plus a chosen subset of hosted apps as plain local
+processes behind a shared local Caddy proxy — real login, real cross-app nav, no Docker, no git
+push/CI/QA-deploy cycle just to click through a change.
+
+- **Infra:** None new. No containers anywhere in this design (the reference dev machine has no
+  local Docker — an ARM64 gap). New local-only files: `organize-me/scripts/local_dev.py` (the
+  orchestrator) and every hosted app's own `scripts/dev.py` (uvicorn `--reload` + CSS watcher,
+  port from `PORT`) — the launcher never hardcodes another repo's run command, only discovers its
+  path and invokes its own `scripts/dev.py`
+  (`docs/adr/local-dev-environment-launcher-orchestration-boundary.md`). New
+  `infra/local_dev/ports.py` (a plain `service_name -> port` map, deliberately kept separate from
+  the versioned `AppEntry` — local port numbers don't affect real routing and shouldn't force a
+  package version bump). Caddy (a single static binary, no install-time code) is the local
+  stand-in for the real Load Balancer, bound to `:10000` by default
+  (`docs/adr/local-dev-environment-local-reverse-proxy.md`).
+- **Routing:** `infra/local_dev/generate_caddyfile.py` derives the local proxy's config from the
+  same `infra/path_rules.py` logic the real LB generator uses, plus `ports.py` — a pure function
+  of the *entire* registry, not whichever apps a given session started, so an app you didn't start
+  cleanly 502s through Caddy rather than needing special-casing.
+- **Secrets:** None new for QA/prod. A new Host setting, `registry_local_dev_bypass: bool = False`
+  (organize-me only), lets `GET /internal/app-registry.json` skip its OIDC check for local callers
+  — evaluated only from the Host's own config, never a caller's claim about itself, and guarded by
+  a startup crash if it's ever true while Cloud Run's own `K_SERVICE` is set
+  (`docs/adr/local-dev-environment-registry-sync-auth-bypass.md`). Every consumer gets a matching
+  `registry_local_dev_bypass` setting; `organizeme_chrome.registry_client` gained
+  `build_local_dev_token_provider()` (chrome-v0.19.1+, promoted from a per-app private copy once a
+  second consumer needed it) as the shared mechanism, alongside `build_default_token_provider()`.
+  All of these are set by the launcher as subprocess environment variables — never hand-added to a
+  developer's own `.env.local`.
+- **Interface contract — what a new hosted app needs, in full:** see
+  `how-to-add-a-hosted-app.md`'s "Local development" section (the maintained, current version of
+  this list). In short: your own `scripts/dev.py`, your own `registry_local_dev_bypass` +
+  registry-client wiring, one `ports.py` entry in this repo, and (only if you have a real
+  third-party integration) a `mock_integrations: bool = False` flag OR'd into your existing
+  real-vs-fake selection point(s) — independent of any existing `E2E_TEST_MODE`-style flag, so
+  turning on mocks for everyday local dev never incidentally exposes a test-only endpoint
+  (`docs/adr/local-dev-environment-mock-integrations-flag.md`). `ha-dashboard`'s
+  `build_ha_transport_factory()` and `doc-library`'s `_refresh_loop` bypass wiring are the current
+  real worked examples; `event-creator`'s own `mock_integrations` slice (event-creator#37) is still
+  open as of this writing.
+- **Known gap on ARM64 dev machines:** the copied-in `tailwindcss` binary's `--watch` mode is
+  flaky under Windows-ARM64 emulation (a long-running native process, distinct from the one-shot
+  `pytailwindcss` binary-download gap already tracked) — `scripts/dev.py` currently ties the whole
+  dev server's lifetime to its CSS-watcher subprocess, so a watch-mode crash takes uvicorn down
+  with it. Not yet filed as its own issue; work around it today with a one-shot
+  `uv run python scripts/build_css.py` followed by `uv run uvicorn app.main:app --reload` run
+  directly, skipping `scripts/dev.py`'s watch loop.
+
 ---
 
 ## How to keep this doc current
