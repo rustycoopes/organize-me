@@ -32,14 +32,20 @@ def main() -> None:
         ("uvicorn", subprocess.Popen(uvicorn_cmd, cwd=REPO_ROOT)),
         ("css-watch", subprocess.Popen(css_cmd, cwd=REPO_ROOT)),
     ]
+    reported_exit = {label: False for label, _ in processes}
 
     try:
-        while all(p.poll() is None for _, p in processes):
+        # Only uvicorn exiting should end this script - a css-watch crash (e.g. a broken
+        # tailwindcss install) degrades to no live CSS rebuilds rather than tearing down the
+        # whole dev server out from under it.
+        _, uvicorn_process = processes[0]
+        while uvicorn_process.poll() is None:
+            for label, p in processes:
+                code = p.poll()
+                if code is not None and not reported_exit[label]:
+                    print(f"[{label}] exited with code {code}", file=sys.stderr)
+                    reported_exit[label] = True
             time.sleep(0.5)
-        for label, p in processes:
-            code = p.poll()
-            if code is not None:
-                print(f"[{label}] exited with code {code}", file=sys.stderr)
     except KeyboardInterrupt:
         # Expected way to stop this script; not a failure.
         pass
