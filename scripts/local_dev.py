@@ -23,6 +23,7 @@ import sys
 import tempfile
 import threading
 import time
+import webbrowser
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -303,7 +304,13 @@ def main() -> None:
             print("error: nothing started - see the errors above.", file=sys.stderr)
             sys.exit(1)
 
-        print(f"Local dev running - browse http://localhost:{CADDY_LOCAL_PORT}")
+        caddy_url = f"http://localhost:{CADDY_LOCAL_PORT}"
+        print(f"Local dev running - browse {caddy_url}")
+        # Only the Caddy-fronted origin knows how to route every onboarded app (e.g.
+        # /ha-dashboard) - opening the Host's own bare port here would silently 404 on any
+        # cross-app nav link, which is exactly the confusing failure mode this auto-open avoids.
+        if any(p.label == "caddy" for p in managed):
+            webbrowser.open(caddy_url)
 
         while any(p.process.poll() is None for p in managed):
             for p in managed:

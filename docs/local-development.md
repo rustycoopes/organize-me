@@ -30,7 +30,10 @@ uv run python scripts/local_dev.py
 With no other hosted apps checked out yet, this starts just the Host plus Caddy, bound to
 `http://localhost:10000` (the shared local origin — see
 `infra/local_dev/ports.py`'s `CADDY_LOCAL_PORT`, overridable via a `CADDY_LOCAL_PORT` environment
-variable if something else already owns `:10000`). Log in at
+variable if something else already owns `:10000`). Once Caddy is up, the launcher opens it in
+your default browser automatically — use that origin, not an individual app's own bare port
+(e.g. `:8000`), since only Caddy knows how to route every onboarded app's paths (a bare-port tab
+404s on any cross-app nav link). Log in at
 `http://localhost:10000/login` exactly as you would against `http://localhost:8000` directly —
 the Host's own pages, static assets, and auth cookie all route through the proxy identically.
 
