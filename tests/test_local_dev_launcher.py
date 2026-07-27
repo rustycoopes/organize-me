@@ -40,10 +40,13 @@ def test_hyphenated_service_name_maps_to_underscored_env_var() -> None:
     assert resolved == Path("/tmp/doc-library")
 
 
-def test_host_subprocess_env_only_sets_port() -> None:
+def test_host_subprocess_env_sets_port_and_registry_bypass() -> None:
+    # The Host verifies GET /internal/app-registry.json itself (registry.py's
+    # _verify_registry_read_token reads registry_local_dev_bypass from its own Settings), so the
+    # bypass must be set on the Host's own subprocess env, not just the consumers'.
     env = host_subprocess_env({"organizeme": 8000}, base_env={})
 
-    assert env == {"PORT": "8000"}
+    assert env == {"PORT": "8000", "REGISTRY_LOCAL_DEV_BYPASS": "true"}
 
 
 def test_non_host_subprocess_env_sets_all_three_generic_vars() -> None:

@@ -61,10 +61,15 @@ def resolve_repo_path(service_name: str, env: Mapping[str, str] = os.environ) ->
 def host_subprocess_env(
     ports: dict[str, int], base_env: Mapping[str, str] | None = None
 ) -> dict[str, str]:
-    """The Host only ever needs its own `PORT` - unlike `non_host_subprocess_env` below, it has
-    no registry-bypass vars to inject since it's the registry's own source, not a consumer."""
+    """The Host isn't a registry *consumer* like `non_host_subprocess_env` below, but it is the
+    one that *verifies* `GET /internal/app-registry.json` requests
+    (`app/api/internal/registry.py`'s `_verify_registry_read_token`), and that check reads
+    `registry_local_dev_bypass` from the Host's own `Settings` - so the bypass has to be set here,
+    on the Host's subprocess env, not on the consumers that read the resulting unauthenticated
+    response."""
     env = dict(base_env if base_env is not None else os.environ)
     env["PORT"] = str(ports[HOST_SERVICE_NAME])
+    env["REGISTRY_LOCAL_DEV_BYPASS"] = "true"
     return env
 
 
