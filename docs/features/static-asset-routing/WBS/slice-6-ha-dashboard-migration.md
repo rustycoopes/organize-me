@@ -104,3 +104,12 @@ One suggested improvement from code review filed as a follow-up, not blocking:
 [ha-dashboard#17](https://github.com/rustycoopes/ha-dashboard/issues/17) (the new static-mount HTTP
 tests require a live database via the `client` fixture even though they never touch it — a
 pre-existing repo-wide pattern, not unique to this slice).
+
+### Follow-up delivered (2026-07-27, ha-dashboard#17, branch `fix/static-mount-tests-no-db` in
+`ha-dashboard`)
+
+Added a `no_db_client` fixture to `tests/conftest.py` — a plain `ASGITransport(app=app)` client with
+no `get_db` override and no `db_session` dependency — and switched `test_static_mount.py`'s two
+HTTP-level tests plus `test_health.py`'s test onto it. All four now run without any reachable
+`DATABASE_URL`. `code-review-master` and `code-quality-guardian` both reviewed the change and raised
+no blocking issues.
