@@ -7,6 +7,8 @@
 card with no horizontal scroll, and its filter/sort controls collapse behind a "Filters (N)"
 toggle.
 
+> Published as [`rustycoopes/event-creator#50`](https://github.com/rustycoopes/event-creator/issues/50).
+
 ## What to build
 
 All in `event-creator` — the `.om-stacked-table` pattern and the chrome pin are already in place
@@ -34,9 +36,10 @@ from Slice 1.
 
 ## Blocked by
 
-- **Slice 1** — needs `chrome-v0.20.0`, the `components.css` import, and the `playwright.config`
-  mobile `describe` / `verify_css_build` assertion it introduces. Independent of Slice 1's
-  Dashboard *template* work, but rebases on the shared config/pin changes.
+- [`rustycoopes/event-creator#49`](https://github.com/rustycoopes/event-creator/issues/49)
+  (Slice 1b) — needs the `chrome-v0.20.0` pin bump, the `components.css` import, and the
+  `playwright.config` mobile `describe` / `verify_css_build` assertion it introduces. Independent
+  of Slice 1b's Dashboard *template* work, but rebases on the shared config/pin changes.
 
 ## Acceptance criteria
 

@@ -6,6 +6,13 @@
 **Delivers:** On a phone, the Event Creator Dashboard renders each event as a labelled card with
 no horizontal scroll, and the filter/sort controls collapse behind a "Filters (N)" toggle.
 
+> **Published as two issues** (this slice spans two repos and `/to-implementation` works one
+> repo/branch at a time):
+> - [`rustycoopes/organize-me#276`](https://github.com/rustycoopes/organize-me/issues/276) —
+>   Slice 1a: chrome `.om-stacked-table` pattern + `v0.20.0` release + Host import wiring.
+> - [`rustycoopes/event-creator#49`](https://github.com/rustycoopes/event-creator/issues/49) —
+>   Slice 1b: Event Creator Dashboard adoption + filter disclosure. Blocked by #276.
+
 ## What to build
 
 Spans two repos. The chrome change must be released before Event Creator can adopt it.
