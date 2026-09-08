@@ -17,7 +17,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from organizeme_chrome.paths import chrome_fonts_dir, chrome_templates_dir, chrome_tokens_css_path
+from organizeme_chrome.paths import (
+    chrome_components_css_path,
+    chrome_fonts_dir,
+    chrome_templates_dir,
+    chrome_tokens_css_path,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_TEMPLATES_DIR = REPO_ROOT / "app" / "templates"
@@ -39,6 +44,10 @@ def _write_entry_css() -> None:
             f'@source "{APP_TEMPLATES_DIR.as_posix()}/**/*.html";',
             f'@source "{chrome_templates_dir().as_posix()}/**/*.html";',
             f'@import "{chrome_tokens_css_path().as_posix()}";',
+            # Unlayered, after tokens.css - so .om-stacked-table beats @layer utilities. The Host
+            # has no tables using the pattern; this is wiring only, to keep the chrome consumers
+            # from diverging (docs/adr/mobile-responsive-tables-css-delivery.md).
+            f'@import "{chrome_components_css_path().as_posix()}";',
         ]
     )
     GENERATED_ENTRY.write_text(entry + "\n")
