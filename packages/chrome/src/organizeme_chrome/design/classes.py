@@ -145,6 +145,8 @@ STACKED_TABLE_CLASS = "om-stacked-table"
 Contract:
 - Every `<td>` needs `data-label="<column name>"` - the empty string for checkbox/actions
   columns, which suppresses the injected `::before` label.
+- Row cells must be `<td>`, not `<th scope="row">` - a body-header `<th>` is not matched by the
+  card-mode reset and renders as an orphan table-cell.
 - Keep `<thead>`: it is visually hidden below `lg` but retained for assistive tech, so the real
   th<->td association still reaches screen readers and `data-label` is cosmetic only.
 - Cells inside the table are **not** controllable with Tailwind utilities below `lg` - the

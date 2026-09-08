@@ -12,8 +12,16 @@
 /* .om-stacked-table - dense data table that flips to labelled cards on compact viewports.
    Contract: class on the <table>; every <td> needs data-label="<column>" (empty string for
    checkbox/actions columns); <thead> is kept (visually hidden below the breakpoint) for
-   assistive tech, so data-label is cosmetic only. See organizeme_chrome.design.STACKED_TABLE_CLASS. */
+   assistive tech, so data-label is cosmetic only. Row-header <th scope="row"> is NOT supported -
+   use <td>. See organizeme_chrome.design.STACKED_TABLE_CLASS. */
 @media (max-width: 1023.98px) {           /* == Tailwind lg (64rem); if chrome redefines --breakpoint-lg, match it here */
+  .om-stacked-table,
+  .om-stacked-table tbody,
+  .om-stacked-table tr,
+  .om-stacked-table td {
+    display: block;                        /* table/tbody too, so the <table> fills width without a mandatory w-full */
+  }
+
   .om-stacked-table thead {
     position: absolute;
     width: 1px;
@@ -24,18 +32,19 @@
   }
 
   .om-stacked-table tr {
-    display: block;
     border: 1px solid var(--color-ink-2, #454b56);
+    border-color: color-mix(in srgb, var(--color-ink-2, #454b56) 30%, transparent);
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
     margin-bottom: 0.5rem;
   }
 
   .om-stacked-table td {
-    display: block;
     max-width: none;                       /* defeat max-w-xs / max-w-[...] utilities */
     width: auto;                           /* defeat w-10 / w-1/4 utilities */
-    white-space: normal;                   /* defeat truncate */
+    white-space: normal;                   /* defeat truncate's nowrap */
+    overflow: visible;                     /* defeat truncate's overflow:hidden (would clip, no ellipsis once wrapped) */
+    overflow-wrap: anywhere;               /* wrap long unbreakable values - file paths, emails, IDs */
     padding: 0.25rem 0;
     text-align: left;
   }
@@ -44,5 +53,17 @@
     content: attr(data-label) ": ";
     font-weight: 600;
     color: var(--color-ink-2, #454b56);
+  }
+
+  /* ink-2 is also the dark-mode card surface colour (bipolar token system - see
+     design/classes.py), so the light-mode border/label values above vanish on a dark card.
+     Restate them against paper-2. Dark mode is the `.dark` ancestor class, per tokens.css's
+     `@custom-variant dark`. */
+  .dark .om-stacked-table tr {
+    border-color: color-mix(in srgb, var(--color-paper-2, #f1ede3) 30%, transparent);
+  }
+
+  .dark .om-stacked-table td[data-label]:not([data-label=""])::before {
+    color: var(--color-paper-2, #f1ede3);
   }
 }

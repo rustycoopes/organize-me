@@ -29,13 +29,19 @@ class name is `organizeme_chrome.design.STACKED_TABLE_CLASS`.
   load-bearing for Alpine/`x-data`).
 - Every `<td>` needs `data-label="<column name>"`. Use the **empty string** for checkbox / actions
   columns — an empty `data-label` suppresses the injected `::before` label.
+- Row cells must be `<td>` — a body-header `<th scope="row">` isn't matched by the card-mode
+  reset and renders as an orphan table-cell.
+- The `<table>` doesn't need `w-full` — card mode sets `display: block` on the table and tbody
+  too, so it fills its container.
 - Keep `<thead>`. Below the breakpoint it is visually hidden with an sr-only clip (not
   `display:none`), so the real th↔td association still reaches assistive tech. `data-label` is
   therefore **cosmetic only**.
 - Below the breakpoint, cells are **not** controllable with Tailwind utilities. The rule is
   imported unlayered and wins, and it explicitly resets `display` / `max-width` / `width` /
-  `white-space` so per-cell utilities (`truncate`, `max-w-xs`, `w-10`) don't fight the card
-  layout.
+  `white-space` / `overflow` so per-cell utilities (`truncate`, `max-w-xs`, `w-10`) don't fight
+  the card layout — a `truncate`d cell wraps its full value instead of clipping.
+- Dark mode is handled: the card border and `::before` label restate against `paper-2` under the
+  `.dark` ancestor (the `ink-2` token they use in light mode is also the dark card surface).
 - The consumer's Tailwind entry CSS must `@import` `components.css` (unlayered). A consumer that
   bumps the chrome pin but doesn't add the import gets no change at all.
 

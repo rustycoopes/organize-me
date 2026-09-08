@@ -18,6 +18,9 @@ def test_components_css_ships_the_stacked_table_pattern() -> None:
     assert ".om-stacked-table" in css
     assert "content: attr(data-label)" in css
     assert "1023.98px" in css
+    # ink-2 is also the dark card surface, so the pattern must restate border/label for .dark
+    # (same bug class as design/classes.py's page_header / zebra-stripe comments).
+    assert ".dark .om-stacked-table" in css
 
 
 def test_stacked_table_class_is_importable_and_matches_the_css() -> None:
