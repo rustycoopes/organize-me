@@ -22,5 +22,11 @@ def chrome_tokens_css_path() -> Path:
     return chrome_package_dir() / "static" / "css" / "tokens.css"
 
 
+def chrome_components_css_path() -> Path:
+    """Raw component CSS (`.om-stacked-table` etc.) a consumer `@import`s unlayered into its
+    Tailwind entry CSS - see docs/adr/mobile-responsive-tables-css-delivery.md."""
+    return chrome_package_dir() / "static" / "css" / "components.css"
+
+
 def chrome_fonts_dir() -> Path:
     return chrome_package_dir() / "static" / "fonts"

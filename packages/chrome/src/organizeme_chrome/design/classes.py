@@ -135,6 +135,27 @@ TABLE_BODY_ROW_ZEBRA_CLASSES = (
 )
 TABLE_BODY_CELL_CLASSES = "px-3 py-2 align-middle"
 
+# Responsive stacked-card table (mobile-responsive-tables slice 1). Unlike the TABLE_* strings
+# above, this is NOT a Tailwind utility bundle - it names a raw CSS rule shipped in
+# static/css/components.css that flips a dense table to labelled cards below lg. See
+# docs/adr/mobile-responsive-tables-css-delivery.md.
+STACKED_TABLE_CLASS = "om-stacked-table"
+"""Responsive stacked-card table. Put this class on the `<table>` element (not a wrapper).
+
+Contract:
+- Every `<td>` needs `data-label="<column name>"` - the empty string for checkbox/actions
+  columns, which suppresses the injected `::before` label.
+- Keep `<thead>`: it is visually hidden below `lg` but retained for assistive tech, so the real
+  th<->td association still reaches screen readers and `data-label` is cosmetic only.
+- Cells inside the table are **not** controllable with Tailwind utilities below `lg` - the
+  shipped rule is imported unlayered and beats `@layer utilities` (`truncate`, `max-w-xs`,
+  `w-10` are all reset in card mode).
+- Requires the consumer's Tailwind entry CSS to `@import
+  organizeme_chrome/static/css/components.css` (resolve it via
+  `organizeme_chrome.paths.chrome_components_css_path()`). A consumer that does not add the
+  import gets no change.
+"""
+
 # Inline text-link treatment (event-creator#29) - the one color decision in event-creator's
 # events_panel.html that wasn't already pulled from a named constant here, duplicated verbatim at
 # two call sites. Carries FOCUS_RING/rounded-sm, matching organize-me's own text-cobalt link
