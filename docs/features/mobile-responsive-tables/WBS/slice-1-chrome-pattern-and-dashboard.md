@@ -166,3 +166,71 @@ release changes no rendered output on its own.
 
 **Follow-up filed:** none — the one deferred code-review finding (`<th scope="row">` row headers)
 is documented as unsupported in the contract; no consumer uses it.
+
+## Delivered — Slice 1b (2026-09-08, issue event-creator#49, branch `feature/mobile-responsive-tables-dashboard`)
+
+The Event Creator half — Dashboard adoption of the `.om-stacked-table` pattern + the mobile
+filter disclosure. All in the `event-creator` repo.
+
+**Shipped:**
+
+- `pyproject.toml` / `uv.lock` — `organizeme-chrome` pin `chrome-v0.19.0` → `chrome-v0.20.1`
+  (the version Slice 1a actually released; the issue said `0.20.0`).
+- `scripts/build_css.py` — the generated Tailwind entry CSS now `@import`s
+  `chrome_components_css_path()` unlayered, right after `tokens.css`.
+- `scripts/verify_css_build.py` — new dedicated assertion: the compiled `app.css` must contain
+  `.om-stacked-table`, with a message pointing at the `build_css.py` `@import` (kept separate
+  from the Tailwind-scanning `CANARY_CLASSES` tuple — different failure mode).
+- `app/templates/partials/events_panel.html` — `om-stacked-table` on `<table id="events-table">`;
+  `data-label` on all 10 `<td>`s (`""`, `Type`, `Description`, `Resolved date`, `Raw date text`,
+  `Agreed by`, `Calendar`, `Tasks`, `Reviewed`, `""`); `max-w-[calc(100vw-2rem)]` on both
+  `<dialog>` confirm modals.
+- `app/templates/partials/dashboard_body.html` — filter `<form>` wrapped in a checkbox-`peer`
+  disclosure (`Filters ({{ active_filter_count }})` label shown only below `lg`, form
+  `hidden peer-checked:flex lg:flex`; checkbox `sr-only lg:hidden` so it stays keyboard-operable
+  on mobile). Search input switched to `type="search"`; form `hx-trigger` now
+  `change, search from:#filter-search, keyup[matchMedia('(min-width:1024px)').matches] changed delay:500ms from:#filter-search`
+  — debounced live search on desktop, blur/clear-only below `lg`.
+- `app/pages/dashboard.py` — `active_filter_count = sum(1 for f in (type, parsed_date_from,
+  parsed_date_to, q, show_reviewed) if f)` added to the template context (not `has_active_filters`).
+- Tests: `tests/test_dashboard_page.py` — 3 new string-contains tests (`om-stacked-table` +
+  `data-label`s present; `Filters (0)` vs `Filters (2)`; both dialogs carry the width cap).
+  `e2e/tests/dashboard.spec.ts` — a `test.describe` with `test.use({ viewport: { width: 375,
+  height: 812 } })`: card layout active, `data-label` `::before` visible, no horizontal document
+  scroll, filter form collapsed until "Filters" is tapped (and until Space is pressed on the
+  focused toggle), `Filters (N)` count re-renders on swap.
+
+**Diverged from the plan:**
+
+- **Pinned `chrome-v0.20.1`, not `0.20.0`** (user-confirmed) — `0.20.1` is Slice 1a's own
+  code-review hardening of the same pattern, and is what `organize-me` `main` ships.
+- **Search input changed to `type="search"`** (the issue listed only the `hx-trigger` change) —
+  the ADR's "fires on … native clear" and the `search` event both require it; `search` is bound
+  via `from:#filter-search` because it doesn't bubble to the form.
+- **`hx-trigger` keeps a desktop-only debounced `keyup`** (gated with a `matchMedia` filter
+  expression) rather than a flat `search, change` — the ADR explicitly wants desktop to retain
+  live-as-you-type. `search` is bound with `from:#filter-search` (it doesn't bubble to the form);
+  `change` stays at form level (it already was). See the code-review note below.
+- **Disclosure checkbox is `sr-only lg:hidden`, not `hidden`** — see the code-review note below.
+- **Screenshot audit:** the local dev stack runs (uvicorn + Supabase QA DB + a hand-minted JWT),
+  but the MCP-driven Chrome window would not resize below the desktop viewport, so a true
+  375px-viewport capture wasn't possible on this machine. Card layout + disclosure mechanics
+  were verified locally by forcing the `@media` block on and by `getComputedStyle` checks; the
+  375px behaviour is covered by the new Playwright `describe` (runs against deployed QA in CI).
+  Before/after screenshots to be attached here by hand.
+
+**Code review** (`/code-review`, high) — two findings fixed in this branch:
+
+- Desktop live-as-you-type search was lost (the wholesale `keyup` → `change` swap also dropped
+  it above `lg`, so a typed-but-uncommitted `q` vanished when clicking Sort / pagination). The
+  ADR always wanted desktop to keep debounced keyup — restored via a `matchMedia('(min-width:
+  1024px)')` htmx trigger filter, so below `lg` it's still blur/`search`-only.
+- The disclosure toggle was `hidden` (pointer-only — a keyboard/SR user on mobile couldn't open
+  the filter form at all, a WCAG 2.1.1 regression). Changed to `sr-only lg:hidden` (focusable,
+  Space-operable below `lg`; out of the tab order at `lg`+) with a `peer-focus-visible:` outline
+  on the label. New e2e assertion covers keyboard operation.
+
+**Follow-up filed:** [`event-creator#53`](https://github.com/rustycoopes/event-creator/issues/53)
+(`modelsuggested`) — the mobile filter panel collapses between every field, so a date range (two
+fields) needs re-opening "Filters" each time. Deliberate per the ADR for single-tap filters;
+tracked for a future slice.
